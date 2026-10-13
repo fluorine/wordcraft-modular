@@ -8,3 +8,6 @@ plan/
 /.claude/
 /target-*/
 /craft-fonts/
+
+# graphify knowledge graph (local; rebuild with /graphify)
+graphify-out/
