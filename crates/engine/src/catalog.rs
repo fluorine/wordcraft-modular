@@ -547,6 +547,14 @@ pub fn parity(reg: &Registry) -> Value {
             t.3.push(format!("{group} › {label} (`{id}`)"));
         }
     }
+    let mut exts: Vec<(&str, usize)> = Vec::new();
+    for (_, _, _, id) in &e {
+        let Some(spec) = reg.get(id) else { continue };
+        match exts.iter_mut().find(|x| x.0 == spec.ext) {
+            Some(x) => x.1 += 1,
+            None => exts.push((spec.ext, 1)),
+        }
+    }
     let live = tabs.iter().map(|t| t.1).sum::<usize>();
     let total = e.len();
     json!({
@@ -554,6 +562,7 @@ pub fn parity(reg: &Registry) -> Value {
         "total": total,
         "percent": if total == 0 { 0.0 } else { (live as f64 * 1000.0 / total as f64).round() / 10.0 },
         "tabs": tabs.iter().map(|t| json!({"tab": t.0, "live": t.1, "total": t.2, "missing": t.3})).collect::<Vec<_>>(),
+        "extensions": exts.iter().map(|x| json!({"extension": x.0, "live": x.1})).collect::<Vec<_>>(),
     })
 }
 
@@ -575,5 +584,13 @@ mod tests {
         let pct = p["percent"].as_f64().unwrap();
         // The floor only ever rises.
         assert!(pct >= 90.4, "parity {pct}%");
+    }
+
+    #[test]
+    fn parity_counts_live_features_per_extension() {
+        let p = parity(&crate::cmd::registry());
+        let per: u64 = p["extensions"].as_array().unwrap().iter().map(|x| x["live"].as_u64().unwrap()).sum();
+        assert_eq!(per, p["live"].as_u64().unwrap());
+        assert!(p["extensions"].as_array().unwrap().iter().any(|x| x["extension"] == "references"));
     }
 }

@@ -80,6 +80,7 @@ const OVERRIDES: &[(&str, &[&str])] = &[
     ("compare", &["review.compare", "review.combine", "file.versions"]),
     ("accessibility", &["file.accessibility"]),
     ("templates", &["file.newFromTemplate", "file.saveTemplate"]),
+    ("restrict-editing", &["file.protect"]),
 ];
 
 fn owner_override(id: &str) -> Option<&'static str> {
@@ -110,6 +111,12 @@ pub fn dependents(id: &str) -> Vec<&'static str> {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+
+    /// Known calls by id from a module to an extension it does not depend on.
+    const ALLOWED_CALLS: &[(&str, &str)] = &[
+        // Comments-only protection lets replies through; a name check, not a call.
+        ("protect", "review.reply"),
+    ];
 
     #[test]
     fn every_command_has_a_known_owner() {
@@ -152,6 +159,60 @@ mod tests {
         for e in EXTENSIONS {
             assert!(!dependents(e.id).contains(&e.id), "dependency cycle through {}", e.id);
         }
+    }
+
+    /// Each module's default owner, read from the `tag(..)` calls in `cmd/mod.rs`.
+    fn module_owners(src: &str) -> Vec<(String, String)> {
+        src.lines()
+            .filter_map(|l| {
+                let rest = l.split("extensions::tag(").nth(1)?;
+                let module = rest.split("::specs()").next()?.trim().to_string();
+                let ext = rest.split('"').nth(1)?.to_string();
+                Some((module, ext))
+            })
+            .collect()
+    }
+
+    /// Command-id literals in a module's non-test code must name a command of the
+    /// module's own extension, of core, or of a declared dependency.
+    #[test]
+    fn id_calls_respect_dependencies() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/cmd");
+        let mod_src = std::fs::read_to_string(dir.join("mod.rs")).unwrap();
+        let reg = crate::cmd::registry();
+        let mut bad = Vec::new();
+        for (module, ext) in module_owners(&mod_src) {
+            let src = std::fs::read_to_string(dir.join(format!("{module}.rs"))).unwrap();
+            let code = src.split("#[cfg(test)]").next().unwrap_or("");
+            let lits: Vec<&str> = code.split('"').skip(1).step_by(2).collect();
+            let defined = |id: &str| code.contains(&format!("CommandSpec::new(\"{id}\""));
+            // A module may refer to every extension it hosts commands for.
+            let mut hosted: Vec<&str> = vec![ext.as_str()];
+            for id in lits.iter().filter(|id| defined(id)) {
+                if let Some(s) = reg.get(id) {
+                    hosted.push(s.ext);
+                    hosted.extend(get(s.ext).map(|e| e.depends_on).unwrap_or(&[]));
+                }
+            }
+            hosted.extend(get(&ext).map(|e| e.depends_on).unwrap_or(&[]));
+            for lit in lits {
+                let Some(spec) = reg.get(lit) else { continue };
+                let callee = spec.ext;
+                let own = callee == CORE || hosted.contains(&callee);
+                if !own && !ALLOWED_CALLS.contains(&(module.as_str(), lit)) {
+                    bad.push(format!("{module} ({ext}) -> {lit} ({callee})"));
+                }
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "undeclared cross-extension id calls:
+{}",
+            bad.join(
+                "
+"
+            )
+        );
     }
 
     #[test]
