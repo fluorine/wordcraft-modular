@@ -8,6 +8,7 @@
 
 pub mod catalog;
 pub mod cmd;
+pub mod extensions;
 pub mod file_access;
 pub mod io;
 mod io_ext;
@@ -70,6 +71,8 @@ pub struct CommandSpec {
     /// `None` = enabled; `Some(reason)` = disabled.
     pub enabled: fn(&Session) -> Option<&'static str>,
     pub run: fn(&mut Session, &Value) -> CmdResult,
+    /// Owning extension id; must be in [`extensions::EXTENSIONS`].
+    pub ext: &'static str,
 }
 
 fn always(_: &Session) -> Option<&'static str> {
@@ -78,7 +81,7 @@ fn always(_: &Session) -> Option<&'static str> {
 
 impl CommandSpec {
     pub const fn new(id: &'static str, label: &'static str, location: &'static str, run: fn(&mut Session, &Value) -> CmdResult) -> Self {
-        CommandSpec { id, label, location, shortcut: "", params: "{}", mutates: true, enabled: always, run }
+        CommandSpec { id, label, location, shortcut: "", params: "{}", mutates: true, enabled: always, run, ext: extensions::CORE }
     }
     pub const fn key(mut self, s: &'static str) -> Self {
         self.shortcut = s;
@@ -124,7 +127,7 @@ impl Registry {
         Value::Array(
             self.specs
                 .iter()
-                .map(|s| serde_json::json!({"id": s.id, "label": s.label, "location": s.location, "shortcut": s.shortcut, "params": s.params, "mutates": s.mutates}))
+                .map(|s| serde_json::json!({"id": s.id, "label": s.label, "location": s.location, "shortcut": s.shortcut, "params": s.params, "mutates": s.mutates, "extension": s.ext}))
                 .collect(),
         )
     }

@@ -1,6 +1,6 @@
 # WordCraft modularity: core and extensions
 
-> **Last reviewed:** 2026-10-13 · **Last updated:** 2026-10-13 · **Change:** major (first version: assessment of the current structure, the extension architecture and the phased plan) · **Status:** Phase 0 (plan). No phase is implemented yet.
+> **Last reviewed:** 2026-10-13 · **Last updated:** 2026-10-13 · **Change:** minor (Phase 1 in progress: every command has an owner extension; previously major: first version) · **Status:** Phase 1 in progress.
 
 This document is the plan for the modular edition of WordCraft. WordCraft becomes a small core plus
 **extensions**. Each user selects the extensions they use. The default build contains every current
@@ -208,4 +208,5 @@ Each phase builds, passes `cargo xtask ci`, and lands as its own commits. Each p
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-13 | minor | Phase 1, first step: `CommandSpec.ext`, `crates/engine/src/extensions.rs` (manifests, overrides, `dependents`), the owner shows in `list_commands`; tests check owners, dependencies and cycles. Module splits, the cross-extension id-call scan and per-extension parity remain |
 | 2026-10-13 | major | First version: verdict, blockers, principles, extension cut, Options › Extensions pane, phased plan |
