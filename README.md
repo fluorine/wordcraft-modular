@@ -21,6 +21,12 @@
 </p>
 
 <p align="center">
+  <b>This is the modular edition.</b> WordCraft is being rebuilt as a small core plus extensions:
+  keep only the features you use, switch the others off, or build a lightweight binary without
+  them. <a href="#modular-by-design">Modular by design</a> explains the plan and its status.
+</p>
+
+<p align="center">
   <img alt="Written in Rust" src="https://img.shields.io/badge/written%20in-Rust-2b47b5?style=flat-square&logo=rust&logoColor=white">
   <img alt="Runs on macOS, Windows, Linux, BSD and the web" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20BSD%20%C2%B7%20Web-3b5bdb?style=flat-square">
   <img alt="License: MIT OR Apache-2.0" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-2b47b5?style=flat-square">
@@ -52,6 +58,7 @@
 <p align="center">
   <a href="#a-tour">A tour</a> ·
   <a href="#why-wordcraft">Why WordCraft</a> ·
+  <a href="#modular-by-design">Modular by design</a> ·
   <a href="#what-works-today">What works today</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#for-agents-cli-and-mcp">For agents</a> ·
@@ -86,6 +93,9 @@ Every screenshot below is WordCraft itself, rendered offscreen by its own UI tes
 
 ## Why WordCraft
 
+- **Modular.** A small core plus extensions you turn on or off. A minimal build carries only the
+  features you need, and the full build keeps them all. Planned; see
+  [Modular by design](#modular-by-design).
 - **Familiar.** Word's ribbon tabs, groups, shortcuts and behaviour: Enter continues a list,
   Tab demotes it, Ctrl/⌘+B bolds the word under the caret, the Styles gallery previews styles live,
   F4 repeats, F7 checks spelling, F8 extends the selection.
@@ -101,6 +111,49 @@ Every screenshot below is WordCraft itself, rendered offscreen by its own UI tes
 - **Private.** Spelling, grammar and everything else work offline.
 - **Open.** MIT OR Apache-2.0. Clean-room: built from public specifications and observation, with
   every asset original or openly licensed.
+
+## Modular by design
+
+> [!IMPORTANT]
+> **Status: planning (Phase 0).** The design and the phased plan are in
+> [docs/modularity.md](docs/modularity.md). Today every feature still compiles into every build.
+> This section describes the target, not what the current build does.
+
+WordCraft is moving to a **core plus extensions** design:
+
+- **The core** is the editor every user needs: typing, formatting, styles, lists, tables, page
+  setup, views, track changes, fields and .docx. It always opens, shows and saves every document
+  with no data loss, also content that belongs to an extension that is switched off.
+- **Extensions** add the rest. The default build includes all of them, so nothing is lost by
+  default.
+
+| Extension group | Examples |
+|---|---|
+| Writing aids | comments, spelling and grammar, read aloud, accessibility checker |
+| References | table of contents, citations and bibliography, index, captions, Zotero |
+| Objects | shapes, charts, SmartArt, WordArt, ink and drawing, equations |
+| Workflows | mail merge, compare and versions, macros, restrict editing, content controls, templates, design themes |
+| File formats | PDF export and import, Word 97-2003 .doc, .odt, .rtf, .html, .md, .tex |
+| Automation | MCP server and the JSON control channel |
+
+What it gives you, when the plan lands:
+
+- **Turn extensions on or off** in **File › Options › Extensions**. The same actions are commands
+  (`extensions.list`, `extensions.set`), so the CLI, MCP and agents can manage them too.
+- **Dependencies are handled for you.** Charts need shapes, and Zotero needs references:
+  WordCraft offers to enable what an extension needs, and warns before you disable something
+  another extension uses.
+- **Missing features are suggested, not lost.** If a document contains, for example, an
+  equation and the equation editor is off, the equation still shows and saves, and an info bar
+  offers the extension.
+- **Smaller builds.** `wordcraft` contains every extension. `wordcraft-minimal` contains the core
+  only. Custom builds pick extensions with cargo features:
+  `cargo build -p wordcraft --no-default-features --features "references,pdf-export"`.
+- **Extensions by others** connect out of process, over MCP or the control channel, by command
+  id. There is no native plugin code inside the app, so the app keeps its never-crash and no-unsafe
+  rules, and the web build keeps working.
+
+Extensions are global for now. A per-project scope comes later.
 
 ## What works today
 
@@ -194,6 +247,11 @@ covers every target starting with it (`wordcraft*=debug`). The logger is
 | L6 | `wordcraft-ui-egui` | the Word-style front end (swappable) |
 | apps | `wordcraft`, `wordcraft-cli`, `wordcraft-web` | desktop, command line, browser |
 
+**Planned for the modular edition** ([docs/modularity.md](docs/modularity.md)): an extension
+layer between `wordcraft-engine` and the front end. Each extension is a cargo feature (and later
+a `crates/ext-*` crate) that adds commands, ribbon groups, panes and state to the core. The
+document model and the .docx round trip stay complete in the core.
+
 `cargo xtask ci` runs formatting, clippy, ~800 tests, the asset-attribution check, the layering
 check and the wasm build. Contributor and agent instructions: [AGENTS.md](AGENTS.md).
 
@@ -205,6 +263,10 @@ all of Word for real work, about 55% for a typical professional's weekly work an
 everyday essentials. Beta needs testing against real-world .docx files, keeping charts and SmartArt
 through a round trip, pagination closer to Word's, a stability sweep and native printing. Details
 and estimates: [ROADMAP.md](ROADMAP.md) and [where we fall short](docs/gaps.md).
+
+The modular edition adds a second track: split the features into extensions in ten phases,
+starting with an owner for every command and ending with `wordcraft-minimal` builds. See
+[docs/modularity.md](docs/modularity.md).
 
 ## Downloads
 
