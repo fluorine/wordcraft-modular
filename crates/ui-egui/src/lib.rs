@@ -1223,8 +1223,8 @@ impl WordApp {
 
     /// Commands that live in the UI layer.
     fn ui_command(&mut self, id: &str, p: &Value) -> Option<Result<Value, String>> {
-        if crate::ui_commands::left_out(id) {
-            return Some(Err(format!("{id}: this build has no `{}` extension", crate::ui_commands::get(id).map_or("", |c| c.ext))));
+        if crate::ui_commands::hidden(&self.session, id) {
+            return Some(Err(format!("{id}: {}", wordcraft_engine::extensions::off_reason(crate::ui_commands::get(id).map_or("", |c| c.ext)))));
         }
         let s = |k: &str| p.get(k).and_then(Value::as_str);
         Some(Ok(match id {

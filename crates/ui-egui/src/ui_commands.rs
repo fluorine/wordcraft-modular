@@ -59,6 +59,11 @@ pub fn left_out(id: &str) -> bool {
     get(id).is_some_and(|c| !wordcraft_engine::extensions::compiled(c.ext))
 }
 
+/// `id` is a front-end command whose extension is off in this session.
+pub fn hidden(s: &wordcraft_engine::Session, id: &str) -> bool {
+    get(id).is_some_and(|c| !wordcraft_engine::extensions::enabled(s, c.ext))
+}
+
 /// The commands this build has, for command lists.
 pub fn describe() -> Vec<Value> {
     UI_COMMANDS

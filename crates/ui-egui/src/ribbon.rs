@@ -174,9 +174,12 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     let user_tabs = app.session.ribbon.tabs().into_owned();
     let mut tabs: Vec<(String, bool)> = vec![("File".to_string(), false)];
     tabs.extend(
-        user_tabs.iter().filter(|e| !e.hidden && (e.custom || wordcraft_engine::ribbon::tab_available(&e.name))).map(|e| (e.name.clone(), e.custom)),
+        user_tabs
+            .iter()
+            .filter(|e| !e.hidden && (e.custom || wordcraft_engine::ribbon::tab_enabled(&app.session, &e.name)))
+            .map(|e| (e.name.clone(), e.custom)),
     );
-    for ct in contextual_tabs(&app.session).into_iter().filter(|t| wordcraft_engine::ribbon::tab_available(t)) {
+    for ct in contextual_tabs(&app.session).into_iter().filter(|t| wordcraft_engine::ribbon::tab_enabled(&app.session, t)) {
         if ct == "Outlining" {
             tabs.insert(1.min(tabs.len()), (ct.to_string(), false));
         } else if !tabs.iter().any(|(n, _)| n == ct) {

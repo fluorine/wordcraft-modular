@@ -159,7 +159,7 @@ pub fn label_line(ui: &Ui, cx: f32, y: f32, text: &str, font: egui::FontId, colo
 
 #[allow(clippy::too_many_arguments)]
 fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str, params: Value, menu: bool, checked: bool) -> Response {
-    if wordcraft_engine::extensions::left_out(id) || crate::ui_commands::left_out(id) {
+    if wordcraft_engine::extensions::hidden(&app.session, id) || crate::ui_commands::hidden(&app.session, id) {
         return ui.allocate_response(vec2(0.0, 0.0), Sense::hover());
     }
     let label = tl!(label);
@@ -190,7 +190,7 @@ fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str,
 
 /// A small button: 16 px icon with an optional label; `checked` draws the toggled state.
 pub fn small(ui: &mut Ui, app: &mut WordApp, icon: &str, label: Option<&str>, tip: &str, id: &str, params: Value, checked: bool) -> Response {
-    if wordcraft_engine::extensions::left_out(id) || crate::ui_commands::left_out(id) {
+    if wordcraft_engine::extensions::hidden(&app.session, id) || crate::ui_commands::hidden(&app.session, id) {
         return ui.allocate_response(vec2(0.0, 0.0), Sense::hover());
     }
     let (label, tip) = (label.map(|l| tl!(l)), tl!(tip));

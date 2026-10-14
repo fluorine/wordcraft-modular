@@ -37,6 +37,11 @@ pub fn tab_available(name: &str) -> bool {
     TAB_OWNERS.iter().find(|(t, _)| *t == name).is_none_or(|(_, e)| crate::extensions::compiled(e))
 }
 
+/// A built-in tab this session shows: core, or its extension is on.
+pub fn tab_enabled(s: &crate::Session, name: &str) -> bool {
+    TAB_OWNERS.iter().find(|(t, _)| *t == name).is_none_or(|(_, e)| crate::extensions::enabled(s, e))
+}
+
 /// The Quick Access Toolbar's commands until the user changes them.
 pub const DEFAULT_QAT: [&str; 3] = ["file.save", "edit.undo", "edit.redo"];
 
@@ -459,6 +464,14 @@ mod tests {
             assert_eq!(super::tab_available(tab), crate::extensions::compiled(ext), "{tab}");
         }
         assert!(super::tab_available("Home"), "core tabs always show");
+    }
+
+    #[test]
+    fn a_turned_off_extension_hides_its_tab() {
+        let mut s = crate::Session::new(wordcraft_doc::Document::new());
+        assert!(super::tab_enabled(&s, "Mailings"));
+        s.run("extensions.set", &serde_json::json!({"id": "mailings", "enabled": false})).unwrap();
+        assert!(!super::tab_enabled(&s, "Mailings") && super::tab_enabled(&s, "Home"));
     }
 
     use serde_json::json;
