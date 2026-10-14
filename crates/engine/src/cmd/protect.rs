@@ -329,6 +329,32 @@ pub fn next_region(s: &Session, from: &Pos) -> Option<(Pos, Pos)> {
     Some((next.start.clone(), next.end.clone()))
 }
 
+/// Restrict Editing around every command: refuse, force tracking, then check the result.
+pub fn hooks() -> crate::extensions::Hooks {
+    crate::extensions::Hooks { before: Some(hook_before), verify: Some(hook_verify), ..crate::extensions::Hooks::new("restrict-editing") }
+}
+
+fn hook_before(s: &mut Session, c: &crate::extensions::RunCtx) -> Result<bool, CmdError> {
+    if !c.mutates {
+        return Ok(false);
+    }
+    let guard = check_before(s, c.id, c.params)?;
+    if s.doc.settings.protection.as_deref() == Some("trackedChanges") {
+        s.doc.settings.track_changes = true;
+    }
+    Ok(guard)
+}
+
+/// Outside the exceptions nothing may change.
+fn hook_verify(s: &Session, c: &crate::extensions::RunCtx) -> Result<(), CmdError> {
+    match c.before {
+        Some(before) if !outside_unchanged(before, &s.doc, &s.author) => {
+            Err(CmdError::Disabled(format!("{}: only the editable regions of this protected document can change", c.id)))
+        }
+        _ => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

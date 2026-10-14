@@ -1523,6 +1523,20 @@ fn customize_ribbon(s: &mut Session, v: &Value) -> CmdResult {
     Ok(Value::Object(out))
 }
 
+/// Macro recording: every edit, caret move and selection while a macro records.
+pub fn macro_hooks() -> crate::extensions::Hooks {
+    crate::extensions::Hooks { before: Some(record_step), ..crate::extensions::Hooks::new("macros") }
+}
+
+fn record_step(s: &mut Session, c: &crate::extensions::RunCtx) -> Result<bool, CmdError> {
+    let record = !matches!(c.id, "tools.recordMacro" | "tools.macros" | "edit.undo" | "edit.redo" | "edit.repeat")
+        && (c.mutates || c.id.starts_with("caret.") || c.id.starts_with("select."));
+    if record && let Some((_, steps)) = s.recording.as_mut() {
+        steps.push((c.id.to_string(), crate::session::replay_params(c.params)));
+    }
+    Ok(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

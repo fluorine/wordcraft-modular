@@ -106,6 +106,7 @@ impl CommandSpec {
 pub struct Registry {
     specs: Vec<CommandSpec>,
     by_id: HashMap<&'static str, usize>,
+    hooks: Vec<extensions::Hooks>,
 }
 
 impl Registry {
@@ -114,7 +115,15 @@ impl Registry {
         for (i, s) in specs.iter().enumerate() {
             by_id.insert(s.id, i);
         }
-        Registry { specs, by_id }
+        Registry { specs, by_id, hooks: Vec::new() }
+    }
+    /// The extension hooks `Session::run` calls around each command, in order.
+    pub fn with_hooks(mut self, hooks: Vec<extensions::Hooks>) -> Self {
+        self.hooks = hooks;
+        self
+    }
+    pub fn hooks(&self) -> &[extensions::Hooks] {
+        &self.hooks
     }
     pub fn get(&self, id: &str) -> Option<&CommandSpec> {
         self.by_id.get(id).and_then(|i| self.specs.get(*i))

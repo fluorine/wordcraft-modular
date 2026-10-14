@@ -641,6 +641,23 @@ fn gallery(_: &mut Session, _: &Value) -> CmdResult {
     Ok(json!({"structures": structures, "symbols": symbols, "builtins": builtins}))
 }
 
+/// Typing, caret movement and selection outside the equation commands leave the equation.
+pub fn hooks() -> crate::extensions::Hooks {
+    crate::extensions::Hooks { before: Some(leave_equation), ..crate::extensions::Hooks::new("equation-editor") }
+}
+
+fn leave_equation(s: &mut Session, c: &crate::extensions::RunCtx) -> Result<bool, CmdError> {
+    let id = c.id;
+    if s.math.is_some()
+        && (id.starts_with("text.") || id.starts_with("caret.") || id.starts_with("select.") || id.starts_with("edit.paste"))
+        && let Some(m) = s.math.take()
+    {
+        let off = m.at.off + OBJ.len_utf8();
+        s.sel = Selection::caret(Pos { off, ..m.at });
+    }
+    Ok(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

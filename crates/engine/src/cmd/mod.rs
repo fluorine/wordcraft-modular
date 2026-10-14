@@ -99,7 +99,12 @@ pub fn registry() -> Registry {
     v.extend(crate::extensions::tag(protect::specs(), "restrict-editing"));
     v.extend(crate::extensions::tag(speech::specs(), "read-aloud"));
     v.extend(crate::extensions::tag(controls::specs(), "developer"));
-    Registry::new(v)
+    Registry::new(v).with_hooks(hooks())
+}
+
+/// The extension hooks around every command, in call order.
+pub fn hooks() -> Vec<crate::extensions::Hooks> {
+    vec![protect::hooks(), tools::macro_hooks(), equation::hooks(), connectors::hooks()]
 }
 
 /// A shortcut that differs on macOS, where Word for Mac moves it (⌘Q quits, ⌘Space is

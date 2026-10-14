@@ -290,3 +290,8 @@ fn connect(s: &mut Session, v: &Value) -> CmdResult {
     let o = s.doc.para_at(&pos).and_then(|p| p.object_at(pos.off)).cloned();
     Ok(json!({"object": serde_json::to_value(o).unwrap_or(Value::Null)}))
 }
+
+/// Glued connectors follow the shapes they join.
+pub fn hooks() -> crate::extensions::Hooks {
+    crate::extensions::Hooks { after_edit: Some(|s, c| reroutes_after(c.id) && reroute(s)), ..crate::extensions::Hooks::new("shapes") }
+}

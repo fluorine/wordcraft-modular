@@ -1128,35 +1128,19 @@ impl Session {
         if let Some(why) = (spec.enabled)(self) {
             return Err(CmdError::Disabled(format!("{id}: {why}")));
         }
-        // Restrict Editing: refused outright, or allowed as long as it only edits the exceptions.
-        let guard = if spec.mutates { crate::cmd::protect::check_before(self, id, params)? } else { false };
-        if spec.mutates && self.doc.settings.protection.as_deref() == Some("trackedChanges") {
-            self.doc.settings.track_changes = true;
-        }
-        // Macro recording and Repeat.
-        let record = !matches!(id, "tools.recordMacro" | "tools.macros" | "edit.undo" | "edit.redo" | "edit.repeat")
-            && (spec.mutates || id.starts_with("caret.") || id.starts_with("select."));
-        // A password never lands in a recorded macro or Repeat.
-        let kept = || {
-            let mut p = params.clone();
-            if let Some(m) = p.as_object_mut() {
-                m.remove("password");
+        let ctx = crate::extensions::RunCtx { id, params, mutates: spec.mutates, before: None };
+        let mut verify = Vec::new();
+        for h in reg.hooks() {
+            if let Some(before) = h.before
+                && before(self, &ctx)?
+                && let Some(v) = h.verify
+            {
+                verify.push(v);
             }
-            p
-        };
-        if record && let Some((_, steps)) = self.recording.as_mut() {
-            steps.push((id.to_string(), kept()));
         }
+        // Repeat; a password never lands in it.
         if spec.mutates && !matches!(id, "edit.undo" | "edit.redo" | "edit.repeat") {
-            self.last_command = Some((id.to_string(), kept()));
-        }
-        // Typing, caret movement and selection outside the equation commands leave the equation.
-        if self.math.is_some()
-            && (id.starts_with("text.") || id.starts_with("caret.") || id.starts_with("select.") || id.starts_with("edit.paste"))
-            && let Some(m) = self.math.take()
-        {
-            let off = m.at.off + wordcraft_doc::para::OBJ.len_utf8();
-            self.sel = Selection::caret(Pos { off, ..m.at });
+            self.last_command = Some((id.to_string(), replay_params(params)));
         }
         // The undo stacks are snapshotted whole, not as a length: commands run nested commands,
         // whose checkpoints, undos and redos (and evictions at the limit) must be put back too.
@@ -1203,13 +1187,11 @@ impl Session {
                 Err(CmdError::Failed(format!("{id} panicked: {msg}")))
             }
         };
-        // Restrict Editing: outside the exceptions nothing may change.
-        if result.is_ok()
-            && guard
-            && let Some((before, ..)) = &before_doc
-            && !crate::cmd::protect::outside_unchanged(before, &self.doc, &self.author)
-        {
-            result = Err(CmdError::Disabled(format!("{id}: only the editable regions of this protected document can change")));
+        if result.is_ok() && !verify.is_empty() {
+            let ctx = crate::extensions::RunCtx { id, params, mutates, before: before_doc.as_ref().map(|b| &b.0) };
+            if let Some(e) = verify.iter().find_map(|v| v(self, &ctx).err()) {
+                result = Err(e);
+            }
         }
         match &result {
             Ok(_) => {
@@ -1221,9 +1203,13 @@ impl Session {
                     self.touch();
                     self.doc.ensure_nonempty();
                     self.doc.prune_text_boxes();
-                    // Glued connectors follow the shapes they join.
-                    if crate::cmd::connectors::reroutes_after(id) && crate::cmd::connectors::reroute(self) {
-                        self.touch();
+                    let ctx = crate::extensions::RunCtx { id, params, mutates, before: before_doc.as_ref().map(|b| &b.0) };
+                    for h in reg.hooks() {
+                        if let Some(after) = h.after_edit
+                            && after(self, &ctx)
+                        {
+                            self.touch();
+                        }
                     }
                 }
                 self.clamp_selection();
@@ -1305,4 +1291,13 @@ pub fn blank_document(region: &wordcraft_geom::Region) -> Document {
     d.last_section.page_w = w;
     d.last_section.page_h = h;
     d
+}
+
+/// `params` as Repeat and macros keep them: without a password.
+pub(crate) fn replay_params(params: &Value) -> Value {
+    let mut p = params.clone();
+    if let Some(m) = p.as_object_mut() {
+        m.remove("password");
+    }
+    p
 }

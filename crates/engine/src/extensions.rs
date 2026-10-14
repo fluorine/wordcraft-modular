@@ -1,6 +1,9 @@
 //! Extension manifests: which extension owns each command.
 
-use crate::CommandSpec;
+use serde_json::Value;
+use wordcraft_doc::Document;
+
+use crate::{CmdError, CommandSpec, Session};
 
 /// The always-present core.
 pub const CORE: &str = "core";
@@ -85,6 +88,33 @@ const OVERRIDES: &[(&str, &[&str])] = &[
 
 fn owner_override(id: &str) -> Option<&'static str> {
     OVERRIDES.iter().find(|(_, ids)| ids.contains(&id)).map(|(ext, _)| *ext)
+}
+
+/// What a hook sees of the running command.
+pub struct RunCtx<'a> {
+    pub id: &'a str,
+    pub params: &'a Value,
+    pub mutates: bool,
+    /// The document before the command; `Some` only for mutating commands.
+    pub before: Option<&'a Document>,
+}
+
+/// One extension's calls around `Session::run`. Every hook is optional.
+#[derive(Clone, Copy)]
+pub struct Hooks {
+    pub ext: &'static str,
+    /// Before the undo snapshot. `Err` refuses the command; `Ok(true)` asks for `verify`.
+    pub before: Option<fn(&mut Session, &RunCtx) -> Result<bool, CmdError>>,
+    /// After success, when `before` asked; `Err` rolls the command back.
+    pub verify: Option<fn(&Session, &RunCtx) -> Result<(), CmdError>>,
+    /// After a mutating command succeeds; `true` = the hook changed the document.
+    pub after_edit: Option<fn(&mut Session, &RunCtx) -> bool>,
+}
+
+impl Hooks {
+    pub const fn new(ext: &'static str) -> Self {
+        Hooks { ext, before: None, verify: None, after_edit: None }
+    }
 }
 
 /// Sets the owner of each spec to `ext`, unless an override names another.
@@ -213,6 +243,14 @@ mod tests {
 "
             )
         );
+    }
+
+    #[test]
+    fn hooks_belong_to_known_extensions() {
+        for h in crate::cmd::hooks() {
+            assert!(get(h.ext).is_some_and(|e| e.id != CORE), "hook for {}", h.ext);
+            assert!(h.before.is_some() || h.verify.is_some() || h.after_edit.is_some(), "{} has no hook", h.ext);
+        }
     }
 
     #[test]

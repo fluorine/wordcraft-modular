@@ -1,6 +1,6 @@
 # WordCraft modularity: core and extensions
 
-> **Last reviewed:** 2026-10-13 · **Last updated:** 2026-10-13 · **Change:** minor (Phase 1 done: owners, dependency scan, parity per extension; previously minor: Phase 1 first step; previously major: first version) · **Status:** Phase 1 done. Phase 2 is next.
+> **Last reviewed:** 2026-10-13 · **Last updated:** 2026-10-13 · **Change:** minor (Phase 2 done: extension hooks in `Session::run`; previously minor: Phase 1 done: owners, dependency scan, parity per extension; previously minor: Phase 1 first step; previously major: first version) · **Status:** Phase 2 done. Phase 3 is next.
 
 This document is the plan for the modular edition of WordCraft. WordCraft becomes a small core plus
 **extensions**. Each user selects the extensions they use. The default build contains every current
@@ -208,6 +208,7 @@ Each phase builds, passes `cargo xtask ci`, and lands as its own commits. Each p
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-14 | minor | Phase 2 done: `extensions::Hooks` (`before`, `verify`, `after_edit`) with `RunCtx`, kept in the `Registry` (`cmd::hooks()`). `Session::run` no longer names restrict editing, macro recording, the equation editor or connectors; those modules register hooks. Core steps (Repeat, undo, moves, column dispatch, formatting revisions, outline) stay inline |
 | 2026-10-13 | minor | Phase 1 done: a test scans each command module for command-id literals that cross extensions without a declared dependency (`id_calls_respect_dependencies`, with `ALLOWED_CALLS` for name checks). `file.protect` moved to `restrict-editing`. `parity()` reports live features per extension. The `review`, `tools` and `options` files are not split yet; the owner overrides cover them until Phase 4 needs file boundaries for `cfg` |
 | 2026-10-13 | minor | Phase 1, first step: `CommandSpec.ext`, `crates/engine/src/extensions.rs` (manifests, overrides, `dependents`), the owner shows in `list_commands`; tests check owners, dependencies and cycles. Module splits, the cross-extension id-call scan and per-extension parity remain |
 | 2026-10-13 | major | First version: verdict, blockers, principles, extension cut, Options › Extensions pane, phased plan |
