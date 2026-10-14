@@ -50,6 +50,39 @@ pub fn merge_list(s: &Session) -> (Vec<String>, Vec<Vec<String>>) {
     }
 }
 
+/// The whole recipient list, unfiltered, with its filter and sort.
+#[derive(Default)]
+pub struct MergeSource {
+    pub headers: Vec<String>,
+    pub source: Vec<Vec<String>>,
+    pub filter: Vec<wordcraft_engine::cmd::recipients::FilterRule>,
+    pub sort: Vec<wordcraft_engine::cmd::recipients::SortKey>,
+}
+
+pub fn merge_source(s: &Session) -> MergeSource {
+    #[cfg(feature = "mailings")]
+    {
+        let m = wordcraft_engine::cmd::mailings::merge_state(s);
+        MergeSource { headers: m.headers.clone(), source: m.source.clone(), filter: m.filter.clone(), sort: m.sort.clone() }
+    }
+    #[cfg(not(feature = "mailings"))]
+    {
+        let _ = s;
+        MergeSource::default()
+    }
+}
+
+/// The targets Cross-reference lists for the kind `to`.
+pub fn ref_targets(s: &Session, to: &str) -> Vec<String> {
+    #[cfg(feature = "references")]
+    return wordcraft_engine::cmd::citations::ref_targets(s, to).into_iter().map(|(t, _)| t).collect();
+    #[cfg(not(feature = "references"))]
+    {
+        let _ = (s, to);
+        Vec::new()
+    }
+}
+
 /// The mail-merge list's field names.
 pub fn merge_fields(s: &Session) -> Vec<String> {
     merge_list(s).0
