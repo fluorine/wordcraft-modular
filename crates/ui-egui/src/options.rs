@@ -510,7 +510,7 @@ fn extensions(app: &mut WordApp, ui: &mut Ui) {
                     } else {
                         tl!("Turning off {name} also turns off {names}. Continue?")
                     };
-                    pending = Some((id.to_string(), on, crate::i18n::fmt(ask, &[("name", &tl!(name).to_string()), ("names", &list)])));
+                    pending = Some((id.to_string(), on, crate::i18n::fmt(ask, &[("name", tl!(name)), ("names", &list)])));
                 }
             }
         });
