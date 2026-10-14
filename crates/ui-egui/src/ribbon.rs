@@ -1376,7 +1376,7 @@ fn references(app: &mut WordApp, ui: &mut Ui) {
         });
         stack(ui, |ui| {
             small(ui, app, "sources", Some("Manage Sources"), "Manage Sources", "references.sources", json!({}), false);
-            let current = app.session.bib_style.clone();
+            let current = wordcraft_engine::cmd::citations::current_style(&app.session).name.to_string();
             let label = crate::i18n::fmt(tl!("Style: {style}"), &[("style", &current)]);
             menu_button(ui, app, "styles", Some(&label), "Citation Style", false, "references.citationStyle", |ui, app| {
                 for st in &wordcraft_engine::cmd::citations::STYLES {

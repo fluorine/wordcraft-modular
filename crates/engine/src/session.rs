@@ -396,8 +396,6 @@ pub struct Session {
     /// Quick Parts / AutoText entries.
     pub building_blocks: std::collections::BTreeMap<String, Fragment>,
     pub autosave: bool,
-    /// Citation style: APA, MLA, Chicago, IEEE.
-    pub bib_style: String,
     /// Requests from commands to the UI (open a dialog, scroll…), drained by the front end.
     pub ui_requests: Vec<Value>,
     /// Preferences the front end saves between runs.
@@ -526,10 +524,6 @@ impl Prefs {
 
 /// The citation style a document records (References › Style), APA when it records none or
 /// one we don't know.
-fn doc_bib_style(doc: &Document) -> String {
-    doc.settings.bib_style.as_deref().and_then(crate::cmd::citations::find_style).map_or("APA", |st| st.name).to_string()
-}
-
 /// Maximum undo depth.
 const MAX_UNDO: usize = 500;
 /// How many steps the Undo button's list shows (#701); `edit.undoTo` reaches no further.
@@ -552,7 +546,6 @@ impl Session {
 
     pub fn new(doc: Document) -> Self {
         let start = doc.start_of(StoryRef::Body);
-        let bib_style = doc_bib_style(&doc);
         Session {
             doc,
             sel: Selection::caret(start),
@@ -588,7 +581,6 @@ impl Session {
             ext: Default::default(),
             building_blocks: Default::default(),
             autosave: true,
-            bib_style,
             ui_requests: Vec::new(),
             also_selected: Vec::new(),
             prefs: Prefs::default(),
@@ -940,7 +932,6 @@ impl Session {
     /// Replace the document (open/new).
     pub fn set_document(&mut self, doc: Document) {
         self.document_id = self.document_id.wrapping_add(1);
-        self.bib_style = doc_bib_style(&doc);
         self.doc = doc;
         self.doc.ensure_nonempty();
         self.password = None;
@@ -1013,7 +1004,6 @@ impl Session {
             ext: _,
             building_blocks: _,
             autosave: _,
-            bib_style: _,
             ui_requests: _,
             document_id: _,
             prefs: _,

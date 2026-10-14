@@ -283,6 +283,11 @@ pub fn find_style(name: &str) -> Option<&'static CiteStyle> {
 }
 
 /// The session's style; APA when the name is unknown.
+/// The document's citation style; APA when it names none we know.
+pub fn current_style(s: &Session) -> &'static CiteStyle {
+    style(s.doc.settings.bib_style.as_deref().and_then(find_style).map_or("APA", |st| st.name))
+}
+
 pub fn style(name: &str) -> &'static CiteStyle {
     find_style(name).unwrap_or(&STYLES[0])
 }
@@ -297,17 +302,16 @@ pub fn specs() -> Vec<CommandSpec> {
             let st = find_style(st).ok_or_else(|| {
                 CmdError::Params(format!("style must be one of {:?}", STYLES.iter().map(|x| x.name).collect::<Vec<_>>()))
             })?;
-            s.bib_style = st.name.to_string();
             // Recorded in the document too, so a save keeps it.
             s.doc.settings.bib_style = Some(st.name.to_string());
             update_citations(s)?;
-            Ok(json!({"style": s.bib_style}))
+            Ok(json!({"style": current_style(s).name}))
         })
         .params(
             r#"{"style": "APA|Chicago|GB/T 7714|GOST (name sort)|GOST (title sort)|Harvard (Anglia)|IEEE|ISO 690 (author-date)|ISO 690 (numerical)|MLA|SIST02|Turabian" (Word's style names work too)}"#,
         ),
         CommandSpec::new("references.bibliography", "Bibliography", "References › Citations & Bibliography", |s, v| {
-            let title = p::str(v, "title").unwrap_or(style(&s.bib_style).bib_title).to_string();
+            let title = p::str(v, "title").unwrap_or(current_style(s).bib_title).to_string();
             generated_list(s, "BIBLIOGRAPHY", &title)?;
             sel_result(s)
         })
@@ -563,7 +567,7 @@ fn citation(s: &mut Session, v: &Value) -> CmdResult {
     };
     let src = s.doc.sources.iter().find(|x| x.tag == tag).cloned().ok_or_else(|| CmdError::Params(format!("no source `{tag}`")))?;
     let pages = p::str(v, "pages").unwrap_or("").to_string();
-    let st = style(&s.bib_style);
+    let st = current_style(s);
     let n = number_of(&s.doc, &bib_order(&s.doc, st, super::default_lang(s)), &tag);
     let props = s.typing_props();
     let at = delete_selection(s)?;
@@ -647,7 +651,7 @@ pub fn update_citations(s: &mut Session) -> Result<(), CmdError> {
 
 /// Refresh the results of the CITATION fields in the body.
 fn refresh_citations(s: &mut Session) -> Result<(), CmdError> {
-    let st = style(&s.bib_style);
+    let st = current_style(s);
     let order = bib_order(&s.doc, st, super::default_lang(s));
     for path in s.doc.para_paths(StoryRef::Body) {
         let Some(p) = s.doc.para(StoryRef::Body, &path) else { continue };
@@ -765,7 +769,7 @@ fn page_of(s: &mut Session, pos: &Pos) -> u32 {
 /// Entry lines (text, hanging indent) for a generated list.
 fn entries_for(s: &mut Session, kind: &str) -> Vec<(String, bool)> {
     if kind.starts_with("BIBLIOGRAPHY") {
-        let st = style(&s.bib_style);
+        let st = current_style(s);
         return bib_order(&s.doc, st, super::default_lang(s))
             .into_iter()
             .enumerate()
@@ -1039,12 +1043,12 @@ mod tests {
         let bytes = wordcraft_docx::write(&s.doc).expect("docx write");
         let doc = wordcraft_docx::read(&bytes).expect("docx read");
         assert_eq!(doc.settings.bib_style.as_deref(), Some("Harvard (Anglia)"));
-        assert_eq!(Session::new(doc.clone()).bib_style, "Harvard (Anglia)");
+        assert_eq!(current_style(&Session::new(doc.clone())).name, "Harvard (Anglia)");
         let mut other = Session::new(wordcraft_doc::Document::new());
         other.set_document(doc);
-        assert_eq!(other.bib_style, "Harvard (Anglia)");
+        assert_eq!(current_style(&other).name, "Harvard (Anglia)");
         // A document without a recorded style is APA.
-        assert_eq!(Session::new(wordcraft_doc::Document::new()).bib_style, "APA");
+        assert_eq!(current_style(&Session::new(wordcraft_doc::Document::new())).name, "APA");
     }
 
     #[test]
@@ -1192,7 +1196,7 @@ mod tests {
             assert!(t.starts_with(cites) && t.contains(list), "{style}: {t}");
         }
         assert!(s.run("references.citationStyle", &json!({"style": "Vancouver"})).unwrap_err().to_string().contains("Turabian"));
-        assert_eq!(s.bib_style, "Turabian", "an unknown style keeps the current one");
+        assert_eq!(current_style(&s).name, "Turabian", "an unknown style keeps the current one");
     }
 
     #[test]
@@ -1250,7 +1254,7 @@ mod tests {
         let rivera = "Rivera A., Chen M. Atlas of Studios. – Portland : Harbor Books, 2021.";
         // Word's style and style-sheet names pick the same styles.
         s.run("references.citationStyle", &json!({"style": "\\GostName.XSL"})).unwrap();
-        assert_eq!(s.bib_style, "GOST (name sort)");
+        assert_eq!(current_style(&s).name, "GOST (name sort)");
         let t = s.doc.plain_text(StoryRef::Body);
         assert!(t.starts_with("[2][1, p. 15]") && t.contains(&format!("1. {okafor}\n2. {rivera}")), "{t}");
         s.run("references.citationStyle", &json!({"style": "GOST - Title Sort"})).unwrap();
