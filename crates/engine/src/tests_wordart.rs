@@ -105,6 +105,7 @@ fn dragging_a_connector_end_glues_it_to_the_nearest_site() {
 }
 
 #[test]
+#[cfg(feature = "pdf-export")]
 fn wordart_is_inserted_styled_and_bent() {
     let mut s = Session::new(Document::new());
     let r = run(&mut s, "insert.wordArt", json!({"text": "Hello", "style": "gradient", "transform": "textArchUp"}));

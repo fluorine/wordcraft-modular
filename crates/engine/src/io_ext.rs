@@ -6,7 +6,7 @@ use wordcraft_doc::Document;
 pub fn open(ext: &str, bytes: &[u8]) -> Option<Result<Document, String>> {
     match ext {
         "docx" | "docm" | "dotx" | "dotm" => Some(wordcraft_docx::read(bytes).map_err(|e| e.to_string())),
-        "doc" | "dot" => Some(wordcraft_docbin::read(bytes).map_err(|e| e.to_string())),
+        "doc" | "dot" => Some(read_doc(bytes)),
         // Word XML Document (Flat OPC) or Word 2003 XML, told apart by the root element.
         "xml" => Some(wordcraft_docx::read_xml(bytes).map_err(|e| e.to_string())),
         // HTML, Markdown, ODT, RTF…: pictures fit the text width (see `io::fit_pictures`).
@@ -29,11 +29,33 @@ pub fn save(ext: &str, doc: &Document, opts: &crate::io::ExportOptions) -> Optio
         "xml" if opts.word2003 => Some(wordcraft_docx::write_wordml2003(doc).map_err(|e| e.to_string())),
         "xml" => Some(wordcraft_docx::write_flat(doc).map_err(|e| e.to_string())),
         "png" => Some(render_png(doc, 0, 2.0, opts)),
-        "pdf" => {
-            let pdf = wordcraft_pdf::PdfOptions { include_markup: opts.markup, comments: opts.markup && opts.comments, ..Default::default() };
-            Some(wordcraft_pdf::export(doc, &pdf).map_err(|e| e.to_string()))
-        }
+        "pdf" => Some(export_pdf(doc, opts)),
         other => wordcraft_formats::export_with(other, doc, &wordcraft_formats::ExportOptions { comments: opts.markup && opts.comments }),
+    }
+}
+
+/// A Word 97-2003 document (`doc-legacy`).
+pub fn read_doc(bytes: &[u8]) -> Result<Document, String> {
+    #[cfg(feature = "doc-legacy")]
+    return wordcraft_docbin::read(bytes).map_err(|e| e.to_string());
+    #[cfg(not(feature = "doc-legacy"))]
+    {
+        let _ = bytes;
+        Err(crate::extensions::missing_format("doc"))
+    }
+}
+
+/// The document as PDF (`pdf-export`).
+fn export_pdf(doc: &Document, opts: &crate::io::ExportOptions) -> Result<Vec<u8>, String> {
+    #[cfg(feature = "pdf-export")]
+    {
+        let pdf = wordcraft_pdf::PdfOptions { include_markup: opts.markup, comments: opts.markup && opts.comments, ..Default::default() };
+        wordcraft_pdf::export(doc, &pdf).map_err(|e| e.to_string())
+    }
+    #[cfg(not(feature = "pdf-export"))]
+    {
+        let _ = (doc, opts);
+        Err(crate::extensions::missing_format("pdf"))
     }
 }
 

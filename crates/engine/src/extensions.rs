@@ -18,10 +18,16 @@ pub struct Extension {
     pub name: &'static str,
     /// Extension ids this one needs; [`CORE`] is implied.
     pub depends_on: &'static [&'static str],
+    /// File extensions it opens or saves (a format extension may own no command).
+    pub formats: &'static [&'static str],
 }
 
 const fn ext(id: &'static str, name: &'static str, depends_on: &'static [&'static str]) -> Extension {
-    Extension { id, name, depends_on }
+    Extension { id, name, depends_on, formats: &[] }
+}
+
+const fn format(id: &'static str, name: &'static str, formats: &'static [&'static str]) -> Extension {
+    Extension { id, name, depends_on: &[], formats }
 }
 
 /// Every extension, core first.
@@ -45,7 +51,22 @@ pub const EXTENSIONS: &[Extension] = &[
     ext("design", "Design themes and style sets", &[]),
     ext("templates", "Templates", &[]),
     ext("restrict-editing", "Restrict editing", &[]),
+    format("pdf-export", "PDF export and printing", &["pdf"]),
+    format("doc-legacy", "Word 97-2003 documents", &["doc", "dot"]),
 ];
+
+/// The extension that handles file extension `ext`, if one does (core formats have none).
+pub fn for_format(ext: &str) -> Option<&'static Extension> {
+    EXTENSIONS.iter().find(|e| e.formats.iter().any(|f| f.eq_ignore_ascii_case(ext)))
+}
+
+/// The error for a format this build leaves out.
+pub fn missing_format(ext: &str) -> String {
+    match for_format(ext) {
+        Some(e) => format!("this build has no {} (the `{}` extension)", e.name, e.id),
+        None => format!("unsupported format `.{ext}`"),
+    }
+}
 
 /// The manifest for `id`.
 pub fn get(id: &str) -> Option<&'static Extension> {
@@ -77,6 +98,8 @@ const BUILT: &[(&str, bool)] = &[
     ("design", cfg!(feature = "design")),
     ("templates", cfg!(feature = "templates")),
     ("restrict-editing", cfg!(feature = "restrict-editing")),
+    ("pdf-export", cfg!(feature = "pdf-export")),
+    ("doc-legacy", cfg!(feature = "doc-legacy")),
 ];
 
 /// Commands that live in a shared module but belong to another extension.
@@ -213,7 +236,7 @@ mod tests {
     fn every_extension_owns_a_command() {
         let reg = crate::cmd::registry();
         let owners: HashSet<&str> = reg.all().iter().map(|s| s.ext).collect();
-        for e in EXTENSIONS.iter().filter(|e| compiled(e.id)) {
+        for e in EXTENSIONS.iter().filter(|e| compiled(e.id) && e.formats.is_empty()) {
             assert!(owners.contains(e.id), "{} owns no command", e.id);
         }
     }
@@ -335,6 +358,19 @@ mod tests {
                 assert!(compiled(d), "{} is built without its dependency {d}", e.id);
             }
         }
+    }
+
+    #[test]
+    fn formats_have_one_owner_and_a_clear_error() {
+        let mut seen = HashSet::new();
+        for e in EXTENSIONS {
+            for f in e.formats {
+                assert!(seen.insert(*f), "two extensions handle .{f}");
+            }
+        }
+        assert_eq!(for_format("PDF").map(|e| e.id), Some("pdf-export"));
+        assert!(missing_format("doc").contains("doc-legacy"));
+        assert!(for_format("docx").is_none(), "docx is core");
     }
 
     #[test]

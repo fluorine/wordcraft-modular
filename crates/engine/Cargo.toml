@@ -11,7 +11,7 @@ workspace = true
 [features]
 # One feature per extension (see src/extensions.rs); `full` is every one.
 default = ["full"]
-full = ["comments", "proofing", "references", "equation-editor", "shapes", "charts", "smart-art", "wordart", "ink", "mailings", "developer", "macros", "compare", "read-aloud", "accessibility", "design", "templates", "restrict-editing"]
+full = ["comments", "proofing", "references", "equation-editor", "shapes", "charts", "smart-art", "wordart", "ink", "mailings", "developer", "macros", "compare", "read-aloud", "accessibility", "design", "templates", "restrict-editing", "pdf-export", "doc-legacy"]
 comments = []
 proofing = []
 references = []
@@ -30,6 +30,8 @@ accessibility = []
 design = []
 templates = []
 restrict-editing = []
+pdf-export = ["dep:wordcraft-pdf"]
+doc-legacy = ["dep:wordcraft-docbin"]
 
 [dependencies]
 wordcraft-geom = { workspace = true }
@@ -39,8 +41,8 @@ wordcraft-layout = { workspace = true }
 wordcraft-render = { workspace = true }
 wordcraft-proof = { workspace = true }
 wordcraft-docx = { workspace = true }
-wordcraft-docbin = { workspace = true }
-wordcraft-pdf = { workspace = true }
+wordcraft-docbin = { workspace = true, optional = true }
+wordcraft-pdf = { workspace = true, optional = true }
 wordcraft-formats = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

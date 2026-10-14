@@ -143,16 +143,25 @@ impl Session {
         let markup = crate::cmd::file::export_options(self, v);
         let lay = self.export_layout_with(markup.markup);
         let plan = plan(v, lay.pages.len(), self.current_pages(&lay))?;
-        let opts = wordcraft_pdf::PdfOptions {
-            pages: Some(plan.pages.clone()),
-            // Repeated pages would repeat the structure tree's entries too.
-            tagged: plan.copies <= 1,
-            include_markup: markup.markup,
-            comments: markup.comments,
-            ..Default::default()
-        };
-        let bytes = wordcraft_pdf::export_layout(&self.doc, &lay, &opts).map_err(|e| CmdError::Failed(e.to_string()))?;
-        Ok((bytes, plan))
+        #[cfg(feature = "pdf-export")]
+        {
+            let opts = wordcraft_pdf::PdfOptions {
+                pages: Some(plan.pages.clone()),
+                // Repeated pages would repeat the structure tree's entries too.
+                tagged: plan.copies <= 1,
+                include_markup: markup.markup,
+                comments: markup.comments,
+                ..Default::default()
+            };
+            let bytes = wordcraft_pdf::export_layout(&self.doc, &lay, &opts).map_err(|e| CmdError::Failed(e.to_string()))?;
+            Ok((bytes, plan))
+        }
+        // Printing goes through a PDF.
+        #[cfg(not(feature = "pdf-export"))]
+        {
+            let _ = (lay, plan, markup);
+            Err(CmdError::Disabled(crate::extensions::missing_format("pdf")))
+        }
     }
 }
 
