@@ -589,7 +589,7 @@ impl WordApp {
         ui.dark_page = self.session.view.dark_mode;
         ui.keyboard = self.session.keymap.clone();
         ui.ribbon = self.session.ribbon.clone();
-        ui.ink_pens = self.session.view.draw.pens.clone();
+        ui.ink_pens = wordcraft_engine::cmd::draw::draw_state(&self.session.ext).pens.clone();
         ui
     }
 
@@ -631,7 +631,9 @@ impl WordApp {
         // So are ribbon and toolbar commands.
         self.session.ribbon = std::mem::take(&mut self.ui.ribbon);
         self.session.ribbon.retain_known(&reg);
-        self.session.view.draw.pens = std::mem::take(&mut self.ui.ink_pens);
+        if let Ok(d) = wordcraft_engine::cmd::draw::draw_mut(&mut self.session.ext) {
+            d.pens = std::mem::take(&mut self.ui.ink_pens);
+        }
     }
 
     /// Run a command the user asked for (ribbon, shortcut, Backstage, file drop). New, Open,

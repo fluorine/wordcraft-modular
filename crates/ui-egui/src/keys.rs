@@ -336,7 +336,9 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
                     continue;
                 }
                 // Escape puts the pen or eraser down (back to selecting).
-                if key == Key::Escape && app.session.view.draw.mode != wordcraft_engine::cmd::draw::DrawMode::Select {
+                if key == Key::Escape
+                    && wordcraft_engine::cmd::draw::draw_state(&app.session.ext).mode != wordcraft_engine::cmd::draw::DrawMode::Select
+                {
                     app.canvas.ink = None;
                     let _ = app.run("draw.select", json!({}));
                     continue;

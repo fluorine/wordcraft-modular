@@ -936,13 +936,15 @@ fn insert(app: &mut WordApp, ui: &mut Ui) {
 fn draw(app: &mut WordApp, ui: &mut Ui) {
     use wordcraft_doc::freeform::InkTool;
     use wordcraft_engine::cmd::draw::{DrawMode, lasso_selection};
-    let mode = app.session.view.draw.mode;
+    let mode = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).mode;
     // The pen the colour and thickness menus change: the one in use, else the pen.
     let tool = mode.pen().unwrap_or(InkTool::Pen);
-    let set = app.session.view.draw.settings(tool);
+    let set = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).settings(tool);
     // The gallery pen in use, if any: changing the colour or thickness changes it too.
-    let custom =
-        app.session.view.draw.pens.iter().position(|p| mode == DrawMode::Pen(p.kind) && p.color == set.color && (p.width - set.width).abs() < 0.01);
+    let custom = wordcraft_engine::cmd::draw::draw_state(&app.session.ext)
+        .pens
+        .iter()
+        .position(|p| mode == DrawMode::Pen(p.kind) && p.color == set.color && (p.width - set.width).abs() < 0.01);
     let lasso_on = lasso_selection(&app.session).is_some();
     group(ui, "Drawing Tools", None, app, |ui, app| {
         big_toggle(ui, app, "select", "Select", "draw.select", mode == DrawMode::Select);
@@ -952,14 +954,14 @@ fn draw(app: &mut WordApp, ui: &mut Ui) {
         big_toggle(ui, app, "pencil", "Pencil", "draw.pencil", mode == DrawMode::Pen(InkTool::Pencil) && custom.is_none());
         big_toggle(ui, app, "highlight", "Highlighter", "draw.highlighter", mode == DrawMode::Pen(InkTool::Highlighter) && custom.is_none());
         // Pens added with Add Pen; right-click one to remove it.
-        let pens = app.session.view.draw.pens.clone();
+        let pens = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).pens.clone();
         for (i, pen) in pens.iter().enumerate() {
             gallery_pen(ui, app, i, *pen, custom == Some(i));
         }
         menu_button(ui, app, "addPen", Some("Add\nPen"), "Add Pen", true, "", |ui, app| {
             for (label, kind) in [("Pen", InkTool::Pen), ("Pencil", InkTool::Pencil), ("Highlighter", InkTool::Highlighter)] {
                 // A new pen starts as that kind's current colour and thickness.
-                let cur = app.session.view.draw.settings(kind);
+                let cur = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).settings(kind);
                 mi(ui, app, label, "draw.addPen", json!({"kind": kind.name(), "color": cur.color.hex(), "width": cur.width}));
             }
         });
@@ -985,7 +987,7 @@ fn draw(app: &mut WordApp, ui: &mut Ui) {
         });
     });
     group(ui, "Convert", None, app, |ui, app| {
-        let on = app.session.view.draw.ink_to_shape;
+        let on = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).ink_to_shape;
         big_toggle(ui, app, "inkToShape", "Ink to\nShape", "draw.inkToShape", on);
         big(ui, app, "inkToMath", "Ink to\nMath", "draw.inkToMath", json!({}), false);
     });
@@ -993,7 +995,7 @@ fn draw(app: &mut WordApp, ui: &mut Ui) {
         big(ui, app, "canvas", "Drawing\nCanvas", "insert.canvas", json!({}), false);
     });
     group(ui, "Replay", None, app, |ui, app| {
-        let on = app.session.view.draw.replay;
+        let on = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).replay;
         big_toggle(ui, app, "replay", "Ink\nReplay", "draw.replay", on);
     });
 }
@@ -1011,8 +1013,8 @@ fn pen_command(tool: wordcraft_doc::freeform::InkTool) -> &'static str {
 /// After the colour or thickness menu changed `tool`'s settings, the gallery pen that was in use
 /// (`custom`) takes them too.
 fn update_gallery_pen(app: &mut WordApp, custom: Option<usize>, tool: wordcraft_doc::freeform::InkTool) {
-    let set = app.session.view.draw.settings(tool);
-    if let Some(p) = custom.and_then(|i| app.session.view.draw.pens.get_mut(i))
+    let set = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).settings(tool);
+    if let Some(p) = custom.and_then(|i| wordcraft_engine::cmd::draw::draw_mut(&mut app.session.ext).ok().and_then(|d| d.pens.get_mut(i)))
         && p.kind == tool
     {
         p.color = set.color;

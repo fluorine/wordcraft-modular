@@ -66,10 +66,10 @@ const GRAB_SLOP: f32 = 4.0;
 /// Handle the pointer while a pen, the eraser or the lasso is in use; `true` when it did (no
 /// text selection or object dragging then).
 pub fn pointer(app: &mut WordApp, ui: &Ui, resp: &egui::Response, rects: &[Rect], layout: &DocLayout, scale: f32) -> bool {
-    let mode = app.session.view.draw.mode;
+    let mode = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).mode;
     if mode != DrawMode::Lasso {
         app.canvas.ink_ui.lasso = None;
-        if app.session.view.draw.lasso.is_some() {
+        if wordcraft_engine::cmd::draw::draw_state(&app.session.ext).lasso.is_some() {
             let _ = app.run("draw.lasso", json!({"clear": true}));
         }
     }
@@ -176,7 +176,7 @@ fn lasso_pointer(app: &mut WordApp, (starts, down, released, at): (bool, bool, b
 /// Keys the lasso and Ink Replay take: Delete deletes the lasso selection, Esc lets it go or
 /// stops the replay. `true` when the key was used.
 pub fn key(app: &mut WordApp, key: Key) -> bool {
-    if key == Key::Escape && app.session.view.draw.replay {
+    if key == Key::Escape && wordcraft_engine::cmd::draw::draw_state(&app.session.ext).replay {
         stop_replay(app);
         return true;
     }
@@ -230,7 +230,7 @@ pub fn paint(app: &WordApp, painter: &Painter, rects: &[Rect], layout: &DocLayou
     let Some(d) = &app.canvas.ink else { return };
     let Some(map) = to_screen(rects, layout, scale, d.page) else { return };
     let s = page_scale(rects, layout, scale, d.page).unwrap_or(scale);
-    let set = app.session.view.draw.settings(d.tool);
+    let set = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).settings(d.tool);
     let alpha = (d.tool.alpha() * 255.0).round() as u8;
     let color = screen_ink(app.session.view.dark_mode, set.color, alpha);
     let pts: Vec<Pos2> = d.pts.iter().map(|p| map(*p)).collect();
@@ -267,7 +267,7 @@ fn paint_lasso(app: &WordApp, painter: &Painter, rects: &[Rect], layout: &DocLay
 
 /// The pointer over the page while a pen, the eraser or the lasso is in use.
 pub fn cursor(app: &WordApp) -> Option<egui::CursorIcon> {
-    match app.session.view.draw.mode {
+    match wordcraft_engine::cmd::draw::draw_state(&app.session.ext).mode {
         DrawMode::Select => None,
         DrawMode::Lasso if matches!(app.canvas.ink_ui.lasso, Some(LassoDrag::Move { .. })) => Some(egui::CursorIcon::Grabbing),
         DrawMode::Eraser | DrawMode::Pen(_) | DrawMode::Lasso => Some(egui::CursorIcon::Crosshair),
@@ -279,7 +279,7 @@ pub fn cursor(app: &WordApp) -> Option<egui::CursorIcon> {
 /// Start, advance or end Ink Replay with the session's `draw.replay` switch; call once a frame
 /// before the pages are drawn.
 pub fn replay_tick(app: &mut WordApp, ctx: &egui::Context) {
-    if !app.session.view.draw.replay {
+    if !wordcraft_engine::cmd::draw::draw_state(&app.session.ext).replay {
         app.canvas.ink_ui.replay = None;
         return;
     }

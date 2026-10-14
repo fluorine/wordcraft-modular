@@ -148,6 +148,18 @@ pub struct DrawState {
     pub replay: bool,
 }
 
+static NO_DRAW: std::sync::LazyLock<DrawState> = std::sync::LazyLock::new(DrawState::default);
+
+/// The session's Draw tab state; the defaults before the Draw tab was used.
+pub fn draw_state(ext: &crate::extensions::ExtState) -> &DrawState {
+    ext.get().unwrap_or(&NO_DRAW)
+}
+
+/// The session's Draw tab state, made on first use.
+pub fn draw_mut(ext: &mut crate::extensions::ExtState) -> Result<&mut DrawState, CmdError> {
+    ext.state()
+}
+
 impl Default for DrawState {
     fn default() -> Self {
         DrawState {
@@ -195,7 +207,7 @@ const MAX_MOVE: f32 = 10_000.0;
 pub fn specs() -> Vec<CommandSpec> {
     vec![
         CommandSpec::new("draw.select", "Select", "Draw › Tools", |s, _| {
-            s.view.draw.mode = DrawMode::Select;
+            draw_mut(&mut s.ext)?.mode = DrawMode::Select;
             state(s)
         })
         .pure(),
@@ -210,7 +222,7 @@ pub fn specs() -> Vec<CommandSpec> {
             if v.get("page").is_some() || v.get("x").is_some() || v.get("y").is_some() {
                 return s.run("draw.erase", v);
             }
-            s.view.draw.mode = DrawMode::Eraser;
+            draw_mut(&mut s.ext)?.mode = DrawMode::Eraser;
             state(s)
         })
         .params(r#"{"page"?: n, "x"?: pt, "y"?: pt}  (no point: use the eraser; a point: delete the ink stroke there)"#)
@@ -223,11 +235,11 @@ pub fn specs() -> Vec<CommandSpec> {
             .pure(),
         CommandSpec::new("draw.removePen", "Remove Pen", "Draw › Pens", |s, v| {
             let i = p::u64(v, "index").and_then(|i| usize::try_from(i).ok()).ok_or_else(|| CmdError::Params("`index` (0-based) is required".into()))?;
-            if i >= s.view.draw.pens.len() {
+            if i >= draw_state(&s.ext).pens.len() {
                 return Err(CmdError::Params(format!("no pen {i}")));
             }
-            let pen = s.view.draw.pens.remove(i);
-            Ok(json!({"removed": Value::from(pen), "pens": s.view.draw.pens.len()}))
+            let pen = draw_mut(&mut s.ext)?.pens.remove(i);
+            Ok(json!({"removed": Value::from(pen), "pens": draw_state(&s.ext).pens.len()}))
         })
         .params(r#"{"index": n}"#)
         .pure(),
@@ -237,7 +249,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("draw.erase", "Erase Ink", "Draw › Tools", erase).params(r#"{"page": n, "x": pt, "y": pt}"#),
         CommandSpec::new("draw.inkToShape", "Ink to Shape", "Draw › Convert", |s, v| {
             if let Some(on) = p::bool(v, "value") {
-                s.view.draw.ink_to_shape = on;
+                draw_mut(&mut s.ext)?.ink_to_shape = on;
                 return Ok(json!({"value": on}));
             }
             // With strokes lasso-selected it converts them; otherwise it turns the mode on or off.
@@ -245,8 +257,8 @@ pub fn specs() -> Vec<CommandSpec> {
             if ink_selected {
                 return s.run("draw.convertInk", &json!({}));
             }
-            s.view.draw.ink_to_shape = !s.view.draw.ink_to_shape;
-            Ok(json!({"value": s.view.draw.ink_to_shape}))
+            draw_mut(&mut s.ext)?.ink_to_shape = !draw_state(&s.ext).ink_to_shape;
+            Ok(json!({"value": draw_state(&s.ext).ink_to_shape}))
         })
         .params(r#"{"value"?: bool}  (no value: convert the lasso-selected strokes, or turn Ink to Shape on or off)"#)
         .pure(),
@@ -266,33 +278,33 @@ pub fn specs() -> Vec<CommandSpec> {
 const PEN_PARAMS: &str = r#"{"color"?: "RRGGBB", "width"?: pt}"#;
 
 fn state(s: &Session) -> CmdResult {
-    serde_json::to_value(&s.view.draw).map_err(|e| CmdError::Failed(e.to_string()))
+    serde_json::to_value(draw_state(&s.ext)).map_err(|e| CmdError::Failed(e.to_string()))
 }
 
 /// Pick up a pen, optionally changing its colour and thickness.
 fn pen(s: &mut Session, v: &Value, tool: InkTool) -> CmdResult {
     let color = p::str(v, "color").map(|c| Rgb::parse(c).ok_or_else(|| CmdError::Params("`color` is RRGGBB".into()))).transpose()?;
-    let set = s.view.draw.settings_mut(tool);
+    let set = draw_mut(&mut s.ext)?.settings_mut(tool);
     if let Some(c) = color {
         set.color = c;
     }
     if let Some(w) = p::f32(v, "width").filter(|w| w.is_finite()) {
         set.width = w.clamp(MIN_WIDTH, MAX_WIDTH);
     }
-    s.view.draw.mode = DrawMode::Pen(tool);
+    draw_mut(&mut s.ext)?.mode = DrawMode::Pen(tool);
     state(s)
 }
 
 /// Add a pen to the gallery and pick it up.
 fn add_pen(s: &mut Session, v: &Value) -> CmdResult {
     let pen = custom_pen(v)?;
-    if s.view.draw.pens.len() >= MAX_PENS {
+    if draw_state(&s.ext).pens.len() >= MAX_PENS {
         return Err(CmdError::Failed(format!("the pen gallery holds at most {MAX_PENS} pens")));
     }
-    s.view.draw.pens.push(pen);
-    *s.view.draw.settings_mut(pen.kind) = PenSettings { color: pen.color, width: pen.width };
-    s.view.draw.mode = DrawMode::Pen(pen.kind);
-    Ok(json!({"pen": Value::from(pen), "index": s.view.draw.pens.len() - 1, "pens": s.view.draw.pens.len()}))
+    draw_mut(&mut s.ext)?.pens.push(pen);
+    *draw_mut(&mut s.ext)?.settings_mut(pen.kind) = PenSettings { color: pen.color, width: pen.width };
+    draw_mut(&mut s.ext)?.mode = DrawMode::Pen(pen.kind);
+    Ok(json!({"pen": Value::from(pen), "index": draw_state(&s.ext).pens.len() - 1, "pens": draw_state(&s.ext).pens.len()}))
 }
 
 /// An ink stroke laid out on a page.
@@ -421,9 +433,9 @@ fn stroke(s: &mut Session, v: &Value) -> CmdResult {
     let (page, layout) = page_param(s, v)?;
     let tool = match p::str(v, "tool") {
         Some(t) => InkTool::parse(t).ok_or_else(|| CmdError::Params("`tool` is pen, pencil or highlighter".into()))?,
-        None => s.view.draw.mode.pen().unwrap_or(InkTool::Pen),
+        None => draw_state(&s.ext).mode.pen().unwrap_or(InkTool::Pen),
     };
-    let set = s.view.draw.settings(tool);
+    let set = draw_state(&s.ext).settings(tool);
     let color = match p::str(v, "color") {
         Some(c) => Rgb::parse(c).ok_or_else(|| CmdError::Params("`color` is RRGGBB".into()))?,
         None => set.color,
@@ -462,7 +474,7 @@ fn stroke(s: &mut Session, v: &Value) -> CmdResult {
     };
     let at = place(s, &layout, obj, page, (fx, fy), (first[0], first[1]))?;
     // Ink to Shape: a stroke that looks like a shape becomes it (in the same undo step).
-    let shape = if s.view.draw.ink_to_shape && tool != InkTool::Highlighter { convert_at(s, &at)? } else { None };
+    let shape = if draw_state(&s.ext).ink_to_shape && tool != InkTool::Highlighter { convert_at(s, &at)? } else { None };
     Ok(json!({"pos": pos_json(&at), "page": page, "rect": [fx, fy, fw, fh], "shape": shape}))
 }
 
@@ -507,12 +519,15 @@ fn place(s: &mut Session, layout: &DocLayout, obj: InlineObject, page: usize, (x
 
 /// The current lasso selection, if the document hasn't changed under it.
 pub fn lasso_selection(s: &Session) -> Option<&LassoSelection> {
-    s.view.draw.lasso.as_ref().filter(|l| l.rev == s.rev() && !l.items.is_empty())
+    draw_state(&s.ext).lasso.as_ref().filter(|l| l.rev == s.rev() && !l.items.is_empty())
 }
 
 /// Keep `sel` selected after the mutating command running now (which bumps the revision once).
 fn keep_lasso(s: &mut Session, sel: LassoSelection) {
-    s.view.draw.lasso = Some(LassoSelection { rev: s.rev().wrapping_add(1), ..sel });
+    let rev = s.rev().wrapping_add(1);
+    if let Ok(d) = draw_mut(&mut s.ext) {
+        d.lasso = Some(LassoSelection { rev, ..sel });
+    }
 }
 
 /// Whether (`x`, `y`) is inside the closed loop `poly` (even–odd rule).
@@ -532,11 +547,11 @@ fn inside(poly: &[[f32; 2]], x: f32, y: f32) -> bool {
 /// centre is inside it; without a loop, pick up the lasso.
 fn lasso(s: &mut Session, v: &Value) -> CmdResult {
     if p::bool(v, "clear") == Some(true) {
-        s.view.draw.lasso = None;
+        draw_mut(&mut s.ext)?.lasso = None;
         return Ok(json!({"selected": [], "count": 0}));
     }
     if v.get("points").is_none() {
-        s.view.draw.mode = DrawMode::Lasso;
+        draw_mut(&mut s.ext)?.mode = DrawMode::Lasso;
         return state(s);
     }
     let (page, layout) = page_param(s, v)?;
@@ -576,7 +591,7 @@ fn lasso(s: &mut Session, v: &Value) -> CmdResult {
         }
     }
     let selected: Vec<Value> = items.iter().map(pos_json).collect();
-    s.view.draw.lasso = (!items.is_empty()).then(|| LassoSelection { page, items, rev: s.rev() });
+    draw_mut(&mut s.ext)?.lasso = (!items.is_empty()).then(|| LassoSelection { page, items, rev: s.rev() });
     Ok(json!({"page": page, "count": selected.len(), "selected": selected}))
 }
 
@@ -643,7 +658,7 @@ fn lasso_delete(s: &mut Session, _: &Value) -> CmdResult {
             deleted += 1;
         }
     }
-    s.view.draw.lasso = None;
+    draw_mut(&mut s.ext)?.lasso = None;
     if deleted == 0 {
         return Err(CmdError::Failed("nothing selected to delete".into()));
     }
@@ -747,12 +762,12 @@ pub fn strokes_in_drawing_order(s: &mut Session) -> Vec<(usize, PlacedInk)> {
 
 /// Start or stop Ink Replay; the strokes in the order they'll be replayed.
 fn replay(s: &mut Session, v: &Value) -> CmdResult {
-    let on = p::bool(v, "value").unwrap_or(!s.view.draw.replay);
+    let on = p::bool(v, "value").unwrap_or(!draw_state(&s.ext).replay);
     let strokes = if on { strokes_in_drawing_order(s) } else { Vec::new() };
     if on && strokes.is_empty() {
         return Err(CmdError::Failed("there is no ink to replay".into()));
     }
-    s.view.draw.replay = on;
+    draw_mut(&mut s.ext)?.replay = on;
     let list: Vec<Value> = strokes
         .iter()
         .map(|(page, k)| {
@@ -830,11 +845,14 @@ mod tests {
         assert!(ink(&s).is_empty());
         // Without a point it picks up the eraser; Select puts it down.
         s.run("draw.eraser", &json!({})).unwrap();
-        assert_eq!(s.view.draw.mode, super::DrawMode::Eraser);
+        assert_eq!(super::draw_state(&s.ext).mode, super::DrawMode::Eraser);
         s.run("draw.pencil", &json!({"width": 1e9})).unwrap();
-        assert_eq!((s.view.draw.mode, s.view.draw.pencil.width), (super::DrawMode::Pen(InkTool::Pencil), super::MAX_WIDTH));
+        assert_eq!(
+            (super::draw_state(&s.ext).mode, super::draw_state(&s.ext).pencil.width),
+            (super::DrawMode::Pen(InkTool::Pencil), super::MAX_WIDTH)
+        );
         s.run("draw.select", &json!({})).unwrap();
-        assert_eq!(s.view.draw.mode, super::DrawMode::Select);
+        assert_eq!(super::draw_state(&s.ext).mode, super::DrawMode::Select);
     }
 
     /// #445: a turned stroke is erased where it is drawn, not where it was before the turn.
@@ -917,7 +935,7 @@ mod tests {
         s.run("draw.stroke", &json!({"page": 0, "points": [[300, 300], [340, 310]]})).unwrap();
         // Without points it picks up the lasso; a loop around the first stroke selects only it.
         s.run("draw.lasso", &json!({})).unwrap();
-        assert_eq!(s.view.draw.mode, super::DrawMode::Lasso);
+        assert_eq!(super::draw_state(&s.ext).mode, super::DrawMode::Lasso);
         let r = s.run("draw.lasso", &json!({"page": 0, "points": [[80, 80], [200, 80], [200, 150], [80, 150]]})).unwrap();
         assert_eq!(r["count"], 1);
         let before = s.layout().object(&super::lasso_selection(&s).unwrap().items[0], 0).unwrap().rect;
@@ -972,7 +990,7 @@ mod tests {
         let r = s.run("draw.inkToShape", &json!({})).unwrap();
         assert_eq!(r["converted"][0]["shape"], "ellipse");
         assert_eq!(ink(&s).len(), 1);
-        assert!(!s.view.draw.ink_to_shape, "converting the selection doesn't turn the mode on");
+        assert!(!super::draw_state(&s.ext).ink_to_shape, "converting the selection doesn't turn the mode on");
     }
 
     #[test]
@@ -982,7 +1000,7 @@ mod tests {
         s.run("draw.stroke", &json!({"page": 0, "points": [[100, 400], [150, 400]]})).unwrap();
         s.run("draw.stroke", &json!({"page": 0, "points": [[100, 90], [150, 90]]})).unwrap();
         let r = s.run("draw.replay", &json!({})).unwrap();
-        assert!(s.view.draw.replay);
+        assert!(super::draw_state(&s.ext).replay);
         let orders: Vec<u64> = r["strokes"].as_array().unwrap().iter().map(|k| k["order"].as_u64().unwrap()).collect();
         assert_eq!(orders, vec![1, 2]);
         let ys: Vec<f32> = super::strokes_in_drawing_order(&mut s).iter().map(|(_, k)| k.rect.y).collect();
@@ -997,14 +1015,14 @@ mod tests {
         let mut s = session();
         let r = s.run("draw.addPen", &json!({"kind": "highlighter", "color": "00B050", "width": 1e9})).unwrap();
         assert_eq!(r["pen"], json!({"kind": "highlighter", "color": "00B050", "width": super::MAX_WIDTH}));
-        assert_eq!(s.view.draw.mode, super::DrawMode::Pen(InkTool::Highlighter), "the new pen is picked up");
+        assert_eq!(super::draw_state(&s.ext).mode, super::DrawMode::Pen(InkTool::Highlighter), "the new pen is picked up");
         for bad in [json!({"kind": "crayon"}), json!({"color": "blue"}), json!(5), json!(null)] {
             assert!(s.run("draw.addPen", &bad).is_err(), "{bad}");
         }
         for _ in 0..super::MAX_PENS + 3 {
             let _ = s.run("draw.addPen", &json!({}));
         }
-        assert_eq!(s.view.draw.pens.len(), super::MAX_PENS);
+        assert_eq!(super::draw_state(&s.ext).pens.len(), super::MAX_PENS);
         s.run("draw.removePen", &json!({"index": 0})).unwrap();
         assert!(s.run("draw.removePen", &json!({"index": 999})).is_err());
         // A saved gallery keeps its pens and drops the junk around them.

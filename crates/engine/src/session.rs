@@ -163,9 +163,6 @@ pub struct ViewState {
     /// Review › Hide Ink: ink strokes aren't shown on screen (they stay in the document).
     #[serde(default)]
     pub hide_ink: bool,
-    /// Draw tab: the tool dragging on the page uses, and each pen's colour and thickness.
-    #[serde(default)]
-    pub draw: crate::cmd::draw::DrawState,
     /// Show field codes instead of their results (`view.fieldCodes`, Alt+F9).
     #[serde(default)]
     pub field_codes: bool,
@@ -232,7 +229,6 @@ impl Default for ViewState {
             proofing: true,
             numeral: NumeralMode::default(),
             hide_ink: false,
-            draw: Default::default(),
             field_codes: false,
             hide_white_space: false,
             outline: Default::default(),
