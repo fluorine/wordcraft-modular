@@ -1036,7 +1036,7 @@ impl FieldForm {
             codes: false,
             code: String::new(),
             bookmarks,
-            merge_fields: wordcraft_engine::cmd::mailings::merge_state(&app.session).headers.clone(),
+            merge_fields: crate::ext::merge_fields(&app.session),
         };
         f.select("DATE");
         f

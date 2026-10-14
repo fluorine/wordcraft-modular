@@ -20,6 +20,22 @@ pub const TABS: [&str; 13] =
 /// Tabs that come up with the selection; custom tabs can't take their names.
 pub const CONTEXTUAL_TABS: [&str; 7] =
     ["Table Design", "Table Layout", "Picture Format", "Shape Format", "Equation", "Chart Design", "SmartArt Design"];
+/// Built-in tabs that belong to an extension; the others are core.
+pub const TAB_OWNERS: [(&str, &str); 7] = [
+    ("Draw", "ink"),
+    ("Mailings", "mailings"),
+    ("Developer", "developer"),
+    ("Shape Format", "shapes"),
+    ("Equation", "equation-editor"),
+    ("Chart Design", "charts"),
+    ("SmartArt Design", "smart-art"),
+];
+
+/// A built-in tab this build can show: core, or its extension is compiled in.
+pub fn tab_available(name: &str) -> bool {
+    TAB_OWNERS.iter().find(|(t, _)| *t == name).is_none_or(|(_, e)| crate::extensions::compiled(e))
+}
+
 /// The Quick Access Toolbar's commands until the user changes them.
 pub const DEFAULT_QAT: [&str; 3] = ["file.save", "edit.undo", "edit.redo"];
 
@@ -434,6 +450,16 @@ impl<'de> Deserialize<'de> for RibbonLayout {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn tab_owners_are_extensions_and_follow_the_build() {
+        for (tab, ext) in super::TAB_OWNERS {
+            assert!(super::TABS.contains(&tab) || super::CONTEXTUAL_TABS.contains(&tab), "{tab} is not a tab");
+            assert!(crate::extensions::get(ext).is_some(), "{tab}: unknown extension {ext}");
+            assert_eq!(super::tab_available(tab), crate::extensions::compiled(ext), "{tab}");
+        }
+        assert!(super::tab_available("Home"), "core tabs always show");
+    }
+
     use serde_json::json;
 
     use super::*;

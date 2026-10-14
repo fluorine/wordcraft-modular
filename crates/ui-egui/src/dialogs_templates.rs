@@ -162,7 +162,7 @@ pub fn organizer(app: &mut WordApp, ui: &mut Ui, f: &mut OrganizerForm) -> bool 
     if let Some(p) = app.dialog_pick.take() {
         f.load(app, &p);
     }
-    let mine = wordcraft_engine::cmd::templates::style_list(&app.session.doc);
+    let mine = crate::ext::template_styles(&app.session.doc);
     let mine = mine.as_array().cloned().unwrap_or_default();
     let s = |x: &Value, k: &str| x.get(k).and_then(Value::as_str).unwrap_or("").to_string();
     if !mine.iter().any(|x| s(x, "id") == f.left) {

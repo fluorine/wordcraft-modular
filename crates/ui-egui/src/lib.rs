@@ -47,6 +47,7 @@ pub mod dialogs_ribbon;
 pub mod dialogs_smart_art;
 pub mod dialogs_templates;
 pub mod equation_tab;
+pub mod ext;
 /// The built-in file browser, for desktops without a system file dialog (#576).
 #[cfg(not(target_arch = "wasm32"))]
 pub mod file_browser;
@@ -54,6 +55,10 @@ pub mod file_dialogs;
 pub mod frame;
 pub mod i18n;
 pub mod icons;
+#[cfg(feature = "ink")]
+pub mod ink;
+#[cfg(not(feature = "ink"))]
+#[path = "ink_off.rs"]
 pub mod ink;
 pub mod keys;
 pub mod keytips;
@@ -243,6 +248,7 @@ pub struct UiState {
     pub caption_labels: Vec<String>,
     /// Draw › Add Pen: the pens added to the pen gallery; the session owns them while running.
     /// Entries that aren't pens are dropped on reading.
+    #[cfg(feature = "ink")]
     #[serde(deserialize_with = "wordcraft_engine::cmd::draw::lenient_pens")]
     pub ink_pens: Vec<wordcraft_engine::cmd::draw::CustomPen>,
     /// File › Options › General: initials for comments; empty = the user name's. The session
@@ -304,6 +310,7 @@ impl Default for UiState {
             keyboard: wordcraft_engine::KeyMap::default(),
             ribbon: wordcraft_engine::RibbonLayout::default(),
             caption_labels: Vec::new(),
+            #[cfg(feature = "ink")]
             ink_pens: Vec::new(),
             initials: String::new(),
             options_pane: "general".into(),
@@ -589,7 +596,10 @@ impl WordApp {
         ui.dark_page = self.session.view.dark_mode;
         ui.keyboard = self.session.keymap.clone();
         ui.ribbon = self.session.ribbon.clone();
-        ui.ink_pens = wordcraft_engine::cmd::draw::draw_state(&self.session.ext).pens.clone();
+        #[cfg(feature = "ink")]
+        {
+            ui.ink_pens = wordcraft_engine::cmd::draw::draw_state(&self.session.ext).pens.clone();
+        }
         ui
     }
 
@@ -631,6 +641,7 @@ impl WordApp {
         // So are ribbon and toolbar commands.
         self.session.ribbon = std::mem::take(&mut self.ui.ribbon);
         self.session.ribbon.retain_known(&reg);
+        #[cfg(feature = "ink")]
         if let Ok(d) = wordcraft_engine::cmd::draw::draw_mut(&mut self.session.ext) {
             d.pens = std::mem::take(&mut self.ui.ink_pens);
         }

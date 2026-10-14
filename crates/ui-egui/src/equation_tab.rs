@@ -266,7 +266,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         math_menu_button(ui, app, "∑_(i=1)^n", "Equation", builtin_menu);
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing = vec2(1.0, 0.0);
-            let latex = wordcraft_engine::cmd::equation::latex(&app.session);
+            let latex = crate::ext::equation_latex(&app.session);
             small(
                 ui,
                 app,
@@ -304,7 +304,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         });
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing = vec2(1.0, 0.0);
-            let normal = wordcraft_engine::cmd::equation::normal_text(&app.session);
+            let normal = crate::ext::equation_normal_text(&app.session);
             small(ui, app, "case", Some("Normal Text"), "Type normal (non-math) text in the equation", "equation.normalText", json!({}), normal);
         });
     });

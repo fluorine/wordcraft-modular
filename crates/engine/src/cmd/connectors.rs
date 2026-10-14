@@ -15,8 +15,7 @@ use wordcraft_doc::{Pos, StoryRef};
 
 use crate::{CmdError, CmdResult, CommandSpec, Session, p};
 
-/// How close (points) a dragged end must come to a connection site to glue to it.
-pub const SNAP: f32 = 12.0;
+pub use super::objects::SNAP;
 /// Largest offset a routed connector gets, points.
 const MAX_OFFSET: f32 = 4000.0;
 

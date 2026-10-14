@@ -330,7 +330,7 @@ fn cause_key(app: &WordApp) -> u64 {
     let s = &app.session;
     let mut h = std::collections::hash_map::DefaultHasher::new();
     (s.rev(), &s.sel.focus).hash(&mut h);
-    if let Some(m) = wordcraft_engine::cmd::equation::editing(s) {
+    if let Some(m) = crate::ext::equation_editing(s) {
         format!("{:?}", m.pos).hash(&mut h);
     }
     h.finish()

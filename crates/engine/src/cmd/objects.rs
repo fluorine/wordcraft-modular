@@ -3,6 +3,9 @@
 //! The selected object is the first picture/shape inside the selection (or right before the
 //! caret). Picture adjustments re-encode the bitmap (originals are kept for Reset Picture).
 
+/// How close (points) a dragged end must come to a connection site to glue to it.
+pub const SNAP: f32 = 12.0;
+
 use serde_json::{Value, json};
 use wordcraft_doc::para::{Float, InlineObject, Wrap, WrapText};
 use wordcraft_doc::props::{Rgb, TextVert, VAlign};

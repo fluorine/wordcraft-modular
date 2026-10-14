@@ -92,12 +92,12 @@ fn reading_toolbar(app: &mut WordApp, ui: &mut Ui, t: Tokens) {
 
 /// Whether the selection is a SmartArt graphic WordCraft can edit (so SmartArt Design is shown).
 pub fn has_smart_art_selected(s: &wordcraft_engine::Session) -> bool {
-    wordcraft_engine::cmd::smart_art::selected_smart_art(s).is_some()
+    crate::ext::smart_art_selected(s)
 }
 
 /// Whether the selection is a chart WordCraft can edit (so Chart Design is shown).
 pub fn has_chart_selected(s: &wordcraft_engine::Session) -> bool {
-    wordcraft_engine::cmd::chart::selected_chart(s).is_some()
+    crate::ext::chart_selected(s)
 }
 
 /// Contextual tabs for the current selection (pure, tested).
@@ -120,7 +120,7 @@ pub fn contextual_tabs(s: &wordcraft_engine::Session) -> Vec<&'static str> {
         tabs.push("Chart Design");
     }
     // Editing an equation.
-    if wordcraft_engine::cmd::equation::editing(s).is_some() {
+    if crate::ext::equation_editing(s).is_some() {
         tabs.push("Equation");
     }
     // Outline view (drawn first, next to File, as Word does).
@@ -147,7 +147,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         return;
     }
     // Editing an equation brings up the Equation tab; leaving it goes back.
-    if wordcraft_engine::cmd::equation::editing(&app.session).is_some() {
+    if crate::ext::equation_editing(&app.session).is_some() {
         if app.equation_prev_tab.is_none() {
             app.equation_prev_tab = Some(app.ui.tab.clone());
             app.ui.tab = "Equation".into();
@@ -173,8 +173,10 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     // Format) may be stored while the selection moved away, and a tab may have been hidden.
     let user_tabs = app.session.ribbon.tabs().into_owned();
     let mut tabs: Vec<(String, bool)> = vec![("File".to_string(), false)];
-    tabs.extend(user_tabs.iter().filter(|e| !e.hidden).map(|e| (e.name.clone(), e.custom)));
-    for ct in contextual_tabs(&app.session) {
+    tabs.extend(
+        user_tabs.iter().filter(|e| !e.hidden && (e.custom || wordcraft_engine::ribbon::tab_available(&e.name))).map(|e| (e.name.clone(), e.custom)),
+    );
+    for ct in contextual_tabs(&app.session).into_iter().filter(|t| wordcraft_engine::ribbon::tab_available(t)) {
         if ct == "Outlining" {
             tabs.insert(1.min(tabs.len()), (ct.to_string(), false));
         } else if !tabs.iter().any(|(n, _)| n == ct) {
@@ -297,10 +299,12 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     match app.ui.tab.as_str() {
                         "Home" => home(app, ui),
                         "Insert" => insert(app, ui),
+                        #[cfg(feature = "ink")]
                         "Draw" => draw(app, ui),
                         "Design" => design(app, ui),
                         "Layout" => layout(app, ui),
                         "References" => references(app, ui),
+                        #[cfg(feature = "mailings")]
                         "Mailings" => mailings(app, ui),
                         "Review" => review(app, ui),
                         "View" => view(app, ui),
@@ -309,11 +313,13 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                         "Help" => help(app, ui),
                         "Table Design" => table_design(app, ui),
                         "Table Layout" => table_layout(app, ui),
-                        "Equation" if wordcraft_engine::cmd::equation::editing(&app.session).is_some() => crate::equation_tab::show(app, ui),
+                        "Equation" if crate::ext::equation_editing(&app.session).is_some() => crate::equation_tab::show(app, ui),
                         "Picture Format" => picture_format(app, ui),
                         "Shape Format" => shape_format(app, ui),
+                        #[cfg(feature = "smart-art")]
                         "SmartArt Design" => smart_art_design(app, ui),
                         "Outlining" => outlining(app, ui),
+                        #[cfg(feature = "charts")]
                         "Chart Design" => chart_design(app, ui),
                         _ => home(app, ui),
                     }
@@ -933,6 +939,7 @@ fn insert(app: &mut WordApp, ui: &mut Ui) {
     });
 }
 
+#[cfg(feature = "ink")]
 fn draw(app: &mut WordApp, ui: &mut Ui) {
     use wordcraft_doc::freeform::InkTool;
     use wordcraft_engine::cmd::draw::{DrawMode, lasso_selection};
@@ -1001,6 +1008,7 @@ fn draw(app: &mut WordApp, ui: &mut Ui) {
 }
 
 /// The command that picks up `tool`.
+#[cfg(feature = "ink")]
 fn pen_command(tool: wordcraft_doc::freeform::InkTool) -> &'static str {
     use wordcraft_doc::freeform::InkTool;
     match tool {
@@ -1012,6 +1020,7 @@ fn pen_command(tool: wordcraft_doc::freeform::InkTool) -> &'static str {
 
 /// After the colour or thickness menu changed `tool`'s settings, the gallery pen that was in use
 /// (`custom`) takes them too.
+#[cfg(feature = "ink")]
 fn update_gallery_pen(app: &mut WordApp, custom: Option<usize>, tool: wordcraft_doc::freeform::InkTool) {
     let set = wordcraft_engine::cmd::draw::draw_state(&app.session.ext).settings(tool);
     if let Some(p) = custom.and_then(|i| wordcraft_engine::cmd::draw::draw_mut(&mut app.session.ext).ok().and_then(|d| d.pens.get_mut(i)))
@@ -1024,6 +1033,7 @@ fn update_gallery_pen(app: &mut WordApp, custom: Option<usize>, tool: wordcraft_
 
 /// A pen of the gallery: its kind's icon over a bar of its colour and thickness; a click picks it
 /// up, right-click offers Remove Pen.
+#[cfg(feature = "ink")]
 fn gallery_pen(ui: &mut Ui, app: &mut WordApp, i: usize, pen: wordcraft_engine::cmd::draw::CustomPen, active: bool) {
     use wordcraft_doc::freeform::InkTool;
     let t = Tokens::get(ui.ctx());
@@ -1072,6 +1082,7 @@ fn style_set_box(app: &mut WordApp, ui: &mut Ui) -> (Rect, Rect) {
 }
 
 fn design(app: &mut WordApp, ui: &mut Ui) {
+    #[cfg(feature = "design")]
     group(ui, "Themes", None, app, |ui, app| {
         menu_button(ui, app, "themes", Some("Themes"), "Themes", true, "design.themes", |ui, app| {
             for (name, ..) in wordcraft_engine::cmd::design::THEMES {
@@ -1081,6 +1092,7 @@ fn design(app: &mut WordApp, ui: &mut Ui) {
     });
     group(ui, "Document Formatting", None, app, |ui, app| {
         style_set_box(app, ui);
+        #[cfg(feature = "design")]
         stack(ui, |ui| {
             menu_button(ui, app, "colors", Some("Colors"), "Theme Colors", false, "design.themeColors", |ui, app| {
                 for (name, ..) in wordcraft_engine::cmd::design::THEMES {
@@ -1378,13 +1390,16 @@ fn references(app: &mut WordApp, ui: &mut Ui) {
         });
         stack(ui, |ui| {
             small(ui, app, "sources", Some("Manage Sources"), "Manage Sources", "references.sources", json!({}), false);
-            let current = wordcraft_engine::cmd::citations::current_style(&app.session).name.to_string();
-            let label = crate::i18n::fmt(tl!("Style: {style}"), &[("style", &current)]);
-            menu_button(ui, app, "styles", Some(&label), "Citation Style", false, "references.citationStyle", |ui, app| {
-                for st in &wordcraft_engine::cmd::citations::STYLES {
-                    mi_check(ui, app, st.name, st.name == current, "references.citationStyle", json!({"style": st.name}));
-                }
-            });
+            #[cfg(feature = "references")]
+            {
+                let current = wordcraft_engine::cmd::citations::current_style(&app.session).name.to_string();
+                let label = crate::i18n::fmt(tl!("Style: {style}"), &[("style", &current)]);
+                menu_button(ui, app, "styles", Some(&label), "Citation Style", false, "references.citationStyle", |ui, app| {
+                    for st in &wordcraft_engine::cmd::citations::STYLES {
+                        mi_check(ui, app, st.name, st.name == current, "references.citationStyle", json!({"style": st.name}));
+                    }
+                });
+            }
             small(ui, app, "bibliography", Some("Bibliography"), "Bibliography", "references.bibliography", json!({}), false);
         });
     });
@@ -1430,6 +1445,7 @@ fn references(app: &mut WordApp, ui: &mut Ui) {
     });
 }
 
+#[cfg(feature = "mailings")]
 fn mailings(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Create", None, app, |ui, app| {
         big(ui, app, "envelope", "Envelopes", "mailings.envelopes", json!({}), false);
@@ -1771,6 +1787,7 @@ fn help(app: &mut WordApp, ui: &mut Ui) {
 
 /// SmartArt Design: the selected graphic's items (Add Shape, Promote, Demote, Text Pane), its
 /// layout (a gallery of previews), its colours and Reset.
+#[cfg(feature = "smart-art")]
 fn smart_art_design(app: &mut WordApp, ui: &mut Ui) {
     use wordcraft_doc::smart_art::{SmartArtColors, SmartArtLayout};
     let Some(g) = wordcraft_engine::cmd::smart_art::selected_smart_art(&app.session) else { return };
@@ -1831,6 +1848,7 @@ fn smart_art_design(app: &mut WordApp, ui: &mut Ui) {
 
 /// Chart Design: the selected chart's elements (title, legend, data labels), its data and type,
 /// and its size.
+#[cfg(feature = "charts")]
 fn chart_design(app: &mut WordApp, ui: &mut Ui) {
     let Some(chart) = wordcraft_engine::cmd::chart::selected_chart(&app.session) else { return };
     group(ui, "Chart Layouts", None, app, |ui, app| {

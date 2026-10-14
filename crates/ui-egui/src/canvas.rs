@@ -95,8 +95,10 @@ pub struct CanvasState {
     /// An ink stroke being drawn with a pen (Draw tab).
     pub(crate) ink: Option<crate::ink::InkDrag>,
     /// The eraser is down: whether it has erased anything in this drag yet.
+    #[cfg(feature = "ink")]
     pub(crate) erasing: Option<bool>,
     /// The lasso being drawn or dragged, and Ink Replay (Draw tab).
+    #[cfg(feature = "ink")]
     pub(crate) ink_ui: crate::ink::InkUi,
     /// Wheel/touchpad scrolling (smooth notches, touchpad momentum).
     pub(crate) wheel: crate::scroll::CanvasScroll,
@@ -185,7 +187,9 @@ impl Default for CanvasState {
             context_synonyms: None,
             obj_drag: None,
             ink: None,
+            #[cfg(feature = "ink")]
             erasing: None,
+            #[cfg(feature = "ink")]
             ink_ui: Default::default(),
             context_menu_open: false,
             context_menu_from_keys: false,
@@ -557,15 +561,7 @@ pub fn sync_fit_zoom(app: &mut WordApp, scale: f32) {
 fn view_key(app: &WordApp, dim_body: bool) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     let v = &app.session.view;
-    (
-        v.marks,
-        app.session.prefs.marks,
-        v.show_markup,
-        v.dark_mode,
-        wordcraft_render::DARK_PAPER,
-        v.hide_ink,
-        wordcraft_engine::cmd::draw::draw_state(&app.session.ext).replay,
-    )
+    (v.marks, app.session.prefs.marks, v.show_markup, v.dark_mode, wordcraft_render::DARK_PAPER, v.hide_ink, crate::ext::ink_replay(&app.session))
         .hash(&mut h);
     app.session.prefs.markup.hash(&mut h);
     dim_body.hash(&mut h);
@@ -1121,7 +1117,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         let focused = resp.has_focus() || app.canvas.focused;
         // Editing an equation: shade it and draw the caret inside it.
         let mut math_caret = false;
-        if let Some(m) = wordcraft_engine::cmd::equation::editing(&app.session).cloned()
+        if let Some(m) = crate::ext::equation_editing(&app.session).cloned()
             && let Some((pi, ex, base, ml)) = layout.equation_geom(&m.at, app.session.page_hint)
             && let Some(pr) = rects.get(pi)
         {
@@ -1298,7 +1294,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 app.session.sel = wordcraft_engine::Selection::caret(at);
                 let _ = app.run("equation.edit", json!({"pos": serde_json::to_value(&inner).unwrap_or_default()}));
             }
-            None if wordcraft_engine::cmd::equation::editing(&app.session).is_some() => {
+            None if crate::ext::equation_editing(&app.session).is_some() => {
                 let _ = app.run("equation.exit", json!({}));
             }
             None => {}
@@ -1306,7 +1302,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     }
     // Right-click on a picture, shape or text box selects it (its menu offers Wrap Text).
     if secondary_clicked
-        && wordcraft_engine::cmd::equation::editing(&app.session).is_none()
+        && crate::ext::equation_editing(&app.session).is_none()
         && let Some(p) = resp.interact_pointer_pos()
         && let Some((page, x, y)) = page_at(&rects, &layout, geo.scale, p)
     {
@@ -1892,7 +1888,7 @@ fn mouse(app: &mut WordApp, ui: &Ui, resp: &egui::Response, rects: &[Rect], layo
             app.session.page_hint = page;
             return;
         }
-        if wordcraft_engine::cmd::equation::editing(&app.session).is_some() {
+        if crate::ext::equation_editing(&app.session).is_some() {
             let _ = app.run("equation.exit", json!({}));
         }
         // The selection bar (the left margin beside body text, #856): a click selects the line,
@@ -2466,7 +2462,7 @@ fn equation_menu(app: &mut WordApp, ui: &mut Ui) {
 }
 
 fn context_menu(app: &mut WordApp, ui: &mut Ui) {
-    if wordcraft_engine::cmd::equation::editing(&app.session).is_some() {
+    if crate::ext::equation_editing(&app.session).is_some() {
         return equation_menu(app, ui);
     }
     ui.set_min_width(220.0);
@@ -2648,7 +2644,7 @@ fn page_render_options(app: &WordApp, dim_body: bool) -> wordcraft_render::Rende
     opts.display.placeholders = true;
     opts.display.markup = app.session.view.show_markup;
     // Ink Replay draws the ink itself, stroke by stroke, over pages without it.
-    opts.display.hide_ink = app.session.view.hide_ink || wordcraft_engine::cmd::draw::draw_state(&app.session.ext).replay;
+    opts.display.hide_ink = app.session.view.hide_ink || crate::ext::ink_replay(&app.session);
     opts.display.revisions = app.session.prefs.markup.clone();
     opts.dark = app.session.view.dark_mode;
     opts.dark_paper = wordcraft_render::DARK_PAPER;

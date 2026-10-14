@@ -110,9 +110,7 @@ fn restrict(s: &mut Session, v: &Value) -> CmdResult {
     Ok(state(s))
 }
 
-/// The error Stop Protection reports when the document's password hash uses an algorithm or form
-/// WordCraft can't check; the protection stays on.
-pub const UNSUPPORTED_PASSWORD: &str = "This password type isn't supported";
+pub use super::UNSUPPORTED_PASSWORD;
 
 /// Stop Protection: with the document's password when it has one. The password is checked like
 /// Word checks it — the current hash form and the legacy one (ECMA-376 Part 4 §14.8.1); a hash

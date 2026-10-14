@@ -48,6 +48,7 @@ pub mod review;
 pub mod smart_art;
 #[cfg(feature = "read-aloud")]
 pub mod speech;
+pub mod stationery;
 pub mod table;
 pub mod table_draw;
 pub mod table_mouse;
@@ -196,6 +197,10 @@ pub fn parse_csv(text: &str) -> Vec<Vec<String>> {
     }
     rows
 }
+
+/// The error Stop Protection reports when the document's password hash uses an algorithm or form
+/// WordCraft can't check; the protection stays on.
+pub const UNSUPPORTED_PASSWORD: &str = "This password type isn't supported";
 
 /// A shortcut that differs on macOS, where Word for Mac moves it (⌘Q quits, ⌘Space is
 /// Spotlight, ⌘⌥H hides other apps…): `mac` there, `other` everywhere else.

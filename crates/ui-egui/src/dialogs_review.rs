@@ -716,7 +716,7 @@ fn enforced_ui(app: &mut WordApp, ui: &mut Ui, st: &mut RestrictPane, mode: &str
         ui.add_space(6.0);
         if ui.button(tl!("Find Next Editable Region")).clicked() {
             let from = app.session.sel.ordered().1;
-            if let Some((a, b)) = wordcraft_engine::cmd::protect::next_region(&app.session, &from) {
+            if let Some((a, b)) = crate::ext::next_editable_region(&app.session, &from) {
                 app.session.sel = wordcraft_engine::Selection { anchor: a, focus: b };
                 app.canvas.want_focus = true;
             }
@@ -757,7 +757,7 @@ fn stop(app: &mut WordApp, st: &mut RestrictPane) {
             st.asking = false;
             st.message.clear();
         }
-        Err(e) if e.contains(wordcraft_engine::cmd::protect::UNSUPPORTED_PASSWORD) => {
+        Err(e) if e.contains(wordcraft_engine::cmd::UNSUPPORTED_PASSWORD) => {
             st.message = tl!("This password type isn't supported.").to_string();
         }
         Err(e) => st.message = e,

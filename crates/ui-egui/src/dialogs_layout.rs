@@ -11,7 +11,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use wordcraft_doc::section::LineNumberRestart;
-use wordcraft_engine::cmd::mailings::{ENVELOPE_SIZES, LABEL_PRODUCTS};
+use wordcraft_engine::cmd::stationery::{ENVELOPE_SIZES, LABEL_PRODUCTS};
 
 use crate::WordApp;
 use crate::options::MeasureExt;
@@ -563,7 +563,7 @@ impl LabelsForm {
             single: false,
             row: 1,
             col: 1,
-            recipients: !wordcraft_engine::cmd::mailings::merge_state(&app.session).rows.is_empty(),
+            recipients: crate::ext::has_recipients(&app.session),
         }
     }
 
@@ -591,7 +591,7 @@ fn product_label(i: usize) -> String {
 }
 
 fn labels_ui(app: &mut WordApp, ui: &mut Ui, f: &mut LabelsForm) -> bool {
-    let has_recipients = !wordcraft_engine::cmd::mailings::merge_state(&app.session).rows.is_empty();
+    let has_recipients = crate::ext::has_recipients(&app.session);
     if has_recipients {
         ui.checkbox(&mut f.recipients, tl!("One label per recipient"));
     }

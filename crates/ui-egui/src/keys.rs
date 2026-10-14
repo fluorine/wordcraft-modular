@@ -239,7 +239,7 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
         if let egui::Event::Paste(t) = &e {
             app.canvas.pasted = true;
             // Copied picture files arrive as their paths: insert the pictures (#45).
-            if wordcraft_engine::cmd::equation::editing(&app.session).is_none()
+            if crate::ext::equation_editing(&app.session).is_none()
                 && !ctx.input(|i| i.modifiers.alt)
                 && crate::paste_picture::paste_named_files(app, t)
             {
@@ -252,14 +252,14 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
         if let egui::Event::Key { key: key @ (Key::V | Key::Paste), pressed: false, modifiers, .. } = &e {
             let paste_keys = is_paste_release(*key, *modifiers);
             let pasted = std::mem::take(&mut app.canvas.pasted);
-            if !pasted && paste_keys && wordcraft_engine::cmd::equation::editing(&app.session).is_none() && app.services.clipboard_picture.is_some() {
+            if !pasted && paste_keys && crate::ext::equation_editing(&app.session).is_none() && app.services.clipboard_picture.is_some() {
                 let _ = app.run("edit.paste", json!({}));
             }
             // Mod+Alt+V with no text on the clipboard: Paste Special still opens, listing what
             // is there (a picture) or saying what it holds (#687, #833).
             if !pasted
                 && is_paste_special_release(*key, *modifiers)
-                && wordcraft_engine::cmd::equation::editing(&app.session).is_none()
+                && crate::ext::equation_editing(&app.session).is_none()
                 && app.services.clipboard_picture.is_some()
             {
                 let _ = app.run("edit.pasteSpecial", json!({}));
@@ -267,7 +267,7 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
             continue;
         }
         // Editing an equation: text and editing keys go into it.
-        if wordcraft_engine::cmd::equation::editing(&app.session).is_some() {
+        if crate::ext::equation_editing(&app.session).is_some() {
             match &e {
                 egui::Event::Text(t) => {
                     let m = ctx.input(|i| i.modifiers);
@@ -336,9 +336,7 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
                     continue;
                 }
                 // Escape puts the pen or eraser down (back to selecting).
-                if key == Key::Escape
-                    && wordcraft_engine::cmd::draw::draw_state(&app.session.ext).mode != wordcraft_engine::cmd::draw::DrawMode::Select
-                {
+                if key == Key::Escape && crate::ext::ink_tool_active(&app.session) {
                     app.canvas.ink = None;
                     let _ = app.run("draw.select", json!({}));
                     continue;

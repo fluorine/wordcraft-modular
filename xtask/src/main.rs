@@ -21,7 +21,8 @@ commands:
   assets          check that every icon/image/font/asset is attributed in ATTRIBUTION.md
   layers          enforce the crate dependency layering (plan/architecture.md §3)
   wasm            cargo check --target wasm32-unknown-unknown for the wasm-safe crates
-  features        clippy -D warnings on the engine with no extensions and with each one alone
+  features        clippy -D warnings on the engine and the front end with no extensions and
+                  with each one alone
   ci              fmt --check, clippy -D warnings, test, assets, layers, features, wasm
                   (stops at first failure)
   corpus [--download]
@@ -152,21 +153,24 @@ fn engine_features() -> Result<Vec<String>, String> {
         .collect())
 }
 
-/// Every extension must build alone, and the engine with none of them.
+/// Every extension must build alone, and the engine and the front end with none of them.
 fn cmd_features() -> Result<(), String> {
     let mut sets = vec![None];
     sets.extend(engine_features()?.into_iter().map(Some));
     let mut failed = Vec::new();
-    for f in &sets {
-        let mut c = cargo();
-        c.args(["clippy", "-p", "wordcraft-engine", "--no-default-features"]);
-        if let Some(f) = f {
-            c.args(["--features", f]);
-        }
-        c.args(["--", "-D", "warnings"]);
-        let name = f.as_deref().unwrap_or("(no extensions)");
-        if run(c, &format!("cargo clippy -p wordcraft-engine --no-default-features {name}")).is_err() {
-            failed.push(name.to_string());
+    // The front end forwards the same features to the engine.
+    for pkg in ["wordcraft-engine", "wordcraft-ui-egui"] {
+        for f in &sets {
+            let mut c = cargo();
+            c.args(["clippy", "-p", pkg, "--no-default-features"]);
+            if let Some(f) = f {
+                c.args(["--features", f]);
+            }
+            c.args(["--", "-D", "warnings"]);
+            let name = format!("{pkg} {}", f.as_deref().unwrap_or("(no extensions)"));
+            if run(c, &format!("cargo clippy -p {pkg} --no-default-features {}", f.as_deref().unwrap_or(""))).is_err() {
+                failed.push(name);
+            }
         }
     }
     if failed.is_empty() { Ok(()) } else { Err(format!("these engine feature sets fail: {}", failed.join(", "))) }

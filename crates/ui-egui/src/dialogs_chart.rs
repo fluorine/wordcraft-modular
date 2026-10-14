@@ -22,7 +22,7 @@ pub struct ChartTypeForm {
 
 impl ChartTypeForm {
     pub fn new(app: &WordApp, change: bool) -> Option<ChartTypeForm> {
-        let current = wordcraft_engine::cmd::chart::selected_chart(&app.session);
+        let current = crate::ext::selected_chart(&app.session);
         if change && current.is_none() {
             return None;
         }
@@ -43,7 +43,7 @@ pub struct ChartDataForm {
 
 impl ChartDataForm {
     pub fn new(app: &WordApp) -> Option<ChartDataForm> {
-        let c = wordcraft_engine::cmd::chart::selected_chart(&app.session)?;
+        let c = crate::ext::selected_chart(&app.session)?;
         Some(Self::of(&c))
     }
 

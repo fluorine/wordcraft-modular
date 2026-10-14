@@ -1138,9 +1138,9 @@ impl Dialog {
             "models" => Dialog::About { tab: 2 },
             // The current list to edit, or a new one to type.
             "recipientList" | "newRecipientList" => {
-                let m = wordcraft_engine::cmd::mailings::merge_state(&app.session);
-                if name == "recipientList" && !m.headers.is_empty() {
-                    Dialog::RecipientList { fields: m.headers.clone(), rows: m.rows.clone(), message: String::new() }
+                let (headers, rows) = crate::ext::merge_list(&app.session);
+                if name == "recipientList" && !headers.is_empty() {
+                    Dialog::RecipientList { fields: headers, rows, message: String::new() }
                 } else {
                     let fields: Vec<String> = NEW_LIST_FIELDS.iter().map(|f| f.to_string()).collect();
                     let rows = vec![vec![String::new(); fields.len()]];
@@ -1148,7 +1148,7 @@ impl Dialog {
                 }
             }
             "insertMergeField" => {
-                let fields = wordcraft_engine::cmd::mailings::merge_state(&app.session).headers.clone();
+                let fields = crate::ext::merge_fields(&app.session);
                 Dialog::InsertMergeField { field: fields.first().cloned().unwrap_or_default(), fields }
             }
             "findRecipient" => Dialog::FindRecipient { text: String::new(), message: String::new() },
@@ -1159,7 +1159,7 @@ impl Dialog {
             }
             "encryptPassword" => Dialog::EncryptPassword { password: Password::default(), confirm: Password::default(), message: String::new() },
             "ruleIf" | "ruleSkipIf" => {
-                let fields = wordcraft_engine::cmd::mailings::merge_state(&app.session).headers.clone();
+                let fields = crate::ext::merge_fields(&app.session);
                 Dialog::MergeRule {
                     rule: if name == "ruleSkipIf" { "SKIPIF" } else { "IF" }.into(),
                     field: fields.first().cloned().unwrap_or_default(),
