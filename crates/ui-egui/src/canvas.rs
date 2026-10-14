@@ -1112,7 +1112,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         let focused = resp.has_focus() || app.canvas.focused;
         // Editing an equation: shade it and draw the caret inside it.
         let mut math_caret = false;
-        if let Some(m) = app.session.math.clone()
+        if let Some(m) = wordcraft_engine::cmd::equation::editing(&app.session).cloned()
             && let Some((pi, ex, base, ml)) = layout.equation_geom(&m.at, app.session.page_hint)
             && let Some(pr) = rects.get(pi)
         {
@@ -1289,7 +1289,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 app.session.sel = wordcraft_engine::Selection::caret(at);
                 let _ = app.run("equation.edit", json!({"pos": serde_json::to_value(&inner).unwrap_or_default()}));
             }
-            None if app.session.math.is_some() => {
+            None if wordcraft_engine::cmd::equation::editing(&app.session).is_some() => {
                 let _ = app.run("equation.exit", json!({}));
             }
             None => {}
@@ -1297,7 +1297,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     }
     // Right-click on a picture, shape or text box selects it (its menu offers Wrap Text).
     if secondary_clicked
-        && app.session.math.is_none()
+        && wordcraft_engine::cmd::equation::editing(&app.session).is_none()
         && let Some(p) = resp.interact_pointer_pos()
         && let Some((page, x, y)) = page_at(&rects, &layout, geo.scale, p)
     {
@@ -1883,7 +1883,7 @@ fn mouse(app: &mut WordApp, ui: &Ui, resp: &egui::Response, rects: &[Rect], layo
             app.session.page_hint = page;
             return;
         }
-        if app.session.math.is_some() {
+        if wordcraft_engine::cmd::equation::editing(&app.session).is_some() {
             let _ = app.run("equation.exit", json!({}));
         }
         // The selection bar (the left margin beside body text, #856): a click selects the line,
@@ -2457,7 +2457,7 @@ fn equation_menu(app: &mut WordApp, ui: &mut Ui) {
 }
 
 fn context_menu(app: &mut WordApp, ui: &mut Ui) {
-    if app.session.math.is_some() {
+    if wordcraft_engine::cmd::equation::editing(&app.session).is_some() {
         return equation_menu(app, ui);
     }
     ui.set_min_width(220.0);

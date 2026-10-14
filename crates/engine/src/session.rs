@@ -415,12 +415,6 @@ pub struct Session {
     /// `None` is WordCraft's default, US English. The front end sets it from the interface
     /// language with [`Session::set_editing_language`] (a Polish interface writes Polish).
     pub editing_lang: Option<String>,
-    /// Editing inside an equation: which one and the caret in it.
-    pub math: Option<MathEdit>,
-    /// Equations are typed in LaTeX rather than the linear format.
-    pub math_latex: bool,
-    /// Text typed into equations is normal (non-math) text.
-    pub math_normal_text: bool,
     /// The password Word documents are saved with (File › Info › Protect Document › Encrypt with
     /// Password, `file.encrypt`); `None` saves them unencrypted. Kept from a password-protected
     /// file that was opened, cleared when the document is replaced.
@@ -596,9 +590,6 @@ impl Session {
             autosave: true,
             bib_style,
             ui_requests: Vec::new(),
-            math: None,
-            math_latex: false,
-            math_normal_text: false,
             also_selected: Vec::new(),
             prefs: Prefs::default(),
             system_region: Default::default(),
@@ -1031,10 +1022,6 @@ impl Session {
             ribbon: _,
             // A preference for new documents, like `prefs`: not part of this document.
             editing_lang: _,
-            // Equation editing mode, like `view`: not part of the document or its history.
-            math: _,
-            math_latex: _,
-            math_normal_text: _,
             // The save password, like the file path: not an edit to the document.
             password: _,
             also_selected: _,
@@ -1087,19 +1074,10 @@ impl Session {
     pub fn clamp_selection(&mut self) {
         self.sel.anchor = self.doc.clamp(&self.sel.anchor);
         self.sel.focus = self.doc.clamp(&self.sel.focus);
-        // The equation being edited must still be there (undo, edits elsewhere).
-        if let Some(m) = &self.math {
-            let eq = self.doc.para_at(&m.at).and_then(|p| match p.object_at(m.at.off) {
-                Some(wordcraft_doc::InlineObject::Equation { math, .. }) => Some(wordcraft_doc::math_edit::clamp(&math.nodes, &m.pos)),
-                _ => None,
-            });
-            match eq {
-                Some(pos) => {
-                    if let Some(m) = self.math.as_mut() {
-                        m.pos = pos;
-                    }
-                }
-                None => self.math = None,
+        let reg = self.registry.clone();
+        for h in reg.hooks() {
+            if let Some(f) = h.after_clamp {
+                f(self);
             }
         }
     }

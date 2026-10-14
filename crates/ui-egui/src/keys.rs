@@ -239,7 +239,10 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
         if let egui::Event::Paste(t) = &e {
             app.canvas.pasted = true;
             // Copied picture files arrive as their paths: insert the pictures (#45).
-            if app.session.math.is_none() && !ctx.input(|i| i.modifiers.alt) && crate::paste_picture::paste_named_files(app, t) {
+            if wordcraft_engine::cmd::equation::editing(&app.session).is_none()
+                && !ctx.input(|i| i.modifiers.alt)
+                && crate::paste_picture::paste_named_files(app, t)
+            {
                 continue;
             }
         }
@@ -249,18 +252,22 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
         if let egui::Event::Key { key: key @ (Key::V | Key::Paste), pressed: false, modifiers, .. } = &e {
             let paste_keys = is_paste_release(*key, *modifiers);
             let pasted = std::mem::take(&mut app.canvas.pasted);
-            if !pasted && paste_keys && app.session.math.is_none() && app.services.clipboard_picture.is_some() {
+            if !pasted && paste_keys && wordcraft_engine::cmd::equation::editing(&app.session).is_none() && app.services.clipboard_picture.is_some() {
                 let _ = app.run("edit.paste", json!({}));
             }
             // Mod+Alt+V with no text on the clipboard: Paste Special still opens, listing what
             // is there (a picture) or saying what it holds (#687, #833).
-            if !pasted && is_paste_special_release(*key, *modifiers) && app.session.math.is_none() && app.services.clipboard_picture.is_some() {
+            if !pasted
+                && is_paste_special_release(*key, *modifiers)
+                && wordcraft_engine::cmd::equation::editing(&app.session).is_none()
+                && app.services.clipboard_picture.is_some()
+            {
                 let _ = app.run("edit.pasteSpecial", json!({}));
             }
             continue;
         }
         // Editing an equation: text and editing keys go into it.
-        if app.session.math.is_some() {
+        if wordcraft_engine::cmd::equation::editing(&app.session).is_some() {
             match &e {
                 egui::Event::Text(t) => {
                     let m = ctx.input(|i| i.modifiers);

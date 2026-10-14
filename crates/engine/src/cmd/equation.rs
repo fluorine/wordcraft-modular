@@ -12,12 +12,12 @@ use wordcraft_doc::{InlineObject, Pos};
 use super::{delete_selection, sel_result, split_para};
 use crate::{CmdError, CmdResult, CommandSpec, MathEdit, Selection, Session, p};
 
-fn editing(s: &Session) -> Option<&'static str> {
-    if s.math.is_none() { Some("not editing an equation") } else { None }
+fn when_editing(s: &Session) -> Option<&'static str> {
+    if s.ext.edit().is_none() { Some("not editing an equation") } else { None }
 }
 
 fn near_equation(s: &Session) -> Option<&'static str> {
-    if s.math.is_some() || equation_at_caret(s).is_some() { None } else { Some("no equation at the caret") }
+    if s.ext.edit().is_some() || equation_at_caret(s).is_some() { None } else { Some("no equation at the caret") }
 }
 
 pub fn specs() -> Vec<CommandSpec> {
@@ -29,32 +29,37 @@ pub fn specs() -> Vec<CommandSpec> {
             .pure()
             .when(near_equation)
             .params(r#"{"pos"?: {"path": [[node, child]…], "off": n}}"#),
-        CommandSpec::new("equation.exit", "Leave Equation", "Equation", exit).pure().when(editing).params(r#"{"before"?: bool}"#),
-        CommandSpec::new("equation.type", "Type in Equation", "Equation", type_text).when(editing).params(r#"{"text": string}"#),
+        CommandSpec::new("equation.exit", "Leave Equation", "Equation", exit).pure().when(when_editing).params(r#"{"before"?: bool}"#),
+        CommandSpec::new("equation.type", "Type in Equation", "Equation", type_text).when(when_editing).params(r#"{"text": string}"#),
         CommandSpec::new("equation.insertStructure", "Insert Structure", "Equation › Structures", insert_structure)
             .params(r#"{"id"?: string (see equation.gallery), "linear"?: string, "latex"?: string}"#),
         CommandSpec::new("equation.insertSymbol", "Insert Symbol", "Equation › Symbols", insert_symbol).params(r#"{"char": string}"#),
         CommandSpec::new("equation.move", "Move in Equation", "Equation", move_caret)
             .pure()
-            .when(editing)
+            .when(when_editing)
             .params(r#"{"dir": "left|right|up|down|home|end|next|prev"}"#),
-        CommandSpec::new("equation.backspace", "Delete Back in Equation", "Equation", |s, _| delete(s, true)).when(editing),
-        CommandSpec::new("equation.delete", "Delete in Equation", "Equation", |s, _| delete(s, false)).when(editing),
-        CommandSpec::new("equation.enter", "Enter in Equation", "Equation", enter).when(editing),
+        CommandSpec::new("equation.backspace", "Delete Back in Equation", "Equation", |s, _| delete(s, true)).when(when_editing),
+        CommandSpec::new("equation.delete", "Delete in Equation", "Equation", |s, _| delete(s, false)).when(when_editing),
+        CommandSpec::new("equation.enter", "Enter in Equation", "Equation", enter).when(when_editing),
         CommandSpec::new("equation.convert", "Convert", "Equation › Conversions", convert)
             .when(near_equation_or_all)
             .params(r#"{"to": "professional|linear", "all"?: bool}"#),
         CommandSpec::new("equation.inputFormat", "Input Format", "Equation › Conversions", |s, v| {
-            if let Some(f) = p::str(v, "format") {
-                s.math_latex = f.eq_ignore_ascii_case("latex");
+            if let Some(f) = p::str(v, "format")
+                && let Some(e) = s.ext.equation_mut()
+            {
+                e.latex = f.eq_ignore_ascii_case("latex");
             }
-            Ok(json!({"format": if s.math_latex { "latex" } else { "unicode" }}))
+            Ok(json!({"format": if latex(s) { "latex" } else { "unicode" }}))
         })
         .pure()
         .params(r#"{"format": "unicode|latex"}"#),
         CommandSpec::new("equation.normalText", "Normal Text", "Equation › Tools", |s, v| {
-            s.math_normal_text = p::bool(v, "value").unwrap_or(!s.math_normal_text);
-            Ok(json!({"normalText": s.math_normal_text}))
+            let on = p::bool(v, "value").unwrap_or(!normal_text(s));
+            if let Some(e) = s.ext.equation_mut() {
+                e.normal_text = on;
+            }
+            Ok(json!({"normalText": normal_text(s)}))
         })
         .pure()
         .params(r#"{"value"?: bool}"#),
@@ -66,9 +71,9 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("equation.set", "Set Equation", "Equation", set).when(near_equation).params(r#"{"linear"?: string, "latex"?: string}"#),
         CommandSpec::new("equation.get", "Equation Info", "Equation", get).pure().when(near_equation),
         CommandSpec::new("equation.gallery", "Equation Gallery", "Equation › Structures", gallery).pure(),
-        CommandSpec::new("equation.structureActions", "Structure Actions", "Equation", structure_actions).pure().when(editing),
+        CommandSpec::new("equation.structureActions", "Structure Actions", "Equation", structure_actions).pure().when(when_editing),
         CommandSpec::new("equation.structure", "Change Structure", "Equation", structure)
-            .when(editing)
+            .when(when_editing)
             .params(r#"{"action": string (see equation.structureActions), "level"?: n}"#),
     ]
 }
@@ -79,7 +84,7 @@ fn near_equation_or_all(_: &Session) -> Option<&'static str> {
 
 /// The equation the caret is at: on its U+FFFC or just after it (or the one being edited).
 fn equation_at_caret(s: &Session) -> Option<Pos> {
-    if let Some(m) = &s.math {
+    if let Some(m) = s.ext.edit() {
         return Some(m.at.clone());
     }
     let f = &s.sel.focus;
@@ -129,7 +134,7 @@ fn plain(nodes: &[MNode]) -> String {
 }
 
 fn result(s: &Session) -> CmdResult {
-    let Some(m) = &s.math else { return sel_result(s) };
+    let Some(m) = s.ext.edit() else { return sel_result(s) };
     let info = s.doc.para_at(&m.at).and_then(|p| match p.object_at(m.at.off) {
         Some(InlineObject::Equation { linear, display, .. }) => Some((linear.clone(), *display)),
         _ => None,
@@ -164,7 +169,7 @@ fn insert(s: &mut Session, v: &Value) -> CmdResult {
 }
 
 fn insert_nodes_as_equation(s: &mut Session, nodes: Arg, v: &Value) -> CmdResult {
-    s.math = None;
+    s.ext.set_edit(None);
     let props = s.typing_props();
     let at = delete_selection(s)?;
     // On an empty line it's a display equation, in text an inline one.
@@ -179,7 +184,7 @@ fn insert_nodes_as_equation(s: &mut Session, nodes: Arg, v: &Value) -> CmdResult
     let end = s.doc.insert_object(&at, obj, &props)?;
     if p::bool(v, "edit").unwrap_or(true) {
         s.sel = Selection::caret(at.clone());
-        s.math = Some(MathEdit { at, pos: caret });
+        s.ext.set_edit(Some(MathEdit { at, pos: caret }));
     } else {
         s.sel = Selection::caret(end);
     }
@@ -201,12 +206,12 @@ fn edit(s: &mut Session, v: &Value) -> CmdResult {
     let pos =
         v.get("pos").and_then(|p| serde_json::from_value::<MathPos>(p.clone()).ok()).unwrap_or_else(|| MathPos::new(Vec::new(), me::units(&nodes)));
     s.sel = Selection::caret(at.clone());
-    s.math = Some(MathEdit { pos: me::clamp(&nodes, &pos), at });
+    s.ext.set_edit(Some(MathEdit { pos: me::clamp(&nodes, &pos), at }));
     result(s)
 }
 
 fn exit(s: &mut Session, v: &Value) -> CmdResult {
-    if let Some(m) = s.math.take() {
+    if let Some(m) = s.ext.take_edit() {
         let before = p::bool(v, "before").unwrap_or(false);
         let off = if before { m.at.off } else { m.at.off + OBJ.len_utf8() };
         s.sel = Selection::caret(Pos { off, ..m.at });
@@ -215,14 +220,14 @@ fn exit(s: &mut Session, v: &Value) -> CmdResult {
 }
 
 fn current(s: &Session) -> Result<MathEdit, CmdError> {
-    s.math.clone().ok_or_else(|| CmdError::Disabled("not editing an equation".into()))
+    s.ext.edit().cloned().ok_or_else(|| CmdError::Disabled("not editing an equation".into()))
 }
 
 fn type_text(s: &mut Session, v: &Value) -> CmdResult {
     let text = p::req_str(v, "text")?.to_string();
     let m = current(s)?;
-    let latex = s.math_latex;
-    let style = TypeStyle { nor: s.math_normal_text };
+    let latex = latex(s);
+    let style = TypeStyle { nor: normal_text(s) };
     let mut pos = m.pos.clone();
     with_eq(s, &m.at, |math, _| {
         if math.linear {
@@ -250,7 +255,7 @@ fn type_text(s: &mut Session, v: &Value) -> CmdResult {
             pos = me::insert_text(&mut math.nodes, &pos, &c.to_string(), style);
         }
     })?;
-    if let Some(m) = s.math.as_mut() {
+    if let Some(m) = s.ext.edit_mut() {
         m.pos = pos;
     }
     result(s)
@@ -267,7 +272,7 @@ fn set_literal(nodes: &mut Arg) {
 
 fn insert_structure(s: &mut Session, v: &Value) -> CmdResult {
     let nodes = nodes_from(v).ok_or_else(|| CmdError::Params("give an id, linear or latex".into()))?;
-    let Some(m) = s.math.clone() else {
+    let Some(m) = s.ext.edit().cloned() else {
         // Outside an equation: a new equation holding the structure.
         return insert_nodes_as_equation(s, nodes, &json!({}));
     };
@@ -280,7 +285,7 @@ fn insert_structure(s: &mut Session, v: &Value) -> CmdResult {
             pos = me::insert_nodes(&mut math.nodes, &pos, nodes);
         }
     })?;
-    if let Some(m) = s.math.as_mut() {
+    if let Some(m) = s.ext.edit_mut() {
         m.pos = pos;
     }
     result(s)
@@ -291,18 +296,18 @@ fn insert_symbol(s: &mut Session, v: &Value) -> CmdResult {
     if c.is_empty() {
         return Err(CmdError::Params("empty char".into()));
     }
-    let Some(m) = s.math.clone() else {
+    let Some(m) = s.ext.edit().cloned() else {
         return insert_nodes_as_equation(s, parse_linear(&c), &json!({}));
     };
     let mut pos = m.pos.clone();
-    let style = TypeStyle { nor: s.math_normal_text };
+    let style = TypeStyle { nor: normal_text(s) };
     with_eq(s, &m.at, |math, _| {
         pos = me::insert_text(&mut math.nodes, &pos, &c, style);
         if math.linear {
             set_literal(&mut math.nodes);
         }
     })?;
-    if let Some(m) = s.math.as_mut() {
+    if let Some(m) = s.ext.edit_mut() {
         m.pos = pos;
     }
     result(s)
@@ -330,11 +335,11 @@ fn move_caret(s: &mut Session, v: &Value) -> CmdResult {
         s.doc.para_at(&m.at).and_then(|p| p.object_at(m.at.off)),
         Some(InlineObject::Equation { math, .. }) if math.linear
     );
-    if !s.math_normal_text
+    if !normal_text(s)
         && !shown_linear
         && let Some(before) = nodes_of(s, &m.at)
     {
-        let latex = s.math_latex;
+        let latex = latex(s);
         let mut nodes = before.clone();
         let mut pos = m.pos.clone();
         let mut changed = false;
@@ -351,7 +356,7 @@ fn move_caret(s: &mut Session, v: &Value) -> CmdResult {
             s.checkpoint("Build Up");
             with_eq(s, &m.at, |math, _| math.nodes = nodes)?;
             s.touch();
-            if let Some(mm) = s.math.as_mut() {
+            if let Some(mm) = s.ext.edit_mut() {
                 mm.pos = pos;
             }
         }
@@ -370,7 +375,7 @@ fn move_caret(s: &mut Session, v: &Value) -> CmdResult {
     };
     match next {
         Some(p) => {
-            if let Some(m) = s.math.as_mut() {
+            if let Some(m) = s.ext.edit_mut() {
                 m.pos = p;
             }
             result(s)
@@ -385,7 +390,7 @@ fn delete(s: &mut Session, back: bool) -> CmdResult {
     let nodes = nodes_of(s, &m.at).ok_or_else(|| CmdError::Failed("no equation there".into()))?;
     // An empty equation goes away entirely.
     if nodes.is_empty() {
-        s.math = None;
+        s.ext.set_edit(None);
         s.sel = Selection { anchor: m.at.clone(), focus: Pos { off: m.at.off + OBJ.len_utf8(), ..m.at.clone() } };
         let at = delete_selection(s)?;
         s.sel = Selection::caret(at);
@@ -395,7 +400,7 @@ fn delete(s: &mut Session, back: bool) -> CmdResult {
     with_eq(s, &m.at, |math, _| {
         pos = if back { me::delete_back(&mut math.nodes, &pos) } else { me::delete_forward(&mut math.nodes, &pos) };
     })?;
-    if let Some(m) = s.math.as_mut() {
+    if let Some(m) = s.ext.edit_mut() {
         m.pos = pos;
     }
     result(s)
@@ -403,7 +408,7 @@ fn delete(s: &mut Session, back: bool) -> CmdResult {
 
 fn enter(s: &mut Session, _: &Value) -> CmdResult {
     let m = current(s)?;
-    let latex = s.math_latex;
+    let latex = latex(s);
     let mut pos = m.pos.clone();
     let mut changed = false;
     with_eq(s, &m.at, |math, _| {
@@ -424,13 +429,13 @@ fn enter(s: &mut Session, _: &Value) -> CmdResult {
         }
     })?;
     if changed {
-        if let Some(m) = s.math.as_mut() {
+        if let Some(m) = s.ext.edit_mut() {
             m.pos = pos;
         }
         return result(s);
     }
     // Nothing to build: Enter ends the equation and starts a new paragraph.
-    s.math = None;
+    s.ext.set_edit(None);
     let after = Pos { off: m.at.off + OBJ.len_utf8(), ..m.at };
     let new = split_para(s, &after)?;
     s.sel = Selection::caret(new);
@@ -454,7 +459,7 @@ fn convert_math(math: &mut Math, professional: bool, latex: bool) {
 
 fn convert(s: &mut Session, v: &Value) -> CmdResult {
     let professional = p::str(v, "to").map(|t| !t.eq_ignore_ascii_case("linear")).unwrap_or(true);
-    let latex = s.math_latex;
+    let latex = latex(s);
     if p::bool(v, "all").unwrap_or(false) {
         let mut n = 0;
         let stories: Vec<wordcraft_doc::StoryRef> =
@@ -473,7 +478,7 @@ fn convert(s: &mut Session, v: &Value) -> CmdResult {
                 }
             }
         }
-        if let Some(m) = s.math.as_mut() {
+        if let Some(m) = s.ext.edit_mut() {
             m.pos = MathPos::default();
         }
         s.clamp_selection();
@@ -485,7 +490,7 @@ fn convert(s: &mut Session, v: &Value) -> CmdResult {
         convert_math(math, professional, latex);
         end = me::units(&math.nodes);
     })?;
-    if let Some(m) = s.math.as_mut() {
+    if let Some(m) = s.ext.edit_mut() {
         m.pos = MathPos::new(Vec::new(), end);
     }
     result(s)
@@ -535,7 +540,7 @@ fn number(s: &mut Session, v: &Value) -> CmdResult {
             pos_reset = true;
         }
     })?;
-    if pos_reset && let Some(m) = s.math.as_mut() {
+    if pos_reset && let Some(m) = s.ext.edit_mut() {
         m.pos = MathPos::default();
     }
     s.clamp_selection();
@@ -570,7 +575,7 @@ fn set(s: &mut Session, v: &Value) -> CmdResult {
         math.nodes = nodes;
         math.linear = false;
     })?;
-    if let Some(m) = s.math.as_mut() {
+    if let Some(m) = s.ext.edit_mut() {
         m.pos = MathPos::new(Vec::new(), end);
     }
     result(s)
@@ -587,8 +592,8 @@ fn get(s: &mut Session, _: &Value) -> CmdResult {
         "latex": to_latex(&nodes),
         "display": display,
         "linearForm": math.linear,
-        "editing": s.math.is_some(),
-        "pos": s.math.as_ref().map(|m| serde_json::to_value(&m.pos).unwrap_or(Value::Null)),
+        "editing": s.ext.edit().is_some(),
+        "pos": s.ext.edit().map(|m| serde_json::to_value(&m.pos).unwrap_or(Value::Null)),
         "at": super::pos_json(&at),
     }))
 }
@@ -616,7 +621,7 @@ fn structure(s: &mut Session, v: &Value) -> CmdResult {
     let mut pos = None;
     with_eq(s, &m.at, |math, _| pos = me::apply_structure(&mut math.nodes, &m.pos, level, &action))?;
     let pos = pos.ok_or_else(|| CmdError::Params(format!("{action} doesn't apply here")))?;
-    if let Some(m) = s.math.as_mut() {
+    if let Some(m) = s.ext.edit_mut() {
         m.pos = pos;
     }
     result(s)
@@ -641,16 +646,87 @@ fn gallery(_: &mut Session, _: &Value) -> CmdResult {
     Ok(json!({"structures": structures, "symbols": symbols, "builtins": builtins}))
 }
 
+/// Equation editing: the equation being edited and the typing options.
+#[derive(Default)]
+pub struct EquationState {
+    pub edit: Option<MathEdit>,
+    /// Equations are typed in LaTeX rather than the linear format.
+    pub latex: bool,
+    /// Text typed into equations is normal (non-math) text.
+    pub normal_text: bool,
+}
+
+/// [`EquationState`] in a session's extension state; borrows only `Session::ext`.
+pub trait EquationExt {
+    fn equation(&self) -> Option<&EquationState>;
+    fn equation_mut(&mut self) -> Option<&mut EquationState>;
+    fn edit(&self) -> Option<&MathEdit> {
+        self.equation().and_then(|e| e.edit.as_ref())
+    }
+    fn edit_mut(&mut self) -> Option<&mut MathEdit> {
+        self.equation_mut().and_then(|e| e.edit.as_mut())
+    }
+    fn take_edit(&mut self) -> Option<MathEdit> {
+        self.equation_mut().and_then(|e| e.edit.take())
+    }
+    fn set_edit(&mut self, m: Option<MathEdit>) {
+        if let Some(e) = self.equation_mut() {
+            e.edit = m;
+        }
+    }
+}
+
+impl EquationExt for crate::extensions::ExtState {
+    fn equation(&self) -> Option<&EquationState> {
+        self.get()
+    }
+    fn equation_mut(&mut self) -> Option<&mut EquationState> {
+        self.get_mut()
+    }
+}
+
+/// The equation being edited, if any.
+pub fn editing(s: &Session) -> Option<&MathEdit> {
+    s.ext.edit()
+}
+
+/// Equations are typed in LaTeX.
+pub fn latex(s: &Session) -> bool {
+    s.ext.equation().is_some_and(|e| e.latex)
+}
+
+/// Text typed into equations is normal text.
+pub fn normal_text(s: &Session) -> bool {
+    s.ext.equation().is_some_and(|e| e.normal_text)
+}
+
+/// The equation being edited must still be there (undo, edits elsewhere).
+fn keep_edit_valid(s: &mut Session) {
+    let Some(m) = s.ext.edit() else { return };
+    let eq = s.doc.para_at(&m.at).and_then(|p| match p.object_at(m.at.off) {
+        Some(InlineObject::Equation { math, .. }) => Some(me::clamp(&math.nodes, &m.pos)),
+        _ => None,
+    });
+    match eq {
+        Some(pos) => {
+            if let Some(m) = s.ext.edit_mut() {
+                m.pos = pos;
+            }
+        }
+        None => s.ext.set_edit(None),
+    }
+}
+
 /// Typing, caret movement and selection outside the equation commands leave the equation.
 pub fn hooks() -> crate::extensions::Hooks {
-    crate::extensions::Hooks { before: Some(leave_equation), ..crate::extensions::Hooks::new("equation-editor") }
+    crate::extensions::Hooks { before: Some(leave_equation), after_clamp: Some(keep_edit_valid), ..crate::extensions::Hooks::new("equation-editor") }
 }
 
 fn leave_equation(s: &mut Session, c: &crate::extensions::RunCtx) -> Result<bool, CmdError> {
     let id = c.id;
-    if s.math.is_some()
+    if s.ext.edit().is_some()
         && (id.starts_with("text.") || id.starts_with("caret.") || id.starts_with("select.") || id.starts_with("edit.paste"))
-        && let Some(m) = s.math.take()
+        && let Some(m) = s.ext.take_edit()
     {
         let off = m.at.off + OBJ.len_utf8();
         s.sel = Selection::caret(Pos { off, ..m.at });
@@ -671,21 +747,21 @@ mod tests {
     }
 
     fn linear(s: &Session) -> String {
-        s.math.as_ref().and_then(|m| s.doc.para_at(&m.at).and_then(|p| p.object_at(m.at.off))).map(|o| o.plain_text().to_string()).unwrap_or_default()
+        s.ext.edit().and_then(|m| s.doc.para_at(&m.at).and_then(|p| p.object_at(m.at.off))).map(|o| o.plain_text().to_string()).unwrap_or_default()
     }
 
     #[test]
     fn type_an_equation_like_word() {
         let mut s = session();
         s.run("insert.equation", &json!({})).unwrap();
-        assert!(s.math.is_some(), "editing the new equation");
+        assert!(s.ext.edit().is_some(), "editing the new equation");
         // An empty line gives a display equation.
-        assert!(matches!(s.doc.para_at(&s.math.as_ref().unwrap().at).unwrap().object_at(0), Some(InlineObject::Equation { display: true, .. })));
+        assert!(matches!(s.doc.para_at(&s.ext.edit().unwrap().at).unwrap().object_at(0), Some(InlineObject::Equation { display: true, .. })));
         for t in ["x", "=", "(-b\\pm", " ", "\\sqrt", " ", "(b^2-4ac))/2a", " "] {
             s.run("equation.type", &json!({"text": t})).unwrap();
         }
         assert_eq!(linear(&s), "x=(-b±√(b^2-4ac))/2a");
-        let nodes = nodes_of(&s, &s.math.as_ref().unwrap().at).unwrap();
+        let nodes = nodes_of(&s, &s.ext.edit().unwrap().at).unwrap();
         assert!(matches!(nodes.get(1), Some(MNode::Frac { .. })), "{nodes:#?}");
         // One undo step for the typing.
         s.run("equation.exit", &json!({})).unwrap();
@@ -713,12 +789,12 @@ mod tests {
         assert!(r["latex"].as_str().unwrap().contains("\\sum"));
         // Moving right past the end leaves the equation.
         for _ in 0..20 {
-            if s.math.is_none() {
+            if s.ext.edit().is_none() {
                 break;
             }
             let _ = s.run("equation.move", &json!({"dir": "right"}));
         }
-        assert!(s.math.is_none());
+        assert!(s.ext.edit().is_none());
     }
 
     #[test]
@@ -743,11 +819,11 @@ mod tests {
         assert_eq!(linear(&s), "a/b");
         // Backspacing an equation empty, then once more, removes it.
         let mut n = 0;
-        while s.math.is_some() && n < 50 {
+        while s.ext.edit().is_some() && n < 50 {
             s.run("equation.backspace", &json!({})).unwrap();
             n += 1;
         }
-        assert!(s.math.is_none());
+        assert!(s.ext.edit().is_none());
         assert_eq!(s.doc.para_at(&s.sel.focus).unwrap().objects.len(), 0);
     }
 

@@ -120,7 +120,7 @@ pub fn contextual_tabs(s: &wordcraft_engine::Session) -> Vec<&'static str> {
         tabs.push("Chart Design");
     }
     // Editing an equation.
-    if s.math.is_some() {
+    if wordcraft_engine::cmd::equation::editing(s).is_some() {
         tabs.push("Equation");
     }
     // Outline view (drawn first, next to File, as Word does).
@@ -147,7 +147,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         return;
     }
     // Editing an equation brings up the Equation tab; leaving it goes back.
-    if app.session.math.is_some() {
+    if wordcraft_engine::cmd::equation::editing(&app.session).is_some() {
         if app.equation_prev_tab.is_none() {
             app.equation_prev_tab = Some(app.ui.tab.clone());
             app.ui.tab = "Equation".into();
@@ -309,7 +309,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                         "Help" => help(app, ui),
                         "Table Design" => table_design(app, ui),
                         "Table Layout" => table_layout(app, ui),
-                        "Equation" if app.session.math.is_some() => crate::equation_tab::show(app, ui),
+                        "Equation" if wordcraft_engine::cmd::equation::editing(&app.session).is_some() => crate::equation_tab::show(app, ui),
                         "Picture Format" => picture_format(app, ui),
                         "Shape Format" => shape_format(app, ui),
                         "SmartArt Design" => smart_art_design(app, ui),

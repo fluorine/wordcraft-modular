@@ -132,11 +132,13 @@ pub struct Hooks {
     pub verify: Option<fn(&Session, &RunCtx) -> Result<(), CmdError>>,
     /// After a mutating command succeeds; `true` = the hook changed the document.
     pub after_edit: Option<fn(&mut Session, &RunCtx) -> bool>,
+    /// After `Session::clamp_selection`: keep the extension's own positions valid.
+    pub after_clamp: Option<fn(&mut Session)>,
 }
 
 impl Hooks {
     pub const fn new(ext: &'static str) -> Self {
-        Hooks { ext, before: None, verify: None, after_edit: None }
+        Hooks { ext, before: None, verify: None, after_edit: None, after_clamp: None }
     }
 }
 
@@ -272,7 +274,7 @@ mod tests {
     fn hooks_belong_to_known_extensions() {
         for h in crate::cmd::hooks() {
             assert!(get(h.ext).is_some_and(|e| e.id != CORE), "hook for {}", h.ext);
-            assert!(h.before.is_some() || h.verify.is_some() || h.after_edit.is_some(), "{} has no hook", h.ext);
+            assert!(h.before.is_some() || h.verify.is_some() || h.after_edit.is_some() || h.after_clamp.is_some(), "{} has no hook", h.ext);
         }
     }
 

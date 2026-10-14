@@ -36,7 +36,7 @@ pub(crate) fn fill(app: &mut WordApp, id: &str, params: &mut Value) -> Option<Re
         // Picture files copied in a file manager reach us as their paths: paste the pictures,
         // as Ctrl+V does.
         if id == "edit.paste"
-            && app.session.math.is_none()
+            && wordcraft_engine::cmd::equation::editing(&app.session).is_none()
             && paste_picture::names_picture_files(&text)
             && let Some(r) = paste_picture::paste(app)
         {
