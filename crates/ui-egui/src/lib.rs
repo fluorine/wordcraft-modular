@@ -79,6 +79,7 @@ pub mod table_pen;
 pub mod table_resize;
 pub mod table_ruler;
 pub mod theme;
+pub mod ui_commands;
 pub mod widgets;
 pub mod window_geometry;
 pub mod wordart_menus;
@@ -1010,6 +1011,9 @@ impl WordApp {
 
     /// Commands that live in the UI layer.
     fn ui_command(&mut self, id: &str, p: &Value) -> Option<Result<Value, String>> {
+        if crate::ui_commands::left_out(id) {
+            return Some(Err(format!("{id}: this build has no `{}` extension", crate::ui_commands::get(id).map_or("", |c| c.ext))));
+        }
         let s = |k: &str| p.get(k).and_then(Value::as_str);
         Some(Ok(match id {
             "ui.tab" => {
