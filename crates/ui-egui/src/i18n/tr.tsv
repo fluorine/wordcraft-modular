@@ -2514,3 +2514,27 @@ preview	Title	Örnek
 	Language Preferences…	Dil tercihleri…
 	Extensions	Uzantılar
 	Turn Extension On or Off	Uzantıyı aç veya kapat
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Kullanmadığınız şeyleri kapatın. Belgeler, kapalı bir uzantının içeriği dahil tüm içeriğini korur.
+	Always on	Her zaman açık
+	Not in this build	Bu sürümde yok
+	Needs: {names}	Gerekli: {names}
+	Change them too	Onları da değiştir
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Bu belgede kapalı uzantıların içeriği var: {names}. Olduğu gibi gösterilir ve kaydedilir.
+	Turn On	Aç
+	Dismiss	Kapat
+	Core	Çekirdek
+	Spelling, grammar and thesaurus	Yazım, dil bilgisi ve eş anlamlılar sözlüğü
+	References and citations	Başvurular ve alıntılar
+	Equation editor	Denklem düzenleyici
+	Shapes and drawing canvas	Şekiller ve çizim tuvali
+	Charts	Grafikler
+	Ink and Draw	Mürekkep ve çizim
+	Mail merge, envelopes and labels	Adres mektup birleştirme, zarflar ve etiketler
+	Content controls	İçerik denetimleri
+	Compare, combine and versions	Karşılaştır, birleştir ve sürümler
+	Accessibility checker	Erişilebilirlik denetleyicisi
+	Design themes and style sets	Temalar ve stil kümeleri
+	Restrict editing	Düzenlemeyi kısıtla
+	PDF export and printing	PDF'ye aktarma ve yazdırma
+	Word 97-2003 documents	Word 97-2003 belgeleri
+	Alignment Guides	Hizalama kılavuzları

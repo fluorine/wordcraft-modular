@@ -2135,3 +2135,27 @@
 	Language Preferences…	Jezičke postavke…
 	Extensions	Proširenja
 	Turn Extension On or Off	Uključi ili isključi proširenje
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Isključite ono što ne koristite. Dokumenti zadržavaju sav sadržaj, i za isključeno proširenje.
+	Always on	Uvek uključeno
+	Not in this build	Nije u ovoj verziji
+	Needs: {names}	Zahteva: {names}
+	Change them too	Promeni i njih
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Ovaj dokument ima sadržaj isključenih proširenja: {names}. Prikazuje se i čuva nepromenjen.
+	Turn On	Uključi
+	Dismiss	Odbaci
+	Core	Jezgro
+	Spelling, grammar and thesaurus	Pravopis, gramatika i rečnik sinonima
+	References and citations	Reference i citati
+	Equation editor	Uređivač jednačina
+	Shapes and drawing canvas	Oblici i platno za crtanje
+	Charts	Grafikoni
+	Ink and Draw	Mastilo i crtanje
+	Mail merge, envelopes and labels	Objedinjavanje pošte, koverte i nalepnice
+	Content controls	Kontrole sadržaja
+	Compare, combine and versions	Poređenje, kombinovanje i verzije
+	Accessibility checker	Provera pristupačnosti
+	Design themes and style sets	Teme i skupovi stilova
+	Restrict editing	Ograničavanje uređivanja
+	PDF export and printing	Izvoz u PDF i štampanje
+	Word 97-2003 documents	Word 97-2003 dokumenti
+	Alignment Guides	Vođice za poravnavanje

@@ -2514,3 +2514,27 @@
 	Title Bar	Címsáv
 	Extensions	Bővítmények
 	Turn Extension On or Off	Bővítmény be- vagy kikapcsolása
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Kapcsolja ki, amit nem használ. A dokumentumok minden tartalmukat megtartják, a kikapcsolt bővítményekét is.
+	Always on	Mindig bekapcsolva
+	Not in this build	Nincs ebben a kiadásban
+	Needs: {names}	Szükséges: {names}
+	Change them too	Azokat is módosítsa
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	A dokumentum kikapcsolt bővítmények tartalmát tartalmazza: {names}. Változatlanul jelenik meg és mentődik.
+	Turn On	Bekapcsolás
+	Dismiss	Elvetés
+	Core	Alap
+	Spelling, grammar and thesaurus	Helyesírás, nyelvtan és szinonimaszótár
+	References and citations	Hivatkozások és idézetek
+	Equation editor	Egyenletszerkesztő
+	Shapes and drawing canvas	Alakzatok és rajzvászon
+	Charts	Diagramok
+	Ink and Draw	Szabadkézi rajz és rajzolás
+	Mail merge, envelopes and labels	Körlevél, borítékok és címkék
+	Content controls	Tartalomvezérlők
+	Compare, combine and versions	Összehasonlítás, egyesítés és verziók
+	Accessibility checker	Akadálymentességi ellenőrző
+	Design themes and style sets	Témák és stíluskészletek
+	Restrict editing	Szerkesztés korlátozása
+	PDF export and printing	PDF-exportálás és nyomtatás
+	Word 97-2003 documents	Word 97-2003 dokumentumok
+	Alignment Guides	Igazítási segédvonalak

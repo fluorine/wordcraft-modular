@@ -91,6 +91,7 @@ fn pane_label(id: &str) -> &'static str {
         "language" => "Language",
         "accessibility" => "Accessibility",
         "advanced" => "Advanced",
+        "extensions" => "Extensions",
         "agents" => "Agents",
         _ => "General",
     }
@@ -135,6 +136,7 @@ pub fn page(app: &mut WordApp, ui: &mut Ui) {
                 "language" => language(app, ui),
                 "accessibility" => accessibility(app, ui),
                 "advanced" => advanced(app, ui),
+                "extensions" => extensions(app, ui),
                 "agents" => agents(ui),
                 _ => general(app, ui),
             }
@@ -453,6 +455,75 @@ fn advanced(app: &mut WordApp, ui: &mut Ui) {
         if ui.button(tl!("Customize…")).clicked() {
             let _ = app.run("tools.customizeRibbon", json!({}));
         }
+    });
+}
+
+/// File › Options › Extensions: each extension with a switch. A change that would leave another
+/// extension without what it needs is shown first, with a button to change those too.
+fn extensions(app: &mut WordApp, ui: &mut Ui) {
+    section(ui, "Extensions");
+    note(ui, "Turn off what you don't use. Documents keep all their content, even for an extension that is off.");
+    ui.add_space(8.0);
+    let list = app.session.run("extensions.list", &json!({})).unwrap_or(Value::Null);
+    let pending_id = ui.id().with("extension_pending");
+    let mut pending: Option<(String, bool, String)> = ui.data(|d| d.get_temp(pending_id));
+    let names = |ids: &Value| -> String {
+        ids.as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(Value::as_str)
+                    .map(|i| wordcraft_engine::extensions::get(i).map_or(i, |e| tl!(e.name)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_default()
+    };
+    for e in list.as_array().into_iter().flatten() {
+        let (Some(id), Some(name)) = (e["id"].as_str(), e["name"].as_str()) else { continue };
+        let core = e["core"].as_bool().unwrap_or(false);
+        let installed = e["installed"].as_bool().unwrap_or(false);
+        let mut on = e["enabled"].as_bool().unwrap_or(false);
+        ui.horizontal(|ui| {
+            let r = ui.add_enabled(installed && !core, egui::Checkbox::new(&mut on, tl!(name)));
+            let state = if core {
+                tl!("Always on").to_string()
+            } else if !installed {
+                tl!("Not in this build").to_string()
+            } else if e["dependsOn"].as_array().is_some_and(|a| !a.is_empty()) {
+                crate::i18n::fmt(tl!("Needs: {names}"), &[("names", &names(&e["dependsOn"]))])
+            } else {
+                String::new()
+            };
+            ui.label(RichText::new(state).small().weak());
+            if r.changed() {
+                match app.run("extensions.set", json!({"id": id, "enabled": on})) {
+                    Ok(_) => pending = None,
+                    Err(msg) if msg.contains("cascade") => pending = Some((id.to_string(), on, msg)),
+                    Err(msg) => app.status(msg),
+                }
+            }
+        });
+    }
+    if let Some((id, on, msg)) = pending.clone() {
+        ui.add_space(8.0);
+        ui.label(RichText::new(msg.split(": ").skip(1).collect::<Vec<_>>().join(": ")).small());
+        ui.horizontal(|ui| {
+            if ui.button(tl!("Change them too")).clicked() {
+                if let Err(e) = app.run("extensions.set", json!({"id": id, "enabled": on, "cascade": true})) {
+                    app.status(e);
+                }
+                pending = None;
+            }
+            if ui.button(tl!("Cancel")).clicked() {
+                pending = None;
+            }
+        });
+    }
+    ui.data_mut(|d| match pending {
+        Some(p) => {
+            d.insert_temp(pending_id, p);
+        }
+        None => d.remove::<(String, bool, String)>(pending_id),
     });
 }
 

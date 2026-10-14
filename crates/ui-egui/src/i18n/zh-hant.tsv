@@ -2126,3 +2126,27 @@
 	Language Preferences…	語言喜好設定…
 	Extensions	擴充功能
 	Turn Extension On or Off	開啟或關閉擴充功能
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	關閉你不用的功能。即使擴充功能已關閉，文件仍保留其全部內容。
+	Always on	一律開啟
+	Not in this build	此版本中沒有
+	Needs: {names}	需要：{names}
+	Change them too	一併變更
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	此文件包含已關閉擴充功能的內容：{names}。內容會照原樣顯示和儲存。
+	Turn On	開啟
+	Dismiss	關閉
+	Core	核心
+	Spelling, grammar and thesaurus	拼字、文法和同義字
+	References and citations	參考資料和引文
+	Equation editor	方程式編輯器
+	Shapes and drawing canvas	圖案和繪圖畫布
+	Charts	圖表
+	Ink and Draw	筆跡和繪圖
+	Mail merge, envelopes and labels	合併列印、信封和標籤
+	Content controls	內容控制項
+	Compare, combine and versions	比較、合併和版本
+	Accessibility checker	協助工具檢查程式
+	Design themes and style sets	佈景主題和樣式集
+	Restrict editing	限制編輯
+	PDF export and printing	PDF 匯出和列印
+	Word 97-2003 documents	Word 97-2003 文件
+	Alignment Guides	對齊參考線

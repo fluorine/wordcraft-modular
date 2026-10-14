@@ -1137,6 +1137,15 @@ impl Document {
         max.saturating_add(1).max(1)
     }
 
+    /// Every inline object in every story (paragraphs inside tables too).
+    pub fn each_object(&self, f: &mut dyn FnMut(&InlineObject)) {
+        for blocks in std::iter::once(&self.body).chain(self.parts.values().map(|p| &p.blocks)) {
+            for b in blocks.iter() {
+                edit::each_para(b, 0, &mut |p| p.objects.iter().for_each(&mut *f));
+            }
+        }
+    }
+
     /// Change every inline object in every story (paragraphs inside tables too), copying only
     /// the blocks whose paragraphs `wants` says have objects to change.
     pub fn objects_mut(&mut self, wants: &dyn Fn(&InlineObject) -> bool, f: &mut dyn FnMut(&mut InlineObject)) {

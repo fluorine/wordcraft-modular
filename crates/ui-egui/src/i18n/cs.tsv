@@ -2130,3 +2130,27 @@
 	Language Preferences…	Předvolby jazyka…
 	Extensions	Rozšíření
 	Turn Extension On or Off	Zapnout nebo vypnout rozšíření
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Vypněte, co nepoužíváte. Dokumenty si ponechají veškerý obsah, i pro vypnuté rozšíření.
+	Always on	Vždy zapnuto
+	Not in this build	Není v tomto sestavení
+	Needs: {names}	Vyžaduje: {names}
+	Change them too	Změnit i je
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Dokument obsahuje obsah pro vypnutá rozšíření: {names}. Zobrazí se a uloží beze změny.
+	Turn On	Zapnout
+	Dismiss	Zavřít
+	Core	Jádro
+	Spelling, grammar and thesaurus	Pravopis, gramatika a synonyma
+	References and citations	Reference a citace
+	Equation editor	Editor rovnic
+	Shapes and drawing canvas	Tvary a kreslicí plátno
+	Charts	Grafy
+	Ink and Draw	Inkoust a kreslení
+	Mail merge, envelopes and labels	Hromadná korespondence, obálky a štítky
+	Content controls	Ovládací prvky obsahu
+	Compare, combine and versions	Porovnání, sloučení a verze
+	Accessibility checker	Kontrola přístupnosti
+	Design themes and style sets	Motivy a sady stylů
+	Restrict editing	Omezení úprav
+	PDF export and printing	Export do PDF a tisk
+	Word 97-2003 documents	Dokumenty Word 97-2003
+	Alignment Guides	Vodítka zarovnání

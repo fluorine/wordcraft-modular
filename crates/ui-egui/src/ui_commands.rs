@@ -32,6 +32,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     c("ui.dark", "Dark Mode", "View"),
     c("ui.theme", "Office Theme", "File › Options › General"),
     c("ui.interfaceSize", "Interface Size", "File › Options › General"),
+    c("ui.alignmentGuides", "Alignment Guides", "File › Options › Advanced"),
     c("ui.animations", "Animations", "File › Options › Advanced"),
     c("ui.language", "Interface Language", "File › Options › Language"),
     c("ui.saveChanges", "Save Changes", "File"),

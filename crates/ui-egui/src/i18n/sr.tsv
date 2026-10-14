@@ -2139,3 +2139,27 @@
 	Language Preferences…	Језичке поставке…
 	Extensions	Проширења
 	Turn Extension On or Off	Укључи или искључи проширење
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Искључите оно што не користите. Документи задржавају сав садржај, и за искључено проширење.
+	Always on	Увек укључено
+	Not in this build	Није у овој верзији
+	Needs: {names}	Захтева: {names}
+	Change them too	Промени и њих
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Овај документ има садржај искључених проширења: {names}. Приказује се и чува непромењен.
+	Turn On	Укључи
+	Dismiss	Одбаци
+	Core	Језгро
+	Spelling, grammar and thesaurus	Правопис, граматика и речник синонима
+	References and citations	Референце и цитати
+	Equation editor	Уређивач једначина
+	Shapes and drawing canvas	Облици и платно за цртање
+	Charts	Графикони
+	Ink and Draw	Мастило и цртање
+	Mail merge, envelopes and labels	Обједињавање поште, коверте и налепнице
+	Content controls	Контроле садржаја
+	Compare, combine and versions	Поређење, комбиновање и верзије
+	Accessibility checker	Провера приступачности
+	Design themes and style sets	Теме и скупови стилова
+	Restrict editing	Ограничавање уређивања
+	PDF export and printing	Извоз у PDF и штампање
+	Word 97-2003 documents	Word 97-2003 документи
+	Alignment Guides	Вођице за поравнавање

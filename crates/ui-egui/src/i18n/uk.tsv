@@ -2137,3 +2137,27 @@
 	Language Preferences…	Мовні параметри…
 	Extensions	Розширення
 	Turn Extension On or Off	Увімкнути або вимкнути розширення
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Вимкніть те, чим не користуєтеся. Документи зберігають увесь вміст, навіть для вимкненого розширення.
+	Always on	Завжди увімкнено
+	Not in this build	Немає в цій збірці
+	Needs: {names}	Потрібно: {names}
+	Change them too	Змінити і їх
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	У документі є вміст вимкнених розширень: {names}. Він показується і зберігається без змін.
+	Turn On	Увімкнути
+	Dismiss	Закрити
+	Core	Ядро
+	Spelling, grammar and thesaurus	Правопис, граматика й тезаурус
+	References and citations	Посилання та цитати
+	Equation editor	Редактор формул
+	Shapes and drawing canvas	Фігури й полотно
+	Charts	Діаграми
+	Ink and Draw	Рукописне введення й малювання
+	Mail merge, envelopes and labels	Злиття, конверти й наклейки
+	Content controls	Елементи керування вмістом
+	Compare, combine and versions	Порівняння, об'єднання та версії
+	Accessibility checker	Перевірка доступності
+	Design themes and style sets	Теми й набори стилів
+	Restrict editing	Обмеження редагування
+	PDF export and printing	Експорт у PDF і друк
+	Word 97-2003 documents	Документи Word 97-2003
+	Alignment Guides	Напрямні вирівнювання

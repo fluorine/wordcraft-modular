@@ -2137,3 +2137,27 @@
 	Language Preferences…	语言首选项…
 	Extensions	扩展
 	Turn Extension On or Off	打开或关闭扩展
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	关闭你不用的功能。即使扩展已关闭，文档仍保留其全部内容。
+	Always on	始终开启
+	Not in this build	此版本中没有
+	Needs: {names}	需要：{names}
+	Change them too	一并更改
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	此文档包含已关闭扩展的内容：{names}。内容会照原样显示和保存。
+	Turn On	开启
+	Dismiss	关闭
+	Core	核心
+	Spelling, grammar and thesaurus	拼写、语法和同义词库
+	References and citations	引用和引文
+	Equation editor	公式编辑器
+	Shapes and drawing canvas	形状和绘图画布
+	Charts	图表
+	Ink and Draw	墨迹和绘图
+	Mail merge, envelopes and labels	邮件合并、信封和标签
+	Content controls	内容控件
+	Compare, combine and versions	比较、合并和版本
+	Accessibility checker	辅助功能检查器
+	Design themes and style sets	主题和样式集
+	Restrict editing	限制编辑
+	PDF export and printing	PDF 导出和打印
+	Word 97-2003 documents	Word 97-2003 文档
+	Alignment Guides	对齐参考线

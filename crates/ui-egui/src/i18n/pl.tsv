@@ -2509,3 +2509,27 @@ preview	Title	Tytuł
 	Language Preferences…	Preferencje językowe…
 	Extensions	Rozszerzenia
 	Turn Extension On or Off	Włącz lub wyłącz rozszerzenie
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Wyłącz to, czego nie używasz. Dokumenty zachowują całą zawartość, także dla wyłączonego rozszerzenia.
+	Always on	Zawsze włączone
+	Not in this build	Brak w tej wersji
+	Needs: {names}	Wymaga: {names}
+	Change them too	Zmień też je
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Ten dokument zawiera treść wyłączonych rozszerzeń: {names}. Jest wyświetlana i zapisywana bez zmian.
+	Turn On	Włącz
+	Dismiss	Odrzuć
+	Core	Rdzeń
+	Spelling, grammar and thesaurus	Pisownia, gramatyka i tezaurus
+	References and citations	Odwołania i cytaty
+	Equation editor	Edytor równań
+	Shapes and drawing canvas	Kształty i kanwa rysunku
+	Charts	Wykresy
+	Ink and Draw	Pismo odręczne i rysowanie
+	Mail merge, envelopes and labels	Korespondencja seryjna, koperty i etykiety
+	Content controls	Formanty zawartości
+	Compare, combine and versions	Porównywanie, łączenie i wersje
+	Accessibility checker	Sprawdzanie ułatwień dostępu
+	Design themes and style sets	Motywy i zestawy stylów
+	Restrict editing	Ograniczanie edycji
+	PDF export and printing	Eksport do PDF i drukowanie
+	Word 97-2003 documents	Dokumenty programu Word 97-2003
+	Alignment Guides	Linie wyrównania

@@ -2159,3 +2159,27 @@
 	Language Preferences…	Keele-eelistused…
 	Extensions	Laiendused
 	Turn Extension On or Off	Lülita laiendus sisse või välja
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Lülitage välja see, mida te ei kasuta. Dokumendid säilitavad kogu sisu, ka väljalülitatud laienduse oma.
+	Always on	Alati sees
+	Not in this build	Pole selles versioonis
+	Needs: {names}	Vajab: {names}
+	Change them too	Muuda ka neid
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Selles dokumendis on sisu väljalülitatud laienduste jaoks: {names}. Seda näidatakse ja salvestatakse muutmata.
+	Turn On	Lülita sisse
+	Dismiss	Loobu
+	Core	Tuum
+	Spelling, grammar and thesaurus	Õigekiri, grammatika ja tesaurus
+	References and citations	Viited ja tsitaadid
+	Equation editor	Valemiredaktor
+	Shapes and drawing canvas	Kujundid ja joonistuslõuend
+	Charts	Diagrammid
+	Ink and Draw	Tint ja joonistamine
+	Mail merge, envelopes and labels	Kirjakooste, ümbrikud ja sildid
+	Content controls	Sisujuhtelemendid
+	Compare, combine and versions	Võrdlemine, ühendamine ja versioonid
+	Accessibility checker	Hõlbustusfunktsioonide kontroll
+	Design themes and style sets	Kujundused ja laadikomplektid
+	Restrict editing	Redigeerimise piiramine
+	PDF export and printing	PDF-eksport ja printimine
+	Word 97-2003 documents	Word 97-2003 dokumendid
+	Alignment Guides	Joondusjuhikud

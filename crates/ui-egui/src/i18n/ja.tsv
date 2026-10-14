@@ -2125,3 +2125,27 @@
 	Language Preferences…	言語の設定…
 	Extensions	拡張機能
 	Turn Extension On or Off	拡張機能のオン/オフ
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	使わない機能はオフにできます。オフにした拡張機能のコンテンツも文書にすべて残ります。
+	Always on	常にオン
+	Not in this build	このビルドにはありません
+	Needs: {names}	必要: {names}
+	Change them too	それらも変更する
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	この文書にはオフの拡張機能のコンテンツがあります: {names}。そのまま表示・保存されます。
+	Turn On	オンにする
+	Dismiss	閉じる
+	Core	コア
+	Spelling, grammar and thesaurus	スペル チェック、文章校正、類義語辞典
+	References and citations	参考資料と引用文献
+	Equation editor	数式エディター
+	Shapes and drawing canvas	図形と描画キャンバス
+	Charts	グラフ
+	Ink and Draw	インクと描画
+	Mail merge, envelopes and labels	差し込み印刷、封筒、ラベル
+	Content controls	コンテンツ コントロール
+	Compare, combine and versions	比較、組み込み、バージョン
+	Accessibility checker	アクセシビリティ チェック
+	Design themes and style sets	テーマとスタイル セット
+	Restrict editing	編集の制限
+	PDF export and printing	PDF エクスポートと印刷
+	Word 97-2003 documents	Word 97-2003 文書
+	Alignment Guides	配置ガイド

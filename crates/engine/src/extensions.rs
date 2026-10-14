@@ -154,6 +154,39 @@ pub fn active_hooks(s: &Session, reg: &crate::Registry) -> Vec<Hooks> {
     reg.hooks().iter().filter(|h| enabled(s, h.ext)).copied().collect()
 }
 
+/// The extensions whose content `doc` holds. Without them the content still shows and saves;
+/// only editing it needs the extension.
+pub fn content_needs(doc: &wordcraft_doc::Document) -> Vec<&'static str> {
+    use wordcraft_doc::InlineObject as O;
+    use wordcraft_doc::graphic::GraphicKind as G;
+    fn add(out: &mut Vec<&'static str>, id: &'static str) {
+        if !out.contains(&id) {
+            out.push(id);
+        }
+    }
+    let mut out = Vec::new();
+    if !doc.comments.is_empty() {
+        add(&mut out, "comments");
+    }
+    if !doc.sources.is_empty() {
+        add(&mut out, "references");
+    }
+    doc.each_object(&mut |o| match o {
+        O::Equation { .. } => add(&mut out, "equation-editor"),
+        O::Graphic { graphic, .. } => add(
+            &mut out,
+            match graphic.kind {
+                G::Chart => "charts",
+                G::Diagram => "smart-art",
+                G::Ink => "ink",
+            },
+        ),
+        O::ControlStart { .. } => add(&mut out, "developer"),
+        _ => {}
+    });
+    out
+}
+
 /// Why a command of extension `ext` cannot run.
 pub fn off_reason(ext: &str) -> String {
     let name = get(ext).map_or(ext, |e| e.name);
@@ -458,6 +491,18 @@ mod tests {
             assert_eq!(left_out(id), !compiled(ext), "{id}");
         }
         assert!(!left_out("text.insert"), "core is never left out");
+    }
+
+    #[test]
+    fn content_needs_names_what_a_document_holds() {
+        let mut s = crate::Session::new(wordcraft_doc::Document::new());
+        assert!(content_needs(&s.doc).is_empty());
+        s.run("text.insert", &serde_json::json!({"text": "Hello"})).unwrap();
+        s.run("select.all", &serde_json::json!({})).unwrap();
+        s.run("review.newComment", &serde_json::json!({"text": "note"})).unwrap();
+        s.run("insert.equation", &serde_json::json!({})).unwrap();
+        let needs = content_needs(&s.doc);
+        assert!(needs.contains(&"comments") && needs.contains(&"equation-editor"), "{needs:?}");
     }
 
     #[test]

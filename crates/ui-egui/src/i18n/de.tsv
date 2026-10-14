@@ -2124,3 +2124,27 @@
 	Language Preferences…	Spracheinstellungen…
 	Extensions	Erweiterungen
 	Turn Extension On or Off	Erweiterung ein- oder ausschalten
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Schalten Sie aus, was Sie nicht nutzen. Dokumente behalten ihren ganzen Inhalt, auch für eine ausgeschaltete Erweiterung.
+	Always on	Immer an
+	Not in this build	Nicht in diesem Build
+	Needs: {names}	Benötigt: {names}
+	Change them too	Auch diese ändern
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Dieses Dokument enthält Inhalte für ausgeschaltete Erweiterungen: {names}. Sie werden unverändert angezeigt und gespeichert.
+	Turn On	Einschalten
+	Dismiss	Schließen
+	Core	Kern
+	Spelling, grammar and thesaurus	Rechtschreibung, Grammatik und Thesaurus
+	References and citations	Verweise und Zitate
+	Equation editor	Formel-Editor
+	Shapes and drawing canvas	Formen und Zeichenbereich
+	Charts	Diagramme
+	Ink and Draw	Freihand und Zeichnen
+	Mail merge, envelopes and labels	Seriendruck, Umschläge und Etiketten
+	Content controls	Inhaltssteuerelemente
+	Compare, combine and versions	Vergleichen, Kombinieren und Versionen
+	Accessibility checker	Barrierefreiheitsprüfung
+	Design themes and style sets	Designs und Formatvorlagensätze
+	Restrict editing	Bearbeitung einschränken
+	PDF export and printing	PDF-Export und Drucken
+	Word 97-2003 documents	Word 97-2003-Dokumente
+	Alignment Guides	Ausrichtungshilfslinien

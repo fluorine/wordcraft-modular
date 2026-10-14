@@ -2491,3 +2491,27 @@ preview	Title	Título
 	Language Preferences…	Preferencias de idioma…
 	Extensions	Extensiones
 	Turn Extension On or Off	Activar o desactivar extensión
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Desactive lo que no use. Los documentos conservan todo su contenido, incluso el de una extensión desactivada.
+	Always on	Siempre activa
+	Not in this build	No incluida en esta versión
+	Needs: {names}	Necesita: {names}
+	Change them too	Cambiarlas también
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Este documento tiene contenido de extensiones desactivadas: {names}. Se muestra y se guarda tal cual.
+	Turn On	Activar
+	Dismiss	Descartar
+	Core	Núcleo
+	Spelling, grammar and thesaurus	Ortografía, gramática y sinónimos
+	References and citations	Referencias y citas
+	Equation editor	Editor de ecuaciones
+	Shapes and drawing canvas	Formas y lienzo de dibujo
+	Charts	Gráficos
+	Ink and Draw	Entrada de lápiz y dibujo
+	Mail merge, envelopes and labels	Combinar correspondencia, sobres y etiquetas
+	Content controls	Controles de contenido
+	Compare, combine and versions	Comparar, combinar y versiones
+	Accessibility checker	Comprobador de accesibilidad
+	Design themes and style sets	Temas y conjuntos de estilos
+	Restrict editing	Restringir edición
+	PDF export and printing	Exportar a PDF e imprimir
+	Word 97-2003 documents	Documentos de Word 97-2003
+	Alignment Guides	Guías de alineación

@@ -49,6 +49,7 @@ pub mod dialogs_smart_art;
 pub mod dialogs_templates;
 pub mod equation_tab;
 pub mod ext;
+pub mod ext_bar;
 /// The built-in file browser, for desktops without a system file dialog (#576).
 #[cfg(not(target_arch = "wasm32"))]
 pub mod file_browser;
@@ -509,6 +510,8 @@ pub struct WordApp {
     pub(crate) outline_prev_tab: Option<String>,
     /// Zotero commands in flight (`ui.zotero.*`).
     pub zotero: zotero::ZoteroLink,
+    /// The bar for content of extensions that are off.
+    pub ext_bar: ext_bar::ExtBar,
     /// The egui context, once the first frame has run (background work wakes the UI with it).
     pub(crate) ctx: Option<egui::Context>,
     /// Read Aloud: the start of the sentence the caret was last moved to, and the last error shown.
@@ -613,6 +616,7 @@ impl WordApp {
             smart_art_typing: None,
             outline_prev_tab: None,
             zotero: zotero::ZoteroLink::default(),
+            ext_bar: Default::default(),
             ctx: None,
             read_aloud_at: None,
             read_aloud_error: None,
@@ -1828,11 +1832,13 @@ impl WordApp {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
             chrome::title_bar(self, ui);
             ribbon::show(self, ui);
+            ext_bar::show(self, ui);
             chrome::status_bar(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
         } else {
             chrome::title_bar(self, ui);
             ribbon::show(self, ui);
+            ext_bar::show(self, ui);
             chrome::status_bar(self, ui);
             panes::show(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |ui| {

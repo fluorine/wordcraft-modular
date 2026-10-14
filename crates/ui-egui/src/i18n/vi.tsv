@@ -2536,3 +2536,27 @@
 # Extensions (modular edition)
 	Extensions	Tiện ích mở rộng
 	Turn Extension On or Off	Bật hoặc tắt tiện ích mở rộng
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Tắt những gì bạn không dùng. Tài liệu vẫn giữ toàn bộ nội dung, kể cả của tiện ích mở rộng đã tắt.
+	Always on	Luôn bật
+	Not in this build	Không có trong bản này
+	Needs: {names}	Cần: {names}
+	Change them too	Đổi cả chúng
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Tài liệu này có nội dung của tiện ích mở rộng đang tắt: {names}. Nội dung vẫn hiển thị và lưu nguyên vẹn.
+	Turn On	Bật
+	Dismiss	Bỏ qua
+	Core	Lõi
+	Spelling, grammar and thesaurus	Chính tả, ngữ pháp và từ điển đồng nghĩa
+	References and citations	Tham chiếu và trích dẫn
+	Equation editor	Trình soạn phương trình
+	Shapes and drawing canvas	Hình dạng và khung vẽ
+	Charts	Biểu đồ
+	Ink and Draw	Mực và vẽ
+	Mail merge, envelopes and labels	Phối thư, phong bì và nhãn
+	Content controls	Điều khiển nội dung
+	Compare, combine and versions	So sánh, kết hợp và phiên bản
+	Accessibility checker	Bộ kiểm tra trợ năng
+	Design themes and style sets	Chủ đề và bộ kiểu
+	Restrict editing	Hạn chế chỉnh sửa
+	PDF export and printing	Xuất PDF và in
+	Word 97-2003 documents	Tài liệu Word 97-2003
+	Alignment Guides	Đường căn chỉnh

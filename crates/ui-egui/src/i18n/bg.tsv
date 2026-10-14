@@ -2505,3 +2505,27 @@
 	Language Preferences…	Езикови предпочитания…
 	Extensions	Разширения
 	Turn Extension On or Off	Включване или изключване на разширение
+	Turn off what you don't use. Documents keep all their content, even for an extension that is off.	Изключете това, което не използвате. Документите запазват цялото си съдържание, дори за изключено разширение.
+	Always on	Винаги включено
+	Not in this build	Не е в тази версия
+	Needs: {names}	Изисква: {names}
+	Change them too	Промени и тях
+	This document has content for extensions that are off: {names}. It shows and saves as it is.	Документът има съдържание за изключени разширения: {names}. Показва се и се записва както е.
+	Turn On	Включи
+	Dismiss	Затвори
+	Core	Ядро
+	Spelling, grammar and thesaurus	Правопис, граматика и синонимен речник
+	References and citations	Справки и цитати
+	Equation editor	Редактор на уравнения
+	Shapes and drawing canvas	Фигури и платно за рисуване
+	Charts	Диаграми
+	Ink and Draw	Мастило и рисуване
+	Mail merge, envelopes and labels	Обединяване на кореспонденция, пликове и етикети
+	Content controls	Контроли за съдържание
+	Compare, combine and versions	Сравняване, обединяване и версии
+	Accessibility checker	Проверка за достъпност
+	Design themes and style sets	Теми и набори стилове
+	Restrict editing	Ограничаване на редактирането
+	PDF export and printing	Експорт в PDF и печат
+	Word 97-2003 documents	Документи на Word 97-2003
+	Alignment Guides	Помощни линии за подравняване
