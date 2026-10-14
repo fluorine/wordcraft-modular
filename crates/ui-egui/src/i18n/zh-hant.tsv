@@ -2130,7 +2130,6 @@
 	Always on	一律開啟
 	Not in this build	此版本中沒有
 	Needs: {names}	需要：{names}
-	Change them too	一併變更
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	此文件包含已關閉擴充功能的內容：{names}。內容會照原樣顯示和儲存。
 	Turn On	開啟
 	Dismiss	關閉
@@ -2150,3 +2149,5 @@
 	PDF export and printing	PDF 匯出和列印
 	Word 97-2003 documents	Word 97-2003 文件
 	Alignment Guides	對齊參考線
+	Turning on {name} also turns on {names}. Continue?	開啟 {name} 也會開啟 {names}。是否繼續？
+	Turning off {name} also turns off {names}. Continue?	關閉 {name} 也會關閉 {names}。是否繼續？

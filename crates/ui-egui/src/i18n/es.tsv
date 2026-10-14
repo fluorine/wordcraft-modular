@@ -2495,7 +2495,6 @@ preview	Title	Título
 	Always on	Siempre activa
 	Not in this build	No incluida en esta versión
 	Needs: {names}	Necesita: {names}
-	Change them too	Cambiarlas también
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Este documento tiene contenido de extensiones desactivadas: {names}. Se muestra y se guarda tal cual.
 	Turn On	Activar
 	Dismiss	Descartar
@@ -2515,3 +2514,5 @@ preview	Title	Título
 	PDF export and printing	Exportar a PDF e imprimir
 	Word 97-2003 documents	Documentos de Word 97-2003
 	Alignment Guides	Guías de alineación
+	Turning on {name} also turns on {names}. Continue?	Al activar {name} también se activa {names}. ¿Continuar?
+	Turning off {name} also turns off {names}. Continue?	Al desactivar {name} también se desactiva {names}. ¿Continuar?

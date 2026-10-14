@@ -2518,7 +2518,6 @@
 	Always on	Mindig bekapcsolva
 	Not in this build	Nincs ebben a kiadásban
 	Needs: {names}	Szükséges: {names}
-	Change them too	Azokat is módosítsa
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	A dokumentum kikapcsolt bővítmények tartalmát tartalmazza: {names}. Változatlanul jelenik meg és mentődik.
 	Turn On	Bekapcsolás
 	Dismiss	Elvetés
@@ -2538,3 +2537,5 @@
 	PDF export and printing	PDF-exportálás és nyomtatás
 	Word 97-2003 documents	Word 97-2003 dokumentumok
 	Alignment Guides	Igazítási segédvonalak
+	Turning on {name} also turns on {names}. Continue?	A(z) {name} bekapcsolása ezeket is bekapcsolja: {names}. Folytatja?
+	Turning off {name} also turns off {names}. Continue?	A(z) {name} kikapcsolása ezeket is kikapcsolja: {names}. Folytatja?

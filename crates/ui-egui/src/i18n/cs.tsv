@@ -2134,7 +2134,6 @@
 	Always on	Vždy zapnuto
 	Not in this build	Není v tomto sestavení
 	Needs: {names}	Vyžaduje: {names}
-	Change them too	Změnit i je
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Dokument obsahuje obsah pro vypnutá rozšíření: {names}. Zobrazí se a uloží beze změny.
 	Turn On	Zapnout
 	Dismiss	Zavřít
@@ -2154,3 +2153,5 @@
 	PDF export and printing	Export do PDF a tisk
 	Word 97-2003 documents	Dokumenty Word 97-2003
 	Alignment Guides	Vodítka zarovnání
+	Turning on {name} also turns on {names}. Continue?	Zapnutím {name} se zapne také {names}. Pokračovat?
+	Turning off {name} also turns off {names}. Continue?	Vypnutím {name} se vypne také {names}. Pokračovat?

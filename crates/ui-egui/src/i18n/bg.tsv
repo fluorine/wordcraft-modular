@@ -2509,7 +2509,6 @@
 	Always on	Винаги включено
 	Not in this build	Не е в тази версия
 	Needs: {names}	Изисква: {names}
-	Change them too	Промени и тях
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Документът има съдържание за изключени разширения: {names}. Показва се и се записва както е.
 	Turn On	Включи
 	Dismiss	Затвори
@@ -2529,3 +2528,5 @@
 	PDF export and printing	Експорт в PDF и печат
 	Word 97-2003 documents	Документи на Word 97-2003
 	Alignment Guides	Помощни линии за подравняване
+	Turning on {name} also turns on {names}. Continue?	Включването на {name} включва и {names}. Продължаване?
+	Turning off {name} also turns off {names}. Continue?	Изключването на {name} изключва и {names}. Продължаване?

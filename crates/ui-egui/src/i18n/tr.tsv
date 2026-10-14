@@ -2518,7 +2518,6 @@ preview	Title	Örnek
 	Always on	Her zaman açık
 	Not in this build	Bu sürümde yok
 	Needs: {names}	Gerekli: {names}
-	Change them too	Onları da değiştir
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Bu belgede kapalı uzantıların içeriği var: {names}. Olduğu gibi gösterilir ve kaydedilir.
 	Turn On	Aç
 	Dismiss	Kapat
@@ -2538,3 +2537,5 @@ preview	Title	Örnek
 	PDF export and printing	PDF'ye aktarma ve yazdırma
 	Word 97-2003 documents	Word 97-2003 belgeleri
 	Alignment Guides	Hizalama kılavuzları
+	Turning on {name} also turns on {names}. Continue?	{name} açılırsa {names} de açılır. Devam edilsin mi?
+	Turning off {name} also turns off {names}. Continue?	{name} kapatılırsa {names} de kapanır. Devam edilsin mi?

@@ -2143,7 +2143,6 @@
 	Always on	Увек укључено
 	Not in this build	Није у овој верзији
 	Needs: {names}	Захтева: {names}
-	Change them too	Промени и њих
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Овај документ има садржај искључених проширења: {names}. Приказује се и чува непромењен.
 	Turn On	Укључи
 	Dismiss	Одбаци
@@ -2163,3 +2162,5 @@
 	PDF export and printing	Извоз у PDF и штампање
 	Word 97-2003 documents	Word 97-2003 документи
 	Alignment Guides	Вођице за поравнавање
+	Turning on {name} also turns on {names}. Continue?	Укључивање {name} укључује и {names}. Наставити?
+	Turning off {name} also turns off {names}. Continue?	Искључивање {name} искључује и {names}. Наставити?

@@ -2129,7 +2129,6 @@
 	Always on	常にオン
 	Not in this build	このビルドにはありません
 	Needs: {names}	必要: {names}
-	Change them too	それらも変更する
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	この文書にはオフの拡張機能のコンテンツがあります: {names}。そのまま表示・保存されます。
 	Turn On	オンにする
 	Dismiss	閉じる
@@ -2149,3 +2148,5 @@
 	PDF export and printing	PDF エクスポートと印刷
 	Word 97-2003 documents	Word 97-2003 文書
 	Alignment Guides	配置ガイド
+	Turning on {name} also turns on {names}. Continue?	{name} をオンにすると {names} もオンになります。続行しますか?
+	Turning off {name} also turns off {names}. Continue?	{name} をオフにすると {names} もオフになります。続行しますか?

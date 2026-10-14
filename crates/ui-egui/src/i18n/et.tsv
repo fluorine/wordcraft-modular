@@ -2163,7 +2163,6 @@
 	Always on	Alati sees
 	Not in this build	Pole selles versioonis
 	Needs: {names}	Vajab: {names}
-	Change them too	Muuda ka neid
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Selles dokumendis on sisu väljalülitatud laienduste jaoks: {names}. Seda näidatakse ja salvestatakse muutmata.
 	Turn On	Lülita sisse
 	Dismiss	Loobu
@@ -2183,3 +2182,5 @@
 	PDF export and printing	PDF-eksport ja printimine
 	Word 97-2003 documents	Word 97-2003 dokumendid
 	Alignment Guides	Joondusjuhikud
+	Turning on {name} also turns on {names}. Continue?	{name} sisselülitamine lülitab sisse ka {names}. Kas jätkata?
+	Turning off {name} also turns off {names}. Continue?	{name} väljalülitamine lülitab välja ka {names}. Kas jätkata?

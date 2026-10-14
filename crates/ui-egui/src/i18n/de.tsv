@@ -2128,7 +2128,6 @@
 	Always on	Immer an
 	Not in this build	Nicht in diesem Build
 	Needs: {names}	Benötigt: {names}
-	Change them too	Auch diese ändern
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Dieses Dokument enthält Inhalte für ausgeschaltete Erweiterungen: {names}. Sie werden unverändert angezeigt und gespeichert.
 	Turn On	Einschalten
 	Dismiss	Schließen
@@ -2148,3 +2147,5 @@
 	PDF export and printing	PDF-Export und Drucken
 	Word 97-2003 documents	Word 97-2003-Dokumente
 	Alignment Guides	Ausrichtungshilfslinien
+	Turning on {name} also turns on {names}. Continue?	Wenn Sie {name} einschalten, wird auch {names} eingeschaltet. Fortfahren?
+	Turning off {name} also turns off {names}. Continue?	Wenn Sie {name} ausschalten, wird auch {names} ausgeschaltet. Fortfahren?

@@ -2513,7 +2513,6 @@ preview	Title	Tytuł
 	Always on	Zawsze włączone
 	Not in this build	Brak w tej wersji
 	Needs: {names}	Wymaga: {names}
-	Change them too	Zmień też je
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Ten dokument zawiera treść wyłączonych rozszerzeń: {names}. Jest wyświetlana i zapisywana bez zmian.
 	Turn On	Włącz
 	Dismiss	Odrzuć
@@ -2533,3 +2532,5 @@ preview	Title	Tytuł
 	PDF export and printing	Eksport do PDF i drukowanie
 	Word 97-2003 documents	Dokumenty programu Word 97-2003
 	Alignment Guides	Linie wyrównania
+	Turning on {name} also turns on {names}. Continue?	Włączenie {name} włączy też {names}. Kontynuować?
+	Turning off {name} also turns off {names}. Continue?	Wyłączenie {name} wyłączy też {names}. Kontynuować?

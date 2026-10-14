@@ -187,6 +187,27 @@ pub fn content_needs(doc: &wordcraft_doc::Document) -> Vec<&'static str> {
     out
 }
 
+/// The other extensions that change with turning `id` on or off in this session: the ones it
+/// needs that are off, or the ones that need it and are on.
+pub fn affected(s: &Session, id: &str, on: bool) -> Vec<&'static str> {
+    if on {
+        let mut needs: Vec<&'static str> = Vec::new();
+        let mut frontier = vec![id];
+        while let Some(cur) = frontier.pop() {
+            for d in get(cur).map(|e| e.depends_on).unwrap_or(&[]) {
+                if !needs.contains(d) {
+                    needs.push(d);
+                    frontier.push(d);
+                }
+            }
+        }
+        needs.retain(|d| !enabled(s, d));
+        needs
+    } else {
+        dependents(id).into_iter().filter(|d| enabled(s, d)).collect()
+    }
+}
+
 /// Why a command of extension `ext` cannot run.
 pub fn off_reason(ext: &str) -> String {
     let name = get(ext).map_or(ext, |e| e.name);
@@ -504,6 +525,16 @@ mod tests {
         s.run("insert.equation", &serde_json::json!({})).unwrap();
         let needs = content_needs(&s.doc);
         assert!(needs.contains(&"comments") && needs.contains(&"equation-editor"), "{needs:?}");
+    }
+
+    #[test]
+    fn affected_lists_what_a_switch_changes() {
+        let mut s = crate::Session::new(wordcraft_doc::Document::new());
+        let off = affected(&s, "shapes", false);
+        assert!(off.contains(&"charts") && off.contains(&"ink") && !off.contains(&"comments"), "{off:?}");
+        s.prefs.disabled_extensions = vec!["shapes".into(), "charts".into()];
+        assert_eq!(affected(&s, "charts", true), vec!["shapes"]);
+        assert!(affected(&s, "comments", false).is_empty());
     }
 
     #[test]

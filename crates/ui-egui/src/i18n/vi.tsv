@@ -2540,7 +2540,6 @@
 	Always on	Luôn bật
 	Not in this build	Không có trong bản này
 	Needs: {names}	Cần: {names}
-	Change them too	Đổi cả chúng
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Tài liệu này có nội dung của tiện ích mở rộng đang tắt: {names}. Nội dung vẫn hiển thị và lưu nguyên vẹn.
 	Turn On	Bật
 	Dismiss	Bỏ qua
@@ -2560,3 +2559,5 @@
 	PDF export and printing	Xuất PDF và in
 	Word 97-2003 documents	Tài liệu Word 97-2003
 	Alignment Guides	Đường căn chỉnh
+	Turning on {name} also turns on {names}. Continue?	Bật {name} cũng bật {names}. Tiếp tục?
+	Turning off {name} also turns off {names}. Continue?	Tắt {name} cũng tắt {names}. Tiếp tục?

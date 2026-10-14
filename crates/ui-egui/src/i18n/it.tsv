@@ -2504,7 +2504,6 @@ preview	Title	Esempio
 	Always on	Sempre attiva
 	Not in this build	Non presente in questa build
 	Needs: {names}	Richiede: {names}
-	Change them too	Cambia anche queste
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Questo documento ha contenuti di estensioni disattivate: {names}. Viene mostrato e salvato così com'è.
 	Turn On	Attiva
 	Dismiss	Ignora
@@ -2524,3 +2523,5 @@ preview	Title	Esempio
 	PDF export and printing	Esportazione PDF e stampa
 	Word 97-2003 documents	Documenti Word 97-2003
 	Alignment Guides	Guide di allineamento
+	Turning on {name} also turns on {names}. Continue?	Attivando {name} si attiva anche {names}. Continuare?
+	Turning off {name} also turns off {names}. Continue?	Disattivando {name} si disattiva anche {names}. Continuare?

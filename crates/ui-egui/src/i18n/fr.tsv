@@ -2137,7 +2137,6 @@
 	Always on	Toujours active
 	Not in this build	Absente de cette version
 	Needs: {names}	Nécessite : {names}
-	Change them too	Les modifier aussi
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	Ce document contient du contenu d'extensions désactivées : {names}. Il s'affiche et s'enregistre tel quel.
 	Turn On	Activer
 	Dismiss	Ignorer
@@ -2157,3 +2156,5 @@
 	PDF export and printing	Export PDF et impression
 	Word 97-2003 documents	Documents Word 97-2003
 	Alignment Guides	Repères d'alignement
+	Turning on {name} also turns on {names}. Continue?	Activer {name} active aussi {names}. Continuer ?
+	Turning off {name} also turns off {names}. Continue?	Désactiver {name} désactive aussi {names}. Continuer ?

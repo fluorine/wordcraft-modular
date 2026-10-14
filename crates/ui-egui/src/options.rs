@@ -496,25 +496,36 @@ fn extensions(app: &mut WordApp, ui: &mut Ui) {
             };
             ui.label(RichText::new(state).small().weak());
             if r.changed() {
-                match app.run("extensions.set", json!({"id": id, "enabled": on})) {
-                    Ok(_) => pending = None,
-                    Err(msg) if msg.contains("cascade") => pending = Some((id.to_string(), on, msg)),
-                    Err(msg) => app.status(msg),
+                let others = wordcraft_engine::extensions::affected(&app.session, id, on);
+                if others.is_empty() {
+                    if let Err(msg) = app.run("extensions.set", json!({"id": id, "enabled": on})) {
+                        app.status(msg);
+                    }
+                    pending = None;
+                } else {
+                    // Ask first: Yes switches the others too, No leaves every switch as it was.
+                    let list = names(&json!(others));
+                    let ask = if on {
+                        tl!("Turning on {name} also turns on {names}. Continue?")
+                    } else {
+                        tl!("Turning off {name} also turns off {names}. Continue?")
+                    };
+                    pending = Some((id.to_string(), on, crate::i18n::fmt(ask, &[("name", &tl!(name).to_string()), ("names", &list)])));
                 }
             }
         });
     }
     if let Some((id, on, msg)) = pending.clone() {
         ui.add_space(8.0);
-        ui.label(RichText::new(msg.split(": ").skip(1).collect::<Vec<_>>().join(": ")).small());
+        ui.label(RichText::new(msg).small());
         ui.horizontal(|ui| {
-            if ui.button(tl!("Change them too")).clicked() {
+            if ui.button(tl!("Yes")).clicked() {
                 if let Err(e) = app.run("extensions.set", json!({"id": id, "enabled": on, "cascade": true})) {
                     app.status(e);
                 }
                 pending = None;
             }
-            if ui.button(tl!("Cancel")).clicked() {
+            if ui.button(tl!("No")).clicked() {
                 pending = None;
             }
         });

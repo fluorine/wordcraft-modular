@@ -2519,7 +2519,6 @@ preview	Title	Пример
 	Always on	Всегда включено
 	Not in this build	Нет в этой сборке
 	Needs: {names}	Требуется: {names}
-	Change them too	Изменить и их
 	This document has content for extensions that are off: {names}. It shows and saves as it is.	В документе есть содержимое отключённых расширений: {names}. Оно показывается и сохраняется без изменений.
 	Turn On	Включить
 	Dismiss	Закрыть
@@ -2539,3 +2538,5 @@ preview	Title	Пример
 	PDF export and printing	Экспорт в PDF и печать
 	Word 97-2003 documents	Документы Word 97-2003
 	Alignment Guides	Направляющие выравнивания
+	Turning on {name} also turns on {names}. Continue?	Включение {name} включит и {names}. Продолжить?
+	Turning off {name} also turns off {names}. Continue?	Выключение {name} выключит и {names}. Продолжить?
