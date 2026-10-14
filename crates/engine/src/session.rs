@@ -483,6 +483,9 @@ pub struct Prefs {
     /// in Word). A damaged saved value reads as the defaults.
     #[serde(deserialize_with = "crate::cmd::tools::lenient_autocorrect")]
     pub autocorrect: crate::cmd::tools::AutoCorrectPrefs,
+    /// Extensions the user turned off (File › Options › Extensions, `extensions.set`); the
+    /// ones that need them are off too.
+    pub disabled_extensions: Vec<String>,
 }
 
 impl Default for Prefs {
@@ -503,6 +506,7 @@ impl Default for Prefs {
             ignore_internet: true,
             detect_language: true,
             autocorrect: Default::default(),
+            disabled_extensions: Vec::new(),
         }
     }
 }
@@ -1068,7 +1072,7 @@ impl Session {
         self.sel.anchor = self.doc.clamp(&self.sel.anchor);
         self.sel.focus = self.doc.clamp(&self.sel.focus);
         let reg = self.registry.clone();
-        for h in reg.hooks() {
+        for h in crate::extensions::active_hooks(self, &reg) {
             if let Some(f) = h.after_clamp {
                 f(self);
             }
@@ -1082,12 +1086,15 @@ impl Session {
         let join = std::mem::take(&mut self.join_next);
         let reg = self.registry.clone();
         let Some(spec) = reg.get(id) else { return Err(CmdError::Unknown(id.to_string())) };
+        if !crate::extensions::enabled(self, spec.ext) {
+            return Err(CmdError::Disabled(format!("{id}: {}", crate::extensions::off_reason(spec.ext))));
+        }
         if let Some(why) = (spec.enabled)(self) {
             return Err(CmdError::Disabled(format!("{id}: {why}")));
         }
         let ctx = crate::extensions::RunCtx { id, params, mutates: spec.mutates, before: None };
         let mut verify = Vec::new();
-        for h in reg.hooks() {
+        for h in crate::extensions::active_hooks(self, &reg) {
             if let Some(before) = h.before
                 && before(self, &ctx)?
                 && let Some(v) = h.verify
@@ -1161,7 +1168,7 @@ impl Session {
                     self.doc.ensure_nonempty();
                     self.doc.prune_text_boxes();
                     let ctx = crate::extensions::RunCtx { id, params, mutates, before: before_doc.as_ref().map(|b| &b.0) };
-                    for h in reg.hooks() {
+                    for h in crate::extensions::active_hooks(self, &reg) {
                         if let Some(after) = h.after_edit
                             && after(self, &ctx)
                         {

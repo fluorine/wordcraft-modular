@@ -121,6 +121,45 @@ const BUILT: &[(&str, bool)] = &[
     ("zotero", cfg!(feature = "zotero")),
 ];
 
+/// Extension `id` is on, given the extensions turned off: built in, not turned off, and every
+/// extension it needs on too. Core always is.
+pub fn enabled_in(disabled: &[String], id: &str) -> bool {
+    enabled_depth(disabled, id, 0)
+}
+
+fn enabled_depth(disabled: &[String], id: &str, depth: usize) -> bool {
+    if id == CORE {
+        return true;
+    }
+    // The manifest has no cycles (tested); the bound keeps a broken one from recursing forever.
+    depth < EXTENSIONS.len()
+        && compiled(id)
+        && !disabled.iter().any(|d| d == id)
+        && get(id).is_some_and(|e| e.depends_on.iter().all(|d| enabled_depth(disabled, d, depth + 1)))
+}
+
+/// Extension `id` is on in this session.
+pub fn enabled(s: &Session, id: &str) -> bool {
+    enabled_in(&s.prefs.disabled_extensions, id)
+}
+
+/// Command `id` belongs to an extension that is off in this session (left out of the build or
+/// turned off), so the front end hides it.
+pub fn hidden(s: &Session, id: &str) -> bool {
+    owner(id).is_some_and(|e| !enabled(s, e))
+}
+
+/// The hooks of the extensions that are on in this session, in call order.
+pub fn active_hooks(s: &Session, reg: &crate::Registry) -> Vec<Hooks> {
+    reg.hooks().iter().filter(|h| enabled(s, h.ext)).copied().collect()
+}
+
+/// Why a command of extension `ext` cannot run.
+pub fn off_reason(ext: &str) -> String {
+    let name = get(ext).map_or(ext, |e| e.name);
+    if compiled(ext) { format!("the {name} extension is turned off") } else { format!("this build has no {name} extension") }
+}
+
 /// Commands that live in a shared module but belong to another extension.
 const OVERRIDES: &[(&str, &[&str])] = &[
     (

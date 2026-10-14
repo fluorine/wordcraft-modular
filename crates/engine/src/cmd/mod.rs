@@ -18,6 +18,7 @@ pub mod draw;
 pub mod edit;
 #[cfg(feature = "equation-editor")]
 pub mod equation;
+pub mod extensions;
 pub mod fields;
 pub mod file;
 pub mod find_pattern;
@@ -130,6 +131,7 @@ pub fn registry() -> Registry {
     v.extend(crate::extensions::tag(speech::specs(), "read-aloud"));
     #[cfg(feature = "developer")]
     v.extend(crate::extensions::tag(controls::specs(), "developer"));
+    v.extend(crate::extensions::tag(extensions::specs(), "core"));
     Registry::new(v).with_hooks(hooks().into_iter().filter(|h| crate::extensions::compiled(h.ext)).collect())
 }
 
