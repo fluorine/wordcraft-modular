@@ -148,6 +148,9 @@ pub fn builtin_menu(ui: &mut Ui, app: &mut WordApp) {
 
 /// Insert › Symbols › Equation: a split button (insert a new equation, or pick a ready-made one).
 pub fn insert_button(ui: &mut Ui, app: &mut WordApp) {
+    if crate::widgets::hidden(app, "insert.equation") {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     let label = tl!("Equation");
     let w = (ui.ctx().fonts_mut(|f| f.layout_no_wrap(label.to_string(), regular(11.5), t.text).size().x) + 22.0).max(48.0);

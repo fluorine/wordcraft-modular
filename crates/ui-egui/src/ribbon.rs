@@ -1054,7 +1054,7 @@ fn insert(app: &mut WordApp, ui: &mut Ui) {
                 }
                 mi(ui, app, "Field…", "ui.dialog", json!({"name": "field"}));
             });
-            menu_button(ui, app, "wordArt", Some("WordArt"), "WordArt", false, "", |ui, app| {
+            menu_button(ui, app, "wordArt", Some("WordArt"), "WordArt", false, "insert.wordArt", |ui, app| {
                 crate::wordart_menus::style_gallery(ui, app, "insert.wordArt")
             });
             small(ui, app, "dropCap", Some("Drop Cap"), "Drop Cap", "insert.dropCap", json!({}), false);
