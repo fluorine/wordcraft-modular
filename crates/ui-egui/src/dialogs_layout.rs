@@ -563,7 +563,7 @@ impl LabelsForm {
             single: false,
             row: 1,
             col: 1,
-            recipients: !app.session.merge.rows.is_empty(),
+            recipients: !wordcraft_engine::cmd::mailings::merge_state(&app.session).rows.is_empty(),
         }
     }
 
@@ -591,7 +591,7 @@ fn product_label(i: usize) -> String {
 }
 
 fn labels_ui(app: &mut WordApp, ui: &mut Ui, f: &mut LabelsForm) -> bool {
-    let has_recipients = !app.session.merge.rows.is_empty();
+    let has_recipients = !wordcraft_engine::cmd::mailings::merge_state(&app.session).rows.is_empty();
     if has_recipients {
         ui.checkbox(&mut f.recipients, tl!("One label per recipient"));
     }

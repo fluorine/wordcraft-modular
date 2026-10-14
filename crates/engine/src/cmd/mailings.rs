@@ -21,13 +21,24 @@ pub struct MergeState {
     pub highlight: bool,
 }
 
+static NO_MERGE: MergeState = MergeState { kind: String::new(), headers: Vec::new(), rows: Vec::new(), preview: false, record: 0, highlight: false };
+
+/// The session's mail-merge state; empty before any recipients were chosen.
+pub fn merge_state(s: &Session) -> &MergeState {
+    s.ext.get().unwrap_or(&NO_MERGE)
+}
+
+fn st(s: &mut Session) -> Result<&mut MergeState, CmdError> {
+    s.ext.state()
+}
+
 fn has_recipients(s: &Session) -> Option<&'static str> {
-    if s.merge.rows.is_empty() { Some("select recipients first") } else { None }
+    if merge_state(s).rows.is_empty() { Some("select recipients first") } else { None }
 }
 
 /// Edit Recipient List needs a list to edit (fields, even with no entries yet).
 fn has_list(s: &Session) -> Option<&'static str> {
-    if s.merge.headers.is_empty() && s.merge.rows.is_empty() { Some("select recipients first") } else { None }
+    if merge_state(s).headers.is_empty() && merge_state(s).rows.is_empty() { Some("select recipients first") } else { None }
 }
 
 /// The kinds of document Start Mail Merge makes. `normal` is an ordinary document again; only
@@ -41,8 +52,8 @@ pub fn specs() -> Vec<CommandSpec> {
             if !MERGE_KINDS.contains(&kind.as_str()) {
                 return Err(CmdError::Params(format!("`kind` must be one of {}", MERGE_KINDS.join(", "))));
             }
-            s.merge.kind = kind;
-            Ok(json!({"kind": s.merge.kind}))
+            st(s)?.kind = kind;
+            Ok(json!({"kind": merge_state(s).kind}))
         })
         .params(r#"{"kind": "letters|emails|envelopes|labels|directory|normal"}"#)
         .pure(),
@@ -53,7 +64,7 @@ pub fn specs() -> Vec<CommandSpec> {
             if v.get("rows").and_then(Value::as_array).is_some() {
                 return recipients(s, &json!({"rows": v.get("rows"), "fields": v.get("fields")}));
             }
-            Ok(json!({"headers": s.merge.headers, "rows": s.merge.rows}))
+            Ok(json!({"headers": merge_state(s).headers, "rows": merge_state(s).rows}))
         })
         .params(r#"{"rows"?: [{field: value}] | [[value]], "fields"?: [string]}"#)
         .key(super::non_mac("Alt+Shift+E"))
@@ -91,18 +102,18 @@ pub fn specs() -> Vec<CommandSpec> {
         })
         .params(r#"{"rule": "IF|SKIPIF|NEXTIF|NEXT|MERGEREC", "field"?, "value"?, "then"?, "else"?}"#),
         CommandSpec::new("mailings.matchFields", "Match Fields", "Mailings › Write & Insert Fields", |s, _| {
-            Ok(json!({"fields": s.merge.headers, "address": address_map(&s.merge.headers)}))
+            Ok(json!({"fields": merge_state(s).headers, "address": address_map(&merge_state(s).headers)}))
         })
         .pure(),
         CommandSpec::new("mailings.highlightFields", "Highlight Merge Fields", "Mailings › Write & Insert Fields", |s, v| {
-            s.merge.highlight = p::bool(v, "value").unwrap_or(!s.merge.highlight);
-            Ok(json!({"value": s.merge.highlight}))
+            st(s)?.highlight = p::bool(v, "value").unwrap_or(!merge_state(s).highlight);
+            Ok(json!({"value": merge_state(s).highlight}))
         })
         .pure(),
         CommandSpec::new("mailings.preview", "Preview Results", "Mailings › Preview Results", |s, v| {
-            s.merge.preview = p::bool(v, "value").unwrap_or(!s.merge.preview);
+            st(s)?.preview = p::bool(v, "value").unwrap_or(!merge_state(s).preview);
             refresh(s);
-            Ok(json!({"preview": s.merge.preview, "record": s.merge.record + 1}))
+            Ok(json!({"preview": merge_state(s).preview, "record": merge_state(s).record + 1}))
         })
         .key(super::non_mac("Alt+Shift+K"))
         .when(has_recipients),
@@ -110,14 +121,13 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("mailings.previous", "Previous Record", "Mailings › Preview Results", |s, _| step(s, -1)).when(has_recipients),
         CommandSpec::new("mailings.findRecipient", "Find Recipient", "Mailings › Preview Results", |s, v| {
             let q = p::req_str(v, "text")?.to_lowercase();
-            let idx = s
-                .merge
+            let idx = merge_state(s)
                 .rows
                 .iter()
                 .position(|r| r.iter().any(|c| c.to_lowercase().contains(&q)))
                 .ok_or_else(|| CmdError::Failed("no matching recipient".into()))?;
-            s.merge.record = idx;
-            s.merge.preview = true;
+            st(s)?.record = idx;
+            st(s)?.preview = true;
             refresh(s);
             Ok(json!({"record": idx + 1}))
         })
@@ -125,11 +135,11 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("mailings.checkErrors", "Check for Errors", "Mailings › Finish", |s, _| {
             let mut missing = Vec::new();
             for f in merge_fields(&s.doc) {
-                if !s.merge.headers.iter().any(|h| h.eq_ignore_ascii_case(&f)) {
+                if !merge_state(s).headers.iter().any(|h| h.eq_ignore_ascii_case(&f)) {
                     missing.push(f);
                 }
             }
-            Ok(json!({"ok": missing.is_empty(), "unknownFields": missing, "records": s.merge.rows.len()}))
+            Ok(json!({"ok": missing.is_empty(), "unknownFields": missing, "records": merge_state(s).rows.len()}))
         })
         .pure(),
         CommandSpec::new("mailings.finish", "Finish & Merge", "Mailings › Finish", finish)
@@ -304,11 +314,11 @@ fn recipients(s: &mut Session, v: &Value) -> CmdResult {
         };
         header_split(all, p::bool(v, "headers").unwrap_or(true))?
     };
-    s.merge.headers = headers;
-    s.merge.rows = rows;
-    s.merge.record = 0;
+    st(s)?.headers = headers;
+    st(s)?.rows = rows;
+    st(s)?.record = 0;
     refresh(s);
-    let mut r = json!({"fields": s.merge.headers, "records": s.merge.rows.len()});
+    let mut r = json!({"fields": merge_state(s).headers, "records": merge_state(s).rows.len()});
     if !sheet.is_null() {
         r["sheet"] = sheet;
     }
@@ -346,11 +356,11 @@ fn header_split(mut all: Vec<Vec<String>>, headers: bool) -> Result<(Vec<String>
 }
 
 fn step(s: &mut Session, d: i64) -> CmdResult {
-    let n = s.merge.rows.len().max(1) as i64;
-    s.merge.record = (s.merge.record as i64 + d).clamp(0, n - 1) as usize;
-    s.merge.preview = true;
+    let n = merge_state(s).rows.len().max(1) as i64;
+    st(s)?.record = (merge_state(s).record as i64 + d).clamp(0, n - 1) as usize;
+    st(s)?.preview = true;
     refresh(s);
-    Ok(json!({"record": s.merge.record + 1, "of": n}))
+    Ok(json!({"record": merge_state(s).record + 1, "of": n}))
 }
 
 /// Field names used by MERGEFIELD fields in the document (body, headers and footers).
@@ -394,12 +404,12 @@ fn address_map(headers: &[String]) -> Value {
 }
 
 fn value(s: &Session, row: usize, field: &str) -> String {
-    let Some(i) = s.merge.headers.iter().position(|h| h.eq_ignore_ascii_case(field)) else { return String::new() };
-    s.merge.rows.get(row).and_then(|r| r.get(i)).cloned().unwrap_or_default()
+    let Some(i) = merge_state(s).headers.iter().position(|h| h.eq_ignore_ascii_case(field)) else { return String::new() };
+    merge_state(s).rows.get(row).and_then(|r| r.get(i)).cloned().unwrap_or_default()
 }
 
 fn address_block(s: &Session, row: usize) -> String {
-    let m = address_map(&s.merge.headers);
+    let m = address_map(&merge_state(s).headers);
     let g = |k: &str| m.get(k).and_then(Value::as_str).map(|f| value(s, row, f)).unwrap_or_default();
     let name = [g("title"), g("firstName"), g("lastName")].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" ");
     let city_line = [g("city"), [g("state"), g("postal")].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" ")]
@@ -411,7 +421,7 @@ fn address_block(s: &Session, row: usize) -> String {
 }
 
 fn greeting(s: &Session, row: usize) -> String {
-    let m = address_map(&s.merge.headers);
+    let m = address_map(&merge_state(s).headers);
     let g = |k: &str| m.get(k).and_then(Value::as_str).map(|f| value(s, row, f)).unwrap_or_default();
     let name = [g("firstName"), g("lastName")].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" ");
     if name.is_empty() { "Dear Sir or Madam,".into() } else { format!("Dear {name},") }
@@ -508,10 +518,10 @@ fn header_footer_ids(doc: &Document) -> Vec<u32> {
 /// Update merge field results: record values when previewing, «Field» placeholders otherwise.
 /// NEXT moves later fields of the previewed document to the next record, as Finish & Merge does.
 pub fn refresh(s: &mut Session) {
-    let preview = s.merge.preview && !s.merge.rows.is_empty();
-    let last = s.merge.rows.len();
+    let preview = merge_state(s).preview && !merge_state(s).rows.is_empty();
+    let last = merge_state(s).rows.len();
     for story in merge_stories(&s.doc) {
-        let mut cur = s.merge.record;
+        let mut cur = merge_state(s).record;
         for path in s.doc.para_paths(story) {
             let updates: Vec<(usize, String)> = match s.doc.para(story, &path) {
                 Some(p) => p
@@ -564,10 +574,10 @@ const MAX_MERGED_BLOCKS: usize = 200_000;
 /// are merged too: with merge fields in them, each letter becomes its own section with its own
 /// header/footer copies.
 fn finish(s: &mut Session, v: &Value) -> CmdResult {
-    let n = s.merge.rows.len();
+    let n = merge_state(s).rows.len();
     let from = (p::u64(v, "from").unwrap_or(1).max(1) as usize).saturating_sub(1);
     let to = (p::u64(v, "to").unwrap_or(n as u64).min(n as u64)) as usize;
-    let directory = s.merge.kind == "directory";
+    let directory = st(s)?.kind == "directory";
     let hf: Vec<u32> =
         header_footer_ids(&s.doc).into_iter().filter(|id| s.doc.story(StoryRef::Part(*id)).is_some_and(|b| has_merge_fields(b, 0))).collect();
     let per_record = !directory && !hf.is_empty();
@@ -661,7 +671,7 @@ fn finish(s: &mut Session, v: &Value) -> CmdResult {
     s.set_document(out);
     s.path = None;
     s.dirty = true;
-    s.merge.preview = false;
+    st(s)?.preview = false;
     Ok(json!({"records": count}))
 }
 
@@ -706,7 +716,7 @@ fn merge_blocks(s: &Session, blocks: &mut Blocks, cur: &mut usize, end: usize, d
                 let mut repl = Vec::new();
                 for off in p.object_offsets() {
                     let Some(InlineObject::Field { instr, .. }) = p.object_at(off) else { continue };
-                    let row = if *cur < end { *cur } else { s.merge.rows.len() };
+                    let row = if *cur < end { *cur } else { merge_state(s).rows.len() };
                     match act(s, instr, row) {
                         Some(Act::Text(t)) => repl.push((off, t)),
                         Some(Act::Next) => {
@@ -765,7 +775,7 @@ fn envelope_size(v: &Value) -> Result<(f32, f32), CmdError> {
 /// in the middle. As a new document, or (`add`) as a section of its own at the start of this one.
 fn envelopes(s: &mut Session, v: &Value) -> CmdResult {
     let delivery = p::str(v, "delivery").map(str::to_string).unwrap_or_else(|| {
-        if s.merge.rows.is_empty() { "Recipient Name\nStreet Address\nCity, ST 00000".into() } else { address_block(s, s.merge.record) }
+        if merge_state(s).rows.is_empty() { "Recipient Name\nStreet Address\nCity, ST 00000".into() } else { address_block(s, merge_state(s).record) }
     });
     let ret = p::str(v, "return").unwrap_or("").to_string();
     let (w, h) = envelope_size(v)?;
@@ -988,7 +998,7 @@ fn labels(s: &mut Session, v: &Value) -> CmdResult {
         let at = |k: &str| x.get(k).and_then(Value::as_u64).unwrap_or(1).max(1) as usize;
         (at("row").min(rows), at("col").min(cols))
     });
-    let from_rec = single.is_none() && p::bool(v, "fromRecipients").unwrap_or(!s.merge.rows.is_empty() && p::str(v, "text").is_none());
+    let from_rec = single.is_none() && p::bool(v, "fromRecipients").unwrap_or(!merge_state(s).rows.is_empty() && p::str(v, "text").is_none());
     let text = p::str(v, "text").unwrap_or("Name\nAddress\nCity, ST 00000").to_string();
     let (page_w, page_h) = if prod.paper == "A4" { (595.3, 841.9) } else { (612.0, 792.0) };
     let h_gap = (prod.h_pitch - prod.width).max(0.0);
@@ -1022,7 +1032,7 @@ fn labels(s: &mut Session, v: &Value) -> CmdResult {
             let content = match single {
                 Some((sr, sc)) if (sr, sc) != (r + 1, c + 1) => String::new(),
                 _ if from_rec => {
-                    let rec = if k < s.merge.rows.len() { address_block(s, k) } else { String::new() };
+                    let rec = if k < merge_state(s).rows.len() { address_block(s, k) } else { String::new() };
                     k += 1;
                     rec
                 }
@@ -1107,10 +1117,10 @@ mod tests {
         // Two sheets and none chosen: the names come back and nothing loads.
         let r = s.run("mailings.recipients", &json!({"data": data})).unwrap();
         assert_eq!(r, json!({"sheets": ["Notes", "Guests"], "chooseSheet": true}));
-        assert!(s.merge.headers.is_empty());
+        assert!(merge_state(&s).headers.is_empty());
         let r = s.run("mailings.recipients", &json!({"data": data, "sheet": "guests"})).unwrap();
         assert_eq!(r, json!({"fields": ["Name", "Column 2", "Name 2"], "records": 2, "sheet": "Guests"}));
-        assert_eq!(s.merge.rows[1], ["Alan", "Wilmslow", "B"]);
+        assert_eq!(merge_state(&s).rows[1], ["Alan", "Wilmslow", "B"]);
         // Without a header row every row is a record.
         let r = s.run("mailings.recipients", &json!({"data": data, "sheet": 2, "headers": false})).unwrap();
         assert_eq!(r["fields"], json!(["Column 1", "Column 2", "Column 3"]));
@@ -1128,13 +1138,13 @@ mod tests {
             .unwrap();
         assert_eq!(r, json!({"fields": ["Last Name", "City", "Age"], "records": 2}));
         assert_eq!(
-            s.merge.rows,
+            merge_state(&s).rows,
             vec![vec!["Lovelace".to_string(), "London".into(), "36".into()], vec!["Turing".into(), String::new(), String::new()]]
         );
         // Objects follow `fields` too; missing and null cells are blank.
         s.run("mailings.editRecipients", &json!({"fields": ["Name", "City"], "rows": [{"City": "Paris", "Name": null}]})).unwrap();
-        assert_eq!(s.merge.headers, vec!["Name", "City"]);
-        assert_eq!(s.merge.rows, vec![vec![String::new(), "Paris".to_string()]]);
+        assert_eq!(merge_state(&s).headers, vec!["Name", "City"]);
+        assert_eq!(merge_state(&s).rows, vec![vec![String::new(), "Paris".to_string()]]);
         // Array rows need the field names.
         let err = s.run("mailings.recipients", &json!({"rows": [["Ada"]]})).unwrap_err();
         assert!(matches!(err, CmdError::Params(_)), "{err}");
@@ -1150,7 +1160,7 @@ mod tests {
         }
         assert_eq!(s.run("mailings.start", &json!({"kind": " Directory "})).unwrap(), json!({"kind": "directory"}));
         assert!(matches!(s.run("mailings.start", &json!({"kind": "fax"})), Err(CmdError::Params(_))));
-        assert_eq!(s.merge.kind, "directory", "a rejected kind leaves the current one");
+        assert_eq!(merge_state(&s).kind, "directory", "a rejected kind leaves the current one");
         assert!(matches!(s.run("mailings.editRecipients", &json!({})), Err(CmdError::Disabled(_))));
         s.run("mailings.recipients", &json!({"csv": "Name\nAda"})).unwrap();
         assert_eq!(s.run("mailings.editRecipients", &json!({})).unwrap(), json!({"headers": ["Name"], "rows": [["Ada"]]}));

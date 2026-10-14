@@ -1138,7 +1138,7 @@ impl Dialog {
             "models" => Dialog::About { tab: 2 },
             // The current list to edit, or a new one to type.
             "recipientList" | "newRecipientList" => {
-                let m = &app.session.merge;
+                let m = wordcraft_engine::cmd::mailings::merge_state(&app.session);
                 if name == "recipientList" && !m.headers.is_empty() {
                     Dialog::RecipientList { fields: m.headers.clone(), rows: m.rows.clone(), message: String::new() }
                 } else {
@@ -1148,7 +1148,7 @@ impl Dialog {
                 }
             }
             "insertMergeField" => {
-                let fields = app.session.merge.headers.clone();
+                let fields = wordcraft_engine::cmd::mailings::merge_state(&app.session).headers.clone();
                 Dialog::InsertMergeField { field: fields.first().cloned().unwrap_or_default(), fields }
             }
             "findRecipient" => Dialog::FindRecipient { text: String::new(), message: String::new() },
@@ -1159,7 +1159,7 @@ impl Dialog {
             }
             "encryptPassword" => Dialog::EncryptPassword { password: Password::default(), confirm: Password::default(), message: String::new() },
             "ruleIf" | "ruleSkipIf" => {
-                let fields = app.session.merge.headers.clone();
+                let fields = wordcraft_engine::cmd::mailings::merge_state(&app.session).headers.clone();
                 Dialog::MergeRule {
                     rule: if name == "ruleSkipIf" { "SKIPIF" } else { "IF" }.into(),
                     field: fields.first().cloned().unwrap_or_default(),

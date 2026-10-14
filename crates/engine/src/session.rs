@@ -398,8 +398,6 @@ pub struct Session {
     pub autosave: bool,
     /// Citation style: APA, MLA, Chicago, IEEE.
     pub bib_style: String,
-    /// Mail merge data source and preview.
-    pub merge: crate::cmd::mailings::MergeState,
     /// Requests from commands to the UI (open a dialog, scroll…), drained by the front end.
     pub ui_requests: Vec<Value>,
     /// Preferences the front end saves between runs.
@@ -597,7 +595,6 @@ impl Session {
             building_blocks: Default::default(),
             autosave: true,
             bib_style,
-            merge: Default::default(),
             ui_requests: Vec::new(),
             math: None,
             math_latex: false,
@@ -1026,7 +1023,6 @@ impl Session {
             building_blocks: _,
             autosave: _,
             bib_style: _,
-            merge: _,
             ui_requests: _,
             document_id: _,
             prefs: _,
