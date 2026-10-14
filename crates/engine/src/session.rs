@@ -391,11 +391,8 @@ pub struct Session {
     pub originals: std::collections::HashMap<String, String>,
     /// Last mutating command (Repeat).
     pub last_command: Option<(String, Value)>,
-    /// Macro being recorded: (name, steps).
-    pub recording: Option<(String, Vec<(String, Value)>)>,
-    pub macros: std::collections::BTreeMap<String, Vec<(String, Value)>>,
-    /// Saved versions: (label, date, document).
-    pub versions: Vec<(String, String, Document)>,
+    /// State owned by extensions, one value per type.
+    pub ext: crate::extensions::ExtState,
     /// Quick Parts / AutoText entries.
     pub building_blocks: std::collections::BTreeMap<String, Fragment>,
     pub autosave: bool,
@@ -598,9 +595,7 @@ impl Session {
             layout: None,
             originals: Default::default(),
             last_command: None,
-            recording: None,
-            macros: Default::default(),
-            versions: Vec::new(),
+            ext: Default::default(),
             building_blocks: Default::default(),
             autosave: true,
             bib_style,
@@ -1029,9 +1024,8 @@ impl Session {
             layout: _,
             originals: _,
             last_command: _,
-            recording: _,
-            macros: _,
-            versions: _,
+            // Extension state (macros, versions…), like the view: not part of the document.
+            ext: _,
             building_blocks: _,
             autosave: _,
             bib_style: _,

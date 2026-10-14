@@ -1,5 +1,8 @@
 //! Extension manifests: which extension owns each command.
 
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+
 use serde_json::Value;
 use wordcraft_doc::Document;
 
@@ -88,6 +91,26 @@ const OVERRIDES: &[(&str, &[&str])] = &[
 
 fn owner_override(id: &str) -> Option<&'static str> {
     OVERRIDES.iter().find(|(_, ids)| ids.contains(&id)).map(|(ext, _)| *ext)
+}
+
+/// Per-session state of the extensions, one value per type. An extension keeps its state
+/// here, not in a `Session` field, so a build without it needs no change to `Session`.
+#[derive(Default)]
+pub struct ExtState(HashMap<TypeId, Box<dyn Any + Send>>);
+
+impl ExtState {
+    /// The `T` this session holds, if any.
+    pub fn get<T: Any + Send>(&self) -> Option<&T> {
+        self.0.get(&TypeId::of::<T>()).and_then(|b| b.downcast_ref())
+    }
+    /// The `T` this session holds; a default one is added first if there is none.
+    pub fn get_mut<T: Any + Send + Default>(&mut self) -> Option<&mut T> {
+        self.0.entry(TypeId::of::<T>()).or_insert_with(|| Box::new(T::default())).downcast_mut()
+    }
+    /// [`Self::get_mut`] as a command error.
+    pub fn state<T: Any + Send + Default>(&mut self) -> Result<&mut T, CmdError> {
+        self.get_mut().ok_or_else(|| CmdError::Failed("extension state is missing".into()))
+    }
 }
 
 /// What a hook sees of the running command.
@@ -251,6 +274,17 @@ mod tests {
             assert!(get(h.ext).is_some_and(|e| e.id != CORE), "hook for {}", h.ext);
             assert!(h.before.is_some() || h.verify.is_some() || h.after_edit.is_some(), "{} has no hook", h.ext);
         }
+    }
+
+    #[test]
+    fn ext_state_starts_empty_and_keeps_values_by_type() {
+        let mut st = ExtState::default();
+        assert!(st.get::<u32>().is_none());
+        if let Some(n) = st.get_mut::<u32>() {
+            *n = 7;
+        }
+        assert_eq!(st.get::<u32>(), Some(&7));
+        assert!(st.get::<String>().is_none());
     }
 
     #[test]

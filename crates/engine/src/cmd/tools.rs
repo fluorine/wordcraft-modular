@@ -346,15 +346,15 @@ pub fn specs() -> Vec<CommandSpec> {
         })
         .key("F4")
         .pure(),
-        CommandSpec::new("tools.recordMacro", "Record Macro", "View › Macros", |s, v| match s.recording.take() {
+        CommandSpec::new("tools.recordMacro", "Record Macro", "View › Macros", |s, v| match s.ext.state::<MacroState>()?.recording.take() {
             Some((name, steps)) => {
                 let n = steps.len();
-                s.macros.insert(name.clone(), steps);
+                s.ext.state::<MacroState>()?.macros.insert(name.clone(), steps);
                 Ok(json!({"recording": false, "saved": name, "steps": n}))
             }
             None => {
                 let name = p::str(v, "name").unwrap_or("Macro1").to_string();
-                s.recording = Some((name.clone(), Vec::new()));
+                s.ext.state::<MacroState>()?.recording = Some((name.clone(), Vec::new()));
                 Ok(json!({"recording": true, "name": name}))
             }
         })
@@ -395,24 +395,26 @@ pub fn specs() -> Vec<CommandSpec> {
         .params(r#"{"mode": "none|readOnly|comments|trackedChanges"}"#),
         CommandSpec::new("file.versions", "Version History", "File › Info", |s, v| {
             if let Some(label) = p::str(v, "save") {
-                s.versions.push((label.to_string(), super::now_iso(), s.doc.clone()));
-                if s.versions.len() > 50 {
-                    s.versions.remove(0);
+                let doc = s.doc.clone();
+                let versions = &mut s.ext.state::<Versions>()?.0;
+                versions.push((label.to_string(), super::now_iso(), doc));
+                if versions.len() > 50 {
+                    versions.remove(0);
                 }
             }
             if let Some(i) = p::u64(v, "restore") {
-                let (_, _, d) = s.versions.get(i as usize).cloned().ok_or_else(|| CmdError::Params("no such version".into()))?;
+                let (_, _, d) = s.ext.state::<Versions>()?.0.get(i as usize).cloned().ok_or_else(|| CmdError::Params("no such version".into()))?;
                 s.checkpoint("Restore Version");
                 s.doc = d;
                 s.touch();
                 s.clamp_selection();
             }
-            Ok(Value::Array(s.versions.iter().enumerate().map(|(i, (l, d, _))| json!({"index": i, "label": l, "date": d})).collect()))
+            Ok(Value::Array(s.ext.get::<Versions>().map(|v| v.0.as_slice()).unwrap_or_default().iter().enumerate().map(|(i, (l, d, _))| json!({"index": i, "label": l, "date": d})).collect()))
         })
         .params(r#"{"save"?: label, "restore"?: index}"#)
         .pure(),
         CommandSpec::new("file.recover", "Recover Unsaved Documents", "File › Info", |s, _| {
-            Ok(Value::Array(s.versions.iter().enumerate().map(|(i, (l, d, _))| json!({"index": i, "label": l, "date": d})).collect()))
+            Ok(Value::Array(s.ext.get::<Versions>().map(|v| v.0.as_slice()).unwrap_or_default().iter().enumerate().map(|(i, (l, d, _))| json!({"index": i, "label": l, "date": d})).collect()))
         })
         .pure(),
         CommandSpec::new("file.newFromTemplate", "New from Template", "File › New", |s, v| {
@@ -731,13 +733,13 @@ fn macros(s: &mut Session, v: &Value) -> CmdResult {
                 a.iter().filter_map(|st| Some((st.get("command")?.as_str()?.to_string(), st.get("params").cloned().unwrap_or(json!({}))))).collect()
             })
             .unwrap_or_default();
-        s.macros.insert(name, steps);
+        s.ext.state::<MacroState>()?.macros.insert(name, steps);
     }
     if let Some(n) = p::str(v, "delete") {
-        s.macros.remove(n);
+        s.ext.state::<MacroState>()?.macros.remove(n);
     }
     if let Some(n) = p::str(v, "run") {
-        let steps = s.macros.get(n).cloned().ok_or_else(|| CmdError::Params(format!("no macro `{n}`")))?;
+        let steps = s.ext.state::<MacroState>()?.macros.get(n).cloned().ok_or_else(|| CmdError::Params(format!("no macro `{n}`")))?;
         for (id, params) in steps.iter().take(10_000) {
             if id == "tools.macros" {
                 continue;
@@ -747,7 +749,13 @@ fn macros(s: &mut Session, v: &Value) -> CmdResult {
         return Ok(json!({"ran": n, "steps": steps.len()}));
     }
     Ok(Value::Object(
-        s.macros.iter().map(|(k, v)| (k.clone(), json!(v.iter().map(|(c, p)| json!({"command": c, "params": p})).collect::<Vec<_>>()))).collect(),
+        s.ext
+            .get::<MacroState>()
+            .map(|m| &m.macros)
+            .into_iter()
+            .flatten()
+            .map(|(k, v)| (k.clone(), json!(v.iter().map(|(c, p)| json!({"command": c, "params": p})).collect::<Vec<_>>())))
+            .collect(),
     ))
 }
 
@@ -1523,6 +1531,17 @@ fn customize_ribbon(s: &mut Session, v: &Value) -> CmdResult {
     Ok(Value::Object(out))
 }
 
+/// Recorded macros and the one being recorded: (name, steps).
+#[derive(Default)]
+pub struct MacroState {
+    pub recording: Option<(String, Vec<(String, Value)>)>,
+    pub macros: std::collections::BTreeMap<String, Vec<(String, Value)>>,
+}
+
+/// Saved versions (File › Info › Version History): (label, date, document), oldest first.
+#[derive(Default)]
+pub struct Versions(pub Vec<(String, String, Document)>);
+
 /// Macro recording: every edit, caret move and selection while a macro records.
 pub fn macro_hooks() -> crate::extensions::Hooks {
     crate::extensions::Hooks { before: Some(record_step), ..crate::extensions::Hooks::new("macros") }
@@ -1531,7 +1550,7 @@ pub fn macro_hooks() -> crate::extensions::Hooks {
 fn record_step(s: &mut Session, c: &crate::extensions::RunCtx) -> Result<bool, CmdError> {
     let record = !matches!(c.id, "tools.recordMacro" | "tools.macros" | "edit.undo" | "edit.redo" | "edit.repeat")
         && (c.mutates || c.id.starts_with("caret.") || c.id.starts_with("select."));
-    if record && let Some((_, steps)) = s.recording.as_mut() {
+    if record && let Some((_, steps)) = s.ext.state::<MacroState>()?.recording.as_mut() {
         steps.push((c.id.to_string(), crate::session::replay_params(c.params)));
     }
     Ok(false)
