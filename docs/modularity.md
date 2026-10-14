@@ -1,6 +1,6 @@
 # WordCraft modularity: core and extensions
 
-> **Last reviewed:** 2026-10-13 · **Last updated:** 2026-10-13 · **Change:** minor (Phase 3 done: extension state store; previously minor: Phase 2 done: extension hooks in `Session::run`; previously minor: Phase 1 done: owners, dependency scan, parity per extension; previously minor: Phase 1 first step; previously major: first version) · **Status:** Phase 3 done. Phase 4 is next.
+> **Last reviewed:** 2026-10-13 · **Last updated:** 2026-10-13 · **Change:** minor (Phase 4 done: cargo features per extension; previously minor: Phase 3 done: extension state store; previously minor: Phase 2 done: extension hooks in `Session::run`; previously minor: Phase 1 done: owners, dependency scan, parity per extension; previously minor: Phase 1 first step; previously major: first version) · **Status:** Phase 4 done. Phase 5 is next.
 
 This document is the plan for the modular edition of WordCraft. WordCraft becomes a small core plus
 **extensions**. Each user selects the extensions they use. The default build contains every current
@@ -208,6 +208,7 @@ Each phase builds, passes `cargo xtask ci`, and lands as its own commits. Each p
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-14 | minor | Phase 4 done: `crates/engine` has one cargo feature per extension, `default = ["full"]`. `extensions::compiled` drops the commands and hooks of extensions a build leaves out, also in shared modules. Gated modules: equation, design, citations, index, mailings, connectors, smart_art, chart, wordart, draw, templates, protect, speech. `controls`, `references`, `objects` and `canvas` stay compiled because core edits use them; only their commands follow the feature. `parse_csv` moved to `cmd/mod.rs`. `cargo xtask features` (in `ci`) runs clippy on the engine with no extensions and with each alone. Tests run on the full build only |
 | 2026-10-14 | minor | Phase 3 done: `extensions::ExtState` (`Session.ext`, one value per type). Moved in: macros and versions (`tools`), Read Aloud (`speech::player`), mail merge (`mailings::merge_state`), equation editing (`equation::EquationState`, new `after_clamp` hook), Draw tab (`draw::draw_state`). `Session.bib_style` removed: `citations::current_style` reads the document. Plain `bool` pane flags in `ViewState` and core `Prefs` stay |
 | 2026-10-14 | minor | Phase 2 done: `extensions::Hooks` (`before`, `verify`, `after_edit`) with `RunCtx`, kept in the `Registry` (`cmd::hooks()`). `Session::run` no longer names restrict editing, macro recording, the equation editor or connectors; those modules register hooks. Core steps (Repeat, undo, moves, column dispatch, formatting revisions, outline) stay inline |
 | 2026-10-13 | minor | Phase 1 done: a test scans each command module for command-id literals that cross extensions without a declared dependency (`id_calls_respect_dependencies`, with `ALLOWED_CALLS` for name checks). `file.protect` moved to `restrict-editing`. `parity()` reports live features per extension. The `review`, `tools` and `options` files are not split yet; the owner overrides cover them until Phase 4 needs file boundaries for `cfg` |

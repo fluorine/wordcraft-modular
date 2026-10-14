@@ -8,6 +8,29 @@ description = "WordCraft engine: session, selection, undo, the command registry 
 [lints]
 workspace = true
 
+[features]
+# One feature per extension (see src/extensions.rs); `full` is every one.
+default = ["full"]
+full = ["comments", "proofing", "references", "equation-editor", "shapes", "charts", "smart-art", "wordart", "ink", "mailings", "developer", "macros", "compare", "read-aloud", "accessibility", "design", "templates", "restrict-editing"]
+comments = []
+proofing = []
+references = []
+equation-editor = []
+shapes = []
+charts = ["shapes"]
+smart-art = ["shapes"]
+wordart = ["shapes"]
+ink = ["shapes"]
+mailings = ["references"]
+developer = []
+macros = []
+compare = []
+read-aloud = []
+accessibility = []
+design = []
+templates = []
+restrict-editing = []
+
 [dependencies]
 wordcraft-geom = { workspace = true }
 wordcraft-doc = { workspace = true }

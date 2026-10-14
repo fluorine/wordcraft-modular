@@ -3,14 +3,20 @@
 pub mod accessibility;
 pub mod canvas;
 pub mod caret;
+#[cfg(feature = "charts")]
 pub mod chart;
+#[cfg(feature = "references")]
 pub mod citations;
 pub mod column;
+#[cfg(feature = "shapes")]
 pub mod connectors;
 pub mod controls;
+#[cfg(feature = "design")]
 pub mod design;
+#[cfg(feature = "ink")]
 pub mod draw;
 pub mod edit;
+#[cfg(feature = "equation-editor")]
 pub mod equation;
 pub mod fields;
 pub mod file;
@@ -18,11 +24,13 @@ pub mod find_pattern;
 pub mod fmt_revisions;
 pub mod font;
 pub mod format;
+#[cfg(feature = "references")]
 pub mod index;
 pub mod ink_shape;
 pub mod insert;
 pub mod inspector;
 pub mod lists;
+#[cfg(feature = "mailings")]
 pub mod mailings;
 pub mod moves;
 pub mod objects;
@@ -32,20 +40,25 @@ pub mod page;
 pub mod para;
 pub mod paste;
 pub mod phonetic;
+#[cfg(feature = "restrict-editing")]
 pub mod protect;
 pub mod references;
 pub mod review;
+#[cfg(feature = "smart-art")]
 pub mod smart_art;
+#[cfg(feature = "read-aloud")]
 pub mod speech;
 pub mod table;
 pub mod table_draw;
 pub mod table_mouse;
 pub mod table_resize;
 pub mod table_style;
+#[cfg(feature = "templates")]
 pub mod templates;
 pub mod text;
 pub mod tools;
 pub mod view;
+#[cfg(feature = "wordart")]
 pub mod wordart;
 
 use serde_json::{Value, json};
@@ -71,6 +84,7 @@ pub fn registry() -> Registry {
     v.extend(crate::extensions::tag(view::specs(), "core"));
     v.extend(crate::extensions::tag(outline::specs(), "core"));
     v.extend(crate::extensions::tag(insert::specs(), "core"));
+    #[cfg(feature = "equation-editor")]
     v.extend(crate::extensions::tag(equation::specs(), "equation-editor"));
     v.extend(crate::extensions::tag(page::specs(), "core"));
     v.extend(crate::extensions::tag(table::specs(), "core"));
@@ -81,30 +95,106 @@ pub fn registry() -> Registry {
     v.extend(crate::extensions::tag(review::specs(), "core"));
     v.extend(crate::extensions::tag(file::specs(), "core"));
     v.extend(crate::extensions::tag(options::specs(), "core"));
+    #[cfg(feature = "design")]
     v.extend(crate::extensions::tag(design::specs(), "design"));
+    #[cfg(feature = "references")]
     v.extend(crate::extensions::tag(references::specs(), "references"));
     v.extend(crate::extensions::tag(fields::specs(), "core"));
+    #[cfg(feature = "mailings")]
     v.extend(crate::extensions::tag(mailings::specs(), "mailings"));
+    #[cfg(feature = "references")]
     v.extend(crate::extensions::tag(citations::specs(), "references"));
+    #[cfg(feature = "references")]
     v.extend(crate::extensions::tag(index::specs(), "references"));
+    #[cfg(feature = "shapes")]
     v.extend(crate::extensions::tag(objects::specs(), "shapes"));
+    #[cfg(feature = "smart-art")]
     v.extend(crate::extensions::tag(smart_art::specs(), "smart-art"));
+    #[cfg(feature = "charts")]
     v.extend(crate::extensions::tag(chart::specs(), "charts"));
+    #[cfg(feature = "ink")]
     v.extend(crate::extensions::tag(draw::specs(), "ink"));
+    #[cfg(feature = "shapes")]
     v.extend(crate::extensions::tag(canvas::specs(), "shapes"));
+    #[cfg(feature = "wordart")]
     v.extend(crate::extensions::tag(wordart::specs(), "wordart"));
+    #[cfg(feature = "shapes")]
     v.extend(crate::extensions::tag(connectors::specs(), "shapes"));
     v.extend(crate::extensions::tag(tools::specs(), "core"));
+    #[cfg(feature = "templates")]
     v.extend(crate::extensions::tag(templates::specs(), "templates"));
+    #[cfg(feature = "restrict-editing")]
     v.extend(crate::extensions::tag(protect::specs(), "restrict-editing"));
+    #[cfg(feature = "read-aloud")]
     v.extend(crate::extensions::tag(speech::specs(), "read-aloud"));
+    #[cfg(feature = "developer")]
     v.extend(crate::extensions::tag(controls::specs(), "developer"));
-    Registry::new(v).with_hooks(hooks())
+    Registry::new(v).with_hooks(hooks().into_iter().filter(|h| crate::extensions::compiled(h.ext)).collect())
 }
 
 /// The extension hooks around every command, in call order.
+#[allow(clippy::vec_init_then_push)]
 pub fn hooks() -> Vec<crate::extensions::Hooks> {
-    vec![protect::hooks(), tools::macro_hooks(), equation::hooks(), connectors::hooks()]
+    #[allow(unused_mut)]
+    let mut v = Vec::new();
+    #[cfg(feature = "restrict-editing")]
+    v.push(protect::hooks());
+    #[cfg(feature = "macros")]
+    v.push(tools::macro_hooks());
+    #[cfg(feature = "equation-editor")]
+    v.push(equation::hooks());
+    #[cfg(feature = "shapes")]
+    v.push(connectors::hooks());
+    v
+}
+
+/// Parse CSV (RFC 4180-ish: quotes, doubled quotes, commas/semicolons/tabs).
+pub fn parse_csv(text: &str) -> Vec<Vec<String>> {
+    let first = text.lines().next().unwrap_or("");
+    let sep = [',', ';', '\t'].into_iter().max_by_key(|c| first.matches(*c).count()).unwrap_or(',');
+    let mut rows = Vec::new();
+    let mut row = Vec::new();
+    let mut cell = String::new();
+    let mut q = false;
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if q {
+            if c == '"' {
+                if chars.peek() == Some(&'"') {
+                    cell.push('"');
+                    chars.next();
+                } else {
+                    q = false;
+                }
+            } else {
+                cell.push(c);
+            }
+        } else if c == '"' {
+            q = true;
+        } else if c == sep {
+            row.push(std::mem::take(&mut cell));
+        } else if c == '\n' || c == '\r' {
+            if c == '\r' && chars.peek() == Some(&'\n') {
+                chars.next();
+            }
+            row.push(std::mem::take(&mut cell));
+            if row.iter().any(|x| !x.is_empty()) {
+                rows.push(std::mem::take(&mut row));
+            } else {
+                row.clear();
+            }
+        } else {
+            cell.push(c);
+        }
+        if rows.len() > 100_000 {
+            break;
+        }
+    }
+    row.push(cell);
+    if row.iter().any(|x| !x.is_empty()) {
+        rows.push(row);
+    }
+    rows
 }
 
 /// A shortcut that differs on macOS, where Word for Mac moves it (⌘Q quits, ⌘Space is

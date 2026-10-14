@@ -514,7 +514,7 @@ pub fn specs() -> Vec<CommandSpec> {
         .params(r#"{"path": string}"#),
         CommandSpec::new("insert.spreadsheet", "Spreadsheet Table", "Insert › Tables", |s, v| {
             let csv = p::str(v, "csv").unwrap_or("A,B,C\n1,2,3\n4,5,6");
-            let rows = super::mailings::parse_csv(csv);
+            let rows = super::parse_csv(csv);
             let cols = rows.iter().map(Vec::len).max().unwrap_or(1).clamp(1, 63);
             s.run("insert.table", &json!({"rows": rows.len().max(1), "cols": cols, "style": "GridTable1Light"}))?;
             let Some((tp, _, _)) = s.sel.focus.path.cell() else { return sel_result(s) };

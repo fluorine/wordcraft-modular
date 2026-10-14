@@ -877,7 +877,14 @@ impl Session {
     /// Would Undo (or Redo) take the document's protection away? Only Stop Protection lifts it.
     pub fn step_lifts_protection(&self, redo: bool) -> bool {
         let next = if redo { self.redo.last() } else { self.history.last() };
-        next.is_some_and(|u| crate::cmd::protect::protection_lifted(&self.doc, &u.doc))
+        #[cfg(feature = "restrict-editing")]
+        return next.is_some_and(|u| crate::cmd::protect::protection_lifted(&self.doc, &u.doc));
+        // Without Restrict Editing nothing enforces protection, so no step lifts it.
+        #[cfg(not(feature = "restrict-editing"))]
+        {
+            let _ = next;
+            false
+        }
     }
     pub fn redo(&mut self) -> bool {
         self.typing_open = false;

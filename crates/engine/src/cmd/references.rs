@@ -533,6 +533,7 @@ fn note(s: &mut Session, v: &Value, kind: NoteKind) -> CmdResult {
 
 /// `references.noteOptions`: footnote or endnote placement, number format, start and restart,
 /// for the whole document (each section then follows it) or the selection's sections.
+#[cfg(feature = "references")]
 pub(super) fn note_options(s: &mut Session, v: &Value) -> CmdResult {
     use wordcraft_doc::section::{MAX_NOTE_START, NotePos, NoteProps, NoteRestart, NumFormat};
     let fmt = |k: &str| -> Result<Option<NumFormat>, CmdError> {
@@ -831,6 +832,7 @@ pub fn update_fields(s: &mut Session) -> Result<(), CmdError> {
         }
         para.touch();
     }
+    #[cfg(feature = "references")]
     super::citations::update_citations(s)?;
     update_toc(s)
 }

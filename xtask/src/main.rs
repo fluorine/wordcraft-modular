@@ -21,7 +21,9 @@ commands:
   assets          check that every icon/image/font/asset is attributed in ATTRIBUTION.md
   layers          enforce the crate dependency layering (plan/architecture.md §3)
   wasm            cargo check --target wasm32-unknown-unknown for the wasm-safe crates
-  ci              fmt --check, clippy -D warnings, test, assets, layers, wasm (stops at first failure)
+  features        clippy -D warnings on the engine with no extensions and with each one alone
+  ci              fmt --check, clippy -D warnings, test, assets, layers, features, wasm
+                  (stops at first failure)
   corpus [--download]
                   show where test corpora live; --download fetches PngSuite into corpus/pngsuite
   stats [--exact] count tests and lines per crate (--exact: ask the test harness via `-- --list`)
@@ -40,6 +42,7 @@ fn main() -> ExitCode {
         Some("assets") => assets::run(&root()),
         Some("layers") => cmd_layers(),
         Some("wasm") => cmd_wasm(),
+        Some("features") => cmd_features(),
         Some("ci") => cmd_ci(),
         Some("corpus") => cmd_corpus(rest.contains(&"--download")),
         Some("stats") => stats::run(&root(), rest.contains(&"--exact")),
@@ -136,6 +139,39 @@ fn wasm_set() -> Result<Vec<String>, String> {
         .collect())
 }
 
+/// The engine's extension features: the `[features]` keys other than `default` and `full`.
+fn engine_features() -> Result<Vec<String>, String> {
+    let path = root().join("crates/engine/Cargo.toml");
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?.replace("\r\n", "\n");
+    let section = text.split("\n[features]\n").nth(1).ok_or("crates/engine/Cargo.toml has no [features]")?;
+    let section = section.split("\n[").next().unwrap_or(section);
+    Ok(section
+        .lines()
+        .filter_map(|l| l.split_once(" = ").map(|(k, _)| k.trim().to_string()))
+        .filter(|k| !k.starts_with('#') && k != "default" && k != "full")
+        .collect())
+}
+
+/// Every extension must build alone, and the engine with none of them.
+fn cmd_features() -> Result<(), String> {
+    let mut sets = vec![None];
+    sets.extend(engine_features()?.into_iter().map(Some));
+    let mut failed = Vec::new();
+    for f in &sets {
+        let mut c = cargo();
+        c.args(["clippy", "-p", "wordcraft-engine", "--no-default-features"]);
+        if let Some(f) = f {
+            c.args(["--features", f]);
+        }
+        c.args(["--", "-D", "warnings"]);
+        let name = f.as_deref().unwrap_or("(no extensions)");
+        if run(c, &format!("cargo clippy -p wordcraft-engine --no-default-features {name}")).is_err() {
+            failed.push(name.to_string());
+        }
+    }
+    if failed.is_empty() { Ok(()) } else { Err(format!("these engine feature sets fail: {}", failed.join(", "))) }
+}
+
 fn cmd_wasm() -> Result<(), String> {
     let set = wasm_set()?;
     let mut results = Vec::new();
@@ -182,6 +218,7 @@ fn cmd_ci() -> Result<(), String> {
         ),
         ("assets", Box::new(|| assets::run(&root()))),
         ("layers", Box::new(cmd_layers)),
+        ("features", Box::new(cmd_features)),
         ("wasm", Box::new(cmd_wasm)),
     ];
     let mut done = Vec::new();

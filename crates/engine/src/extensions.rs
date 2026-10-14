@@ -52,6 +52,33 @@ pub fn get(id: &str) -> Option<&'static Extension> {
     EXTENSIONS.iter().find(|e| e.id == id)
 }
 
+/// Whether this build contains extension `id` (its cargo feature is on). Core always is.
+pub fn compiled(id: &str) -> bool {
+    id == CORE || BUILT.iter().any(|(e, on)| *on && *e == id)
+}
+
+/// Each extension and whether its cargo feature is on.
+const BUILT: &[(&str, bool)] = &[
+    ("comments", cfg!(feature = "comments")),
+    ("proofing", cfg!(feature = "proofing")),
+    ("references", cfg!(feature = "references")),
+    ("equation-editor", cfg!(feature = "equation-editor")),
+    ("shapes", cfg!(feature = "shapes")),
+    ("charts", cfg!(feature = "charts")),
+    ("smart-art", cfg!(feature = "smart-art")),
+    ("wordart", cfg!(feature = "wordart")),
+    ("ink", cfg!(feature = "ink")),
+    ("mailings", cfg!(feature = "mailings")),
+    ("developer", cfg!(feature = "developer")),
+    ("macros", cfg!(feature = "macros")),
+    ("compare", cfg!(feature = "compare")),
+    ("read-aloud", cfg!(feature = "read-aloud")),
+    ("accessibility", cfg!(feature = "accessibility")),
+    ("design", cfg!(feature = "design")),
+    ("templates", cfg!(feature = "templates")),
+    ("restrict-editing", cfg!(feature = "restrict-editing")),
+];
+
 /// Commands that live in a shared module but belong to another extension.
 const OVERRIDES: &[(&str, &[&str])] = &[
     (
@@ -142,9 +169,10 @@ impl Hooks {
     }
 }
 
-/// Sets the owner of each spec to `ext`, unless an override names another.
+/// Sets the owner of each spec to `ext`, unless an override names another, and drops the
+/// specs of extensions this build leaves out.
 pub fn tag(specs: Vec<CommandSpec>, ext: &'static str) -> Vec<CommandSpec> {
-    specs.into_iter().map(|s| CommandSpec { ext: owner_override(s.id).unwrap_or(ext), ..s }).collect()
+    specs.into_iter().map(|s| CommandSpec { ext: owner_override(s.id).unwrap_or(ext), ..s }).filter(|s| compiled(s.ext)).collect()
 }
 
 /// The extensions that need `id`, directly or through others.
@@ -185,7 +213,7 @@ mod tests {
     fn every_extension_owns_a_command() {
         let reg = crate::cmd::registry();
         let owners: HashSet<&str> = reg.all().iter().map(|s| s.ext).collect();
-        for e in EXTENSIONS {
+        for e in EXTENSIONS.iter().filter(|e| compiled(e.id)) {
             assert!(owners.contains(e.id), "{} owns no command", e.id);
         }
     }
@@ -195,6 +223,9 @@ mod tests {
         let reg = crate::cmd::registry();
         for (ext, ids) in OVERRIDES {
             assert!(get(ext).is_some(), "override names unknown extension {ext}");
+            if !compiled(ext) {
+                continue;
+            }
             for id in *ids {
                 assert_eq!(reg.get(id).map(|s| s.ext), Some(*ext), "{id} is not registered under {ext}");
             }
@@ -287,6 +318,23 @@ mod tests {
         }
         assert_eq!(st.get::<u32>(), Some(&7));
         assert!(st.get::<String>().is_none());
+    }
+
+    #[test]
+    fn every_extension_has_a_feature() {
+        for e in EXTENSIONS {
+            let manifest = include_str!("../Cargo.toml");
+            assert!(e.id == CORE || manifest.contains(&format!("\n{} = [", e.id)), "no cargo feature for {}", e.id);
+        }
+    }
+
+    #[test]
+    fn features_enable_their_dependencies() {
+        for e in EXTENSIONS.iter().filter(|e| compiled(e.id)) {
+            for d in e.depends_on {
+                assert!(compiled(d), "{} is built without its dependency {d}", e.id);
+            }
+        }
     }
 
     #[test]

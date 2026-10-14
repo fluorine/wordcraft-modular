@@ -578,6 +578,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "full")]
     fn parity_floor() {
         let reg = crate::cmd::registry();
         let p = parity(&reg);

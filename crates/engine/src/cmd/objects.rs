@@ -955,8 +955,11 @@ fn size(s: &mut Session, v: &Value) -> CmdResult {
     let theme = s.doc.settings.theme_colors.clone();
     with_obj(s, |o| {
         o.set_size(w, h);
+        #[cfg(feature = "charts")]
         super::chart::redraw(o, &theme);
+        #[cfg(feature = "smart-art")]
         super::smart_art::redraw(o, &theme);
+        let _ = &theme;
     })
 }
 

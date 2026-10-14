@@ -172,54 +172,7 @@ fn insert_field(s: &mut Session, instr: &str, placeholder: &str) -> CmdResult {
     sel_result(s)
 }
 
-/// Parse CSV (RFC 4180-ish: quotes, doubled quotes, commas/semicolons/tabs).
-pub fn parse_csv(text: &str) -> Vec<Vec<String>> {
-    let first = text.lines().next().unwrap_or("");
-    let sep = [',', ';', '\t'].into_iter().max_by_key(|c| first.matches(*c).count()).unwrap_or(',');
-    let mut rows = Vec::new();
-    let mut row = Vec::new();
-    let mut cell = String::new();
-    let mut q = false;
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        if q {
-            if c == '"' {
-                if chars.peek() == Some(&'"') {
-                    cell.push('"');
-                    chars.next();
-                } else {
-                    q = false;
-                }
-            } else {
-                cell.push(c);
-            }
-        } else if c == '"' {
-            q = true;
-        } else if c == sep {
-            row.push(std::mem::take(&mut cell));
-        } else if c == '\n' || c == '\r' {
-            if c == '\r' && chars.peek() == Some(&'\n') {
-                chars.next();
-            }
-            row.push(std::mem::take(&mut cell));
-            if row.iter().any(|x| !x.is_empty()) {
-                rows.push(std::mem::take(&mut row));
-            } else {
-                row.clear();
-            }
-        } else {
-            cell.push(c);
-        }
-        if rows.len() > 100_000 {
-            break;
-        }
-    }
-    row.push(cell);
-    if row.iter().any(|x| !x.is_empty()) {
-        rows.push(row);
-    }
-    rows
-}
+pub use super::parse_csv;
 
 /// Most records and fields a recipient list keeps.
 const MAX_RECORDS: usize = 100_000;
