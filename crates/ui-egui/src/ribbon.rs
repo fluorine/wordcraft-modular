@@ -429,11 +429,17 @@ pub(crate) fn size_menu(ui: &mut Ui, app: &mut WordApp) {
 }
 
 pub(crate) fn mi(ui: &mut Ui, app: &mut WordApp, label: &str, id: &str, params: Value) {
+    if crate::widgets::hidden(app, id) {
+        return;
+    }
     mi_text(ui, app, tl!(label), id, params);
 }
 
 /// A menu item whose text is already in the interface language.
 fn mi_text(ui: &mut Ui, app: &mut WordApp, text: &str, id: &str, params: Value) {
+    if crate::widgets::hidden(app, id) {
+        return;
+    }
     let sc = crate::widgets::shortcut_text(app, id);
     let enabled = crate::widgets::enabled(app, id);
     let resp = ui.add_enabled(enabled, egui::Button::new(text).shortcut_text(sc).min_size(vec2(200.0, 0.0)));
@@ -631,6 +637,9 @@ fn language_checks(current: &str, listed: impl Fn(&str) -> bool) -> LanguageChec
 
 /// A menu item with a check mark when `checked` (the current choice of several).
 fn mi_check(ui: &mut Ui, app: &mut WordApp, label: &str, checked: bool, id: &str, params: Value) {
+    if crate::widgets::hidden(app, id) {
+        return;
+    }
     // An invisible mark keeps the unchecked labels aligned with the checked one.
     let mark = egui::RichText::new("✓");
     let mark = if checked { mark } else { mark.color(egui::Color32::TRANSPARENT) };

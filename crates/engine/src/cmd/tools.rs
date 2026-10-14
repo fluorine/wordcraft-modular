@@ -1682,6 +1682,9 @@ fn search_commands(s: &mut Session, v: &Value) -> CmdResult {
             .all()
             .iter()
             .filter(|c| {
+                if !crate::extensions::enabled(s, c.ext) {
+                    return false;
+                }
                 let hay = format!("{} {} {}", c.label, c.location, c.id).to_lowercase();
                 words.iter().all(|w| hay.contains(w.as_str()))
             })

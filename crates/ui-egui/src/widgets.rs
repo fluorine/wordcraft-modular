@@ -159,7 +159,7 @@ pub fn label_line(ui: &Ui, cx: f32, y: f32, text: &str, font: egui::FontId, colo
 
 #[allow(clippy::too_many_arguments)]
 fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str, params: Value, menu: bool, checked: bool) -> Response {
-    if wordcraft_engine::extensions::hidden(&app.session, id) || crate::ui_commands::hidden(&app.session, id) {
+    if hidden(app, id) {
         return ui.allocate_response(vec2(0.0, 0.0), Sense::hover());
     }
     let label = tl!(label);
@@ -190,7 +190,7 @@ fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str,
 
 /// A small button: 16 px icon with an optional label; `checked` draws the toggled state.
 pub fn small(ui: &mut Ui, app: &mut WordApp, icon: &str, label: Option<&str>, tip: &str, id: &str, params: Value, checked: bool) -> Response {
-    if wordcraft_engine::extensions::hidden(&app.session, id) || crate::ui_commands::hidden(&app.session, id) {
+    if hidden(app, id) {
         return ui.allocate_response(vec2(0.0, 0.0), Sense::hover());
     }
     let (label, tip) = (label.map(|l| tl!(l)), tl!(tip));
@@ -252,6 +252,21 @@ pub fn split(
 }
 
 /// Whether a menu button whose menu is about command `id` is on ("" = always).
+/// `id` belongs to an extension that is off (left out of the build or turned off): the ribbon
+/// leaves its button or menu item out.
+pub fn hidden(app: &WordApp, id: &str) -> bool {
+    let h = wordcraft_engine::extensions::hidden(&app.session, id) || crate::ui_commands::hidden(&app.session, id);
+    if h {
+        HIDDEN_IN_GROUP.with(|v| v.borrow_mut().push(id.to_string()));
+    }
+    h
+}
+
+thread_local! {
+    /// The commands left out of the ribbon group being drawn (see [`group_titled`]).
+    static HIDDEN_IN_GROUP: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
 pub fn menu_enabled(app: &WordApp, id: &str) -> bool {
     id.is_empty() || enabled(app, id)
 }
@@ -267,6 +282,9 @@ pub fn menu_button(
     id: &str,
     menu: impl FnOnce(&mut Ui, &mut WordApp),
 ) {
+    if hidden(app, id) {
+        return;
+    }
     let (label, tip) = (label.map(|l| tl!(l)), tl!(tip));
     let t = Tokens::get(ui.ctx());
     // `id` names the command the menu is about (Header for the Header menu…); while it is
@@ -328,6 +346,18 @@ pub fn group(ui: &mut Ui, title: &str, launcher: Option<&str>, app: &mut WordApp
 
 /// A ribbon group whose title is shown as is (a custom group's name, Customize Ribbon).
 pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&str>, app: &mut WordApp, add: impl FnOnce(&mut Ui, &mut WordApp)) {
+    // A group whose every command was left out last frame is skipped, title and all, while
+    // those commands stay left out (an extension that is off).
+    let empty_key = ui.id().with(("empty_group", id_title));
+    if let Some(ids) = ui.data(|d| d.get_temp::<Vec<String>>(empty_key)) {
+        let still = !ids.is_empty() && ids.iter().all(|i| hidden(app, i));
+        HIDDEN_IN_GROUP.with(|v| v.borrow_mut().clear());
+        if still {
+            return;
+        }
+    }
+    HIDDEN_IN_GROUP.with(|v| v.borrow_mut().clear());
+    let mut used = 0.0;
     let t = Tokens::get(ui.ctx());
     let label_w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(title.to_string(), regular(11.0), t.group_label).size().x);
     let start = ui.cursor().min;
@@ -335,7 +365,9 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
         ui.set_min_width(label_w + if launcher.is_some() { 22.0 } else { 10.0 });
         let content = ui.allocate_ui_with_layout(vec2(ui.available_width(), CONTENT_H), egui::Layout::left_to_right(egui::Align::Min), |ui| {
             ui.spacing_mut().item_spacing = vec2(1.0, 1.0);
+            let x0 = ui.cursor().min.x;
             add(ui, app);
+            used = ui.min_rect().max.x - x0;
         });
         #[cfg(test)]
         if content.response.rect.height() > CONTENT_H + 0.5 {
@@ -343,6 +375,14 @@ pub fn group_titled(ui: &mut Ui, id_title: &str, title: &str, launcher: Option<&
         }
         #[cfg(not(test))]
         let _ = content;
+    });
+    let left_out = HIDDEN_IN_GROUP.with(|v| std::mem::take(&mut *v.borrow_mut()));
+    ui.data_mut(|d| {
+        if used < 2.0 && !left_out.is_empty() {
+            d.insert_temp(empty_key, left_out);
+        } else {
+            d.remove::<Vec<String>>(empty_key);
+        }
     });
     let r = inner.response.rect;
     let r = Rect::from_min_max(start, pos2(r.max.x, start.y + CONTENT_H + LABEL_H));

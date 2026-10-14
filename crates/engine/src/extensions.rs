@@ -228,6 +228,7 @@ const OVERRIDES: &[(&str, &[&str])] = &[
     ("accessibility", &["file.accessibility"]),
     ("templates", &["file.newFromTemplate", "file.saveTemplate"]),
     ("restrict-editing", &["file.protect"]),
+    ("shapes", &["insert.shape", "insert.textBox"]),
 ];
 
 fn owner_override(id: &str) -> Option<&'static str> {
