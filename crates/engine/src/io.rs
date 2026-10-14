@@ -406,6 +406,17 @@ pub fn read_file_capped(path: &str, max: u64, what: &str) -> Result<Vec<u8>, Str
     std::fs::read(path).map_err(|e| format!("{path}: {e}"))
 }
 
+/// At most the first `max` bytes of the file at `path`, under the same read root as [`read_file`].
+#[cfg(not(target_arch = "wasm32"))]
+pub fn read_head(path: &str, max: u64) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    crate::file_access::check_read(path)?;
+    let f = std::fs::File::open(path).map_err(|e| format!("{path}: {e}"))?;
+    let mut head = Vec::new();
+    f.take(max).read_to_end(&mut head).map_err(|e| format!("{path}: {e}"))?;
+    Ok(head)
+}
+
 /// Write `bytes` to the file at `path`, inside the automation write root when there is one.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn write_file(path: &str, bytes: &[u8]) -> Result<(), String> {
