@@ -21,7 +21,8 @@ pub const TABS: [&str; 13] =
 pub const CONTEXTUAL_TABS: [&str; 7] =
     ["Table Design", "Table Layout", "Picture Format", "Shape Format", "Equation", "Chart Design", "SmartArt Design"];
 /// Built-in tabs that belong to an extension; the others are core.
-pub const TAB_OWNERS: [(&str, &str); 7] = [
+pub const TAB_OWNERS: [(&str, &str); 8] = [
+    ("Zotero", "zotero"),
     ("Draw", "ink"),
     ("Mailings", "mailings"),
     ("Developer", "developer"),

@@ -11,7 +11,7 @@ workspace = true
 [features]
 # One feature per extension (see src/extensions.rs); `full` is every one.
 default = ["full"]
-full = ["comments", "proofing", "references", "equation-editor", "shapes", "charts", "smart-art", "wordart", "ink", "mailings", "developer", "macros", "compare", "read-aloud", "accessibility", "design", "templates", "restrict-editing", "pdf-export", "doc-legacy"]
+full = ["comments", "proofing", "references", "equation-editor", "shapes", "charts", "smart-art", "wordart", "ink", "mailings", "developer", "macros", "compare", "read-aloud", "accessibility", "design", "templates", "restrict-editing", "pdf-export", "doc-legacy", "zotero"]
 comments = []
 proofing = []
 references = []
@@ -32,6 +32,8 @@ templates = []
 restrict-editing = []
 pdf-export = ["dep:wordcraft-pdf"]
 doc-legacy = ["dep:wordcraft-docbin"]
+# The front end's Zotero connection; nothing in the engine, but one manifest.
+zotero = ["references"]
 
 [dependencies]
 wordcraft-geom = { workspace = true }

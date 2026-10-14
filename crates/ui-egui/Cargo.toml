@@ -11,7 +11,7 @@ workspace = true
 [features]
 # The engine's extensions (see crates/engine/src/extensions.rs), forwarded; `full` is all.
 default = ["full"]
-full = ["comments", "proofing", "references", "equation-editor", "shapes", "charts", "smart-art", "wordart", "ink", "mailings", "developer", "macros", "compare", "read-aloud", "accessibility", "design", "templates", "restrict-editing", "pdf-export", "doc-legacy"]
+full = ["comments", "proofing", "references", "equation-editor", "shapes", "charts", "smart-art", "wordart", "ink", "mailings", "developer", "macros", "compare", "read-aloud", "accessibility", "design", "templates", "restrict-editing", "pdf-export", "doc-legacy", "zotero"]
 comments = ["wordcraft-engine/comments"]
 proofing = ["wordcraft-engine/proofing"]
 references = ["wordcraft-engine/references"]
@@ -32,6 +32,7 @@ templates = ["wordcraft-engine/templates"]
 restrict-editing = ["wordcraft-engine/restrict-editing"]
 pdf-export = ["wordcraft-engine/pdf-export"]
 doc-legacy = ["wordcraft-engine/doc-legacy"]
+zotero = ["wordcraft-engine/zotero", "references", "dep:wordcraft-zotero"]
 
 [dependencies]
 craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "d27646a5f7c8b4fc85d9dd3213b8c88b58e0088d" }
@@ -41,7 +42,7 @@ wordcraft-fonts = { workspace = true }
 wordcraft-layout = { workspace = true }
 wordcraft-render = { workspace = true }
 wordcraft-engine = { workspace = true }
-wordcraft-zotero = { workspace = true }
+wordcraft-zotero = { workspace = true, optional = true }
 egui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

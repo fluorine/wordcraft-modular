@@ -20,14 +20,20 @@ pub struct Extension {
     pub depends_on: &'static [&'static str],
     /// File extensions it opens or saves (a format extension may own no command).
     pub formats: &'static [&'static str],
+    /// Lives in the front end only, so it owns no engine command.
+    pub front_end: bool,
 }
 
 const fn ext(id: &'static str, name: &'static str, depends_on: &'static [&'static str]) -> Extension {
-    Extension { id, name, depends_on, formats: &[] }
+    Extension { id, name, depends_on, formats: &[], front_end: false }
 }
 
 const fn format(id: &'static str, name: &'static str, formats: &'static [&'static str]) -> Extension {
-    Extension { id, name, depends_on: &[], formats }
+    Extension { id, name, depends_on: &[], formats, front_end: false }
+}
+
+const fn front(id: &'static str, name: &'static str, depends_on: &'static [&'static str]) -> Extension {
+    Extension { id, name, depends_on, formats: &[], front_end: true }
 }
 
 /// Every extension, core first.
@@ -53,6 +59,7 @@ pub const EXTENSIONS: &[Extension] = &[
     ext("restrict-editing", "Restrict editing", &[]),
     format("pdf-export", "PDF export and printing", &["pdf"]),
     format("doc-legacy", "Word 97-2003 documents", &["doc", "dot"]),
+    front("zotero", "Zotero", &["references"]),
 ];
 
 /// The extension that handles file extension `ext`, if one does (core formats have none).
@@ -111,6 +118,7 @@ const BUILT: &[(&str, bool)] = &[
     ("restrict-editing", cfg!(feature = "restrict-editing")),
     ("pdf-export", cfg!(feature = "pdf-export")),
     ("doc-legacy", cfg!(feature = "doc-legacy")),
+    ("zotero", cfg!(feature = "zotero")),
 ];
 
 /// Commands that live in a shared module but belong to another extension.
@@ -247,7 +255,7 @@ mod tests {
     fn every_extension_owns_a_command() {
         let reg = crate::cmd::registry();
         let owners: HashSet<&str> = reg.all().iter().map(|s| s.ext).collect();
-        for e in EXTENSIONS.iter().filter(|e| compiled(e.id) && e.formats.is_empty()) {
+        for e in EXTENSIONS.iter().filter(|e| compiled(e.id) && e.formats.is_empty() && !e.front_end) {
             assert!(owners.contains(e.id), "{} owns no command", e.id);
         }
     }

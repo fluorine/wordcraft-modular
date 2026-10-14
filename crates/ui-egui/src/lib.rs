@@ -83,6 +83,10 @@ pub mod ui_commands;
 pub mod widgets;
 pub mod window_geometry;
 pub mod wordart_menus;
+#[cfg(feature = "zotero")]
+pub mod zotero;
+#[cfg(not(feature = "zotero"))]
+#[path = "zotero_off.rs"]
 pub mod zotero;
 
 use serde::{Deserialize, Serialize};
