@@ -402,8 +402,6 @@ pub struct Session {
     pub merge: crate::cmd::mailings::MergeState,
     /// Requests from commands to the UI (open a dialog, scroll…), drained by the front end.
     pub ui_requests: Vec<Value>,
-    /// Read Aloud player (Review › Speech).
-    pub read_aloud: crate::speech::ReadAloud,
     /// Preferences the front end saves between runs.
     pub prefs: Prefs,
     /// The system region (#838): the paper a new blank document starts on, the default
@@ -610,7 +608,6 @@ impl Session {
             keymap: crate::KeyMap::default(),
             ribbon: crate::RibbonLayout::default(),
             editing_lang: None,
-            read_aloud: Default::default(),
             password: None,
             column: None,
             column_mode: false,
@@ -1032,7 +1029,6 @@ impl Session {
             merge: _,
             ui_requests: _,
             document_id: _,
-            read_aloud: _,
             prefs: _,
             system_region: _,
             keymap: _,

@@ -1990,7 +1990,11 @@ fn hostile_params_never_panic() {
         }
         for j in &junk {
             let mut s = Session::new(crate::sample::sample_document());
-            assert_ne!(s.read_aloud.backend, crate::speech::Backend::System, "tests must never start real speech");
+            assert_ne!(
+                s.ext.state::<crate::speech::ReadAloud>().unwrap().backend,
+                crate::speech::Backend::System,
+                "tests must never start real speech"
+            );
             let _ = s.run(spec.id, j);
             s.clamp_selection();
             let _ = s.layout();

@@ -15,21 +15,20 @@ use crate::theme::Tokens;
 /// Per-frame bookkeeping: follow the spoken sentence with the caret, report errors, and keep
 /// frames coming while reading.
 pub fn poll(app: &mut WordApp, ctx: &egui::Context) {
-    let ra = &app.session.read_aloud;
-    if !ra.open {
+    let Some(ra) = wordcraft_engine::speech::player(&app.session).filter(|ra| ra.open) else {
         app.read_aloud_at = None;
         return;
-    }
+    };
     if ra.state() == State::Playing {
         ctx.request_repaint_after(std::time::Duration::from_millis(120));
     }
-    if let Some(e) = app.session.read_aloud.error()
+    if let Some(e) = ra.error()
         && app.read_aloud_error.as_deref() != Some(e.as_str())
     {
         app.read_aloud_error = Some(e.clone());
         app.status(e);
     }
-    let current = app.session.read_aloud.current().map(|u| u.start);
+    let current = wordcraft_engine::speech::player(&app.session).and_then(|ra| ra.current()).map(|u| u.start);
     if current != app.read_aloud_at {
         if let Some(start) = &current {
             app.session.sel = wordcraft_engine::Selection::caret(app.session.doc.clamp(start));
@@ -42,21 +41,15 @@ pub fn poll(app: &mut WordApp, ctx: &egui::Context) {
 
 /// The page rectangles (in page units) of the sentence being read, to highlight.
 pub fn highlight(app: &mut WordApp) -> Option<(wordcraft_engine::doc::Pos, wordcraft_engine::doc::Pos)> {
-    if !app.session.read_aloud.open {
-        return None;
-    }
-    let u = app.session.read_aloud.current()?;
+    let u = wordcraft_engine::speech::player(&app.session).filter(|ra| ra.open)?.current()?;
     Some((app.session.doc.clamp(&u.start), app.session.doc.clamp(&u.end)))
 }
 
 /// The player window.
 pub fn show(app: &mut WordApp, ctx: &egui::Context) {
-    if !app.session.read_aloud.open {
-        return;
-    }
+    let Some(ra) = wordcraft_engine::speech::player(&app.session).filter(|ra| ra.open) else { return };
+    let (state, (index, count), rate, skip_citations, error) = (ra.state(), ra.progress(), ra.rate(), ra.skip_citations, ra.error());
     let t = Tokens::get(ctx);
-    let state = app.session.read_aloud.state();
-    let (index, count) = app.session.read_aloud.progress();
     let mut open = true;
     let mut run: Option<(&str, serde_json::Value)> = None;
     let right_top = app.canvas.canvas_rect.map_or(ctx.content_rect().right_top() + vec2(-24.0, 160.0), |r| r.right_top() + vec2(-24.0, 16.0));
@@ -97,7 +90,7 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
             // Speed: applied when the slider is let go, so dragging doesn't restart the sentence
             // on every frame.
             let id = egui::Id::new("read-aloud-rate");
-            let mut rate = ui.data(|d| d.get_temp::<f32>(id)).unwrap_or_else(|| app.session.read_aloud.rate());
+            let mut rate = ui.data(|d| d.get_temp::<f32>(id)).unwrap_or(rate);
             ui.horizontal(|ui| {
                 ui.label(tl!("Speed"));
                 ui.spacing_mut().slider_width = 110.0;
@@ -120,7 +113,7 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
                     run = Some(("readAloud.speed", json!({"value": 1.0})));
                 }
             });
-            let mut skip = app.session.read_aloud.skip_citations;
+            let mut skip = skip_citations;
             if ui
                 .checkbox(&mut skip, tl!("Skip citations & bibliography"))
                 .on_hover_text(tl!("Don't read Zotero, Mendeley or EndNote citations and bibliographies"))
@@ -128,7 +121,7 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
             {
                 run = Some(("readAloud.skipCitations", json!({"value": skip})));
             }
-            if let Some(e) = app.session.read_aloud.error() {
+            if let Some(e) = &error {
                 ui.label(egui::RichText::new(e).color(t.red).small());
             }
         });
@@ -137,8 +130,10 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
     }
     if let Some((id, params)) = run {
         let _ = app.run(id, params);
-        app.ui.read_aloud_rate = app.session.read_aloud.rate();
-        app.ui.read_aloud_skip_citations = app.session.read_aloud.skip_citations;
+        if let Some(ra) = wordcraft_engine::speech::player(&app.session) {
+            app.ui.read_aloud_rate = ra.rate();
+            app.ui.read_aloud_skip_citations = ra.skip_citations;
+        }
         ctx.request_repaint();
     }
 }

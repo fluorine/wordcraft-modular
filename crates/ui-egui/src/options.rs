@@ -350,7 +350,7 @@ fn accessibility(app: &mut WordApp, ui: &mut Ui) {
     animations_picker(app, ui);
     ui.add_space(8.0);
     section(ui, "Read Aloud");
-    let mut rate = app.session.read_aloud.rate();
+    let mut rate = app.ui.read_aloud_rate;
     ui.horizontal(|ui| {
         ui.label(tl!("Speed"));
         let r = ui.add(egui::Slider::new(&mut rate, MIN_RATE..=MAX_RATE).step_by(0.05).custom_formatter(|v, _| format!("{v:.2}×")));
@@ -358,7 +358,7 @@ fn accessibility(app: &mut WordApp, ui: &mut Ui) {
             let _ = app.run("readAloud.speed", json!({"value": rate}));
         }
     });
-    let mut skip = app.session.read_aloud.skip_citations;
+    let mut skip = app.ui.read_aloud_skip_citations;
     if ui.checkbox(&mut skip, tl!("Skip citations & bibliography")).changed() {
         let _ = app.run("readAloud.skipCitations", json!({"value": skip}));
     }

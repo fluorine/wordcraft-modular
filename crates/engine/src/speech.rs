@@ -259,6 +259,16 @@ struct Shared {
     running: bool,
 }
 
+/// The session's Read Aloud player, if it was ever used.
+pub fn player(s: &crate::Session) -> Option<&ReadAloud> {
+    s.ext.get()
+}
+
+/// The session's Read Aloud player, made on first use.
+pub fn player_mut(s: &mut crate::Session) -> Option<&mut ReadAloud> {
+    s.ext.get_mut()
+}
+
 /// The Read Aloud player.
 pub struct ReadAloud {
     shared: Arc<(Mutex<Shared>, Condvar)>,

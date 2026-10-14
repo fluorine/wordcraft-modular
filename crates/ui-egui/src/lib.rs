@@ -582,8 +582,10 @@ impl WordApp {
         ui.initials = self.session.initials.clone();
         ui.dictionary = wordcraft_engine::proof::user_dictionary();
         ui.editing = self.session.prefs.clone();
-        ui.read_aloud_rate = self.session.read_aloud.rate();
-        ui.read_aloud_skip_citations = self.session.read_aloud.skip_citations;
+        if let Some(ra) = wordcraft_engine::speech::player(&self.session) {
+            ui.read_aloud_rate = ra.rate();
+            ui.read_aloud_skip_citations = ra.skip_citations;
+        }
         ui.dark_page = self.session.view.dark_mode;
         ui.keyboard = self.session.keymap.clone();
         ui.ribbon = self.session.ribbon.clone();
@@ -617,8 +619,10 @@ impl WordApp {
             }
         }
         self.session.prefs = std::mem::take(&mut self.ui.editing);
-        self.session.read_aloud.set_rate(self.ui.read_aloud_rate);
-        self.session.read_aloud.skip_citations = self.ui.read_aloud_skip_citations;
+        if let Some(ra) = wordcraft_engine::speech::player_mut(&mut self.session) {
+            ra.set_rate(self.ui.read_aloud_rate);
+            ra.skip_citations = self.ui.read_aloud_skip_citations;
+        }
         self.session.view.dark_mode = self.ui.dark_page;
         // Keys for commands this version doesn't have are dropped.
         self.session.keymap = std::mem::take(&mut self.ui.keyboard);

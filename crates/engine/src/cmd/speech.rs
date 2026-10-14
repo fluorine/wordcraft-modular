@@ -33,13 +33,13 @@ pub fn specs() -> Vec<CommandSpec> {
 /// Start reading from the caret (or the selection); while reading, pause or carry on.
 fn read_aloud(s: &mut Session, v: &Value) -> CmdResult {
     if let Some(b) = p::bool(v, "skipCitations") {
-        s.read_aloud.skip_citations = b;
+        s.ext.state::<speech::ReadAloud>()?.skip_citations = b;
     }
-    if s.read_aloud.state() != State::Stopped {
-        s.read_aloud.play_pause();
+    if s.ext.state::<speech::ReadAloud>()?.state() != State::Stopped {
+        s.ext.state::<speech::ReadAloud>()?.play_pause();
         return status(s, v);
     }
-    let skip = s.read_aloud.skip_citations;
+    let skip = s.ext.state::<speech::ReadAloud>()?.skip_citations;
     let mut queue = if s.sel.is_collapsed() {
         speech::sentences(&s.doc, &s.sel.focus, None, skip)
     } else {
@@ -54,51 +54,51 @@ fn read_aloud(s: &mut Session, v: &Value) -> CmdResult {
     if queue.is_empty() {
         return Err(CmdError::Failed("there's nothing to read".into()));
     }
-    s.read_aloud.start(queue);
+    s.ext.state::<speech::ReadAloud>()?.start(queue);
     status(s, v)
 }
 
 fn play_pause(s: &mut Session, v: &Value) -> CmdResult {
-    if s.read_aloud.progress().1 == 0 {
+    if s.ext.state::<speech::ReadAloud>()?.progress().1 == 0 {
         return read_aloud(s, v);
     }
-    s.read_aloud.play_pause();
+    s.ext.state::<speech::ReadAloud>()?.play_pause();
     status(s, v)
 }
 
 fn next(s: &mut Session, v: &Value) -> CmdResult {
-    s.read_aloud.skip(1);
+    s.ext.state::<speech::ReadAloud>()?.skip(1);
     status(s, v)
 }
 
 fn previous(s: &mut Session, v: &Value) -> CmdResult {
-    s.read_aloud.skip(-1);
+    s.ext.state::<speech::ReadAloud>()?.skip(-1);
     status(s, v)
 }
 
 fn stop(s: &mut Session, v: &Value) -> CmdResult {
-    s.read_aloud.stop();
+    s.ext.state::<speech::ReadAloud>()?.stop();
     status(s, v)
 }
 
 fn speed(s: &mut Session, v: &Value) -> CmdResult {
     let r = p::f32(v, "value").or_else(|| p::f32(v, "rate")).ok_or_else(|| CmdError::Params("`value` (number, 0.5…3) is required".into()))?;
-    s.read_aloud.set_rate(r);
+    s.ext.state::<speech::ReadAloud>()?.set_rate(r);
     status(s, v)
 }
 
 /// Turn skipping citations on or off; a reading in progress carries on from the same sentence.
 fn skip_citations(s: &mut Session, v: &Value) -> CmdResult {
-    let on = p::bool(v, "value").unwrap_or(!s.read_aloud.skip_citations);
-    if on != s.read_aloud.skip_citations {
-        s.read_aloud.skip_citations = on;
-        if let Some(cur) = s.read_aloud.current() {
-            let paused = s.read_aloud.state() == State::Paused;
+    let on = p::bool(v, "value").unwrap_or(!s.ext.state::<speech::ReadAloud>()?.skip_citations);
+    if on != s.ext.state::<speech::ReadAloud>()?.skip_citations {
+        s.ext.state::<speech::ReadAloud>()?.skip_citations = on;
+        if let Some(cur) = s.ext.state::<speech::ReadAloud>()?.current() {
+            let paused = s.ext.state::<speech::ReadAloud>()?.state() == State::Paused;
             let queue = speech::sentences(&s.doc, &cur.start, None, on);
             if !queue.is_empty() {
-                s.read_aloud.start(queue);
+                s.ext.state::<speech::ReadAloud>()?.start(queue);
                 if paused {
-                    s.read_aloud.play_pause();
+                    s.ext.state::<speech::ReadAloud>()?.play_pause();
                 }
             }
         }
@@ -107,7 +107,7 @@ fn skip_citations(s: &mut Session, v: &Value) -> CmdResult {
 }
 
 fn status(s: &mut Session, _: &Value) -> CmdResult {
-    Ok(s.read_aloud.status())
+    Ok(s.ext.state::<speech::ReadAloud>()?.status())
 }
 
 /// Move the caret to just after the citation it's in or before (a run of adjacent citations
@@ -188,17 +188,20 @@ mod tests {
         d
     }
 
-    fn texts(s: &Session) -> Vec<String> {
-        crate::speech::sentences(&s.doc, &Pos::body(0, 0), None, s.read_aloud.skip_citations).into_iter().map(|u| u.text).collect()
+    fn texts(s: &mut Session) -> Vec<String> {
+        crate::speech::sentences(&s.doc, &Pos::body(0, 0), None, s.ext.state::<crate::speech::ReadAloud>().unwrap().skip_citations)
+            .into_iter()
+            .map(|u| u.text)
+            .collect()
     }
 
     #[test]
     fn citations_and_bibliography_are_skipped() {
         let mut s = Session::new(doc());
         assert_eq!(s.doc.plain_text(StoryRef::Body).lines().next(), Some("Cats purr (Smith 2020). Dogs bark (Jones 2021; Lee 2019)."));
-        assert_eq!(texts(&s), ["Cats purr.", "Dogs bark.", "References"]);
+        assert_eq!(texts(&mut s), ["Cats purr.", "Dogs bark.", "References"]);
         s.run("readAloud.skipCitations", &json!({"value": false})).unwrap();
-        assert_eq!(texts(&s), ["Cats purr (Smith 2020).", "Dogs bark (Jones 2021; Lee 2019).", "References", "Smith J. Cats.", "Jones K. Dogs."]);
+        assert_eq!(texts(&mut s), ["Cats purr (Smith 2020).", "Dogs bark (Jones 2021; Lee 2019).", "References", "Smith J. Cats.", "Jones K. Dogs."]);
     }
 
     #[test]
@@ -224,7 +227,7 @@ mod tests {
         let r = s.run("readAloud.stop", &json!({})).unwrap();
         assert_eq!(r["state"], "stopped");
         assert_eq!(r["open"], false);
-        assert_eq!(s.read_aloud.state(), State::Stopped);
+        assert_eq!(s.ext.state::<crate::speech::ReadAloud>().unwrap().state(), State::Stopped);
     }
 
     #[test]
