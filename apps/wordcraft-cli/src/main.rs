@@ -556,6 +556,7 @@ fn parity_markdown(p: &Value) -> String {
 }
 
 fn main() -> ExitCode {
+    wordcraft_extensions::install_all();
     let args: Vec<OsString> = std::env::args_os().skip(1).collect();
     match run(&args) {
         Ok(()) | Err(Failure::StdoutClosed) => ExitCode::SUCCESS,

@@ -22,6 +22,7 @@ const PNG: &[u8] = &[
 /// write root), `outside` (with `secret.txt`) and `in2`, and a server confined to `in` and `out`
 /// (either may be left out).
 fn confined(tag: &str, read: bool, write: bool) -> (Server, PathBuf) {
+    wordcraft_extensions::install_all();
     let base = std::env::temp_dir().join(format!("wc-mcp-roots-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     for d in ["in", "out", "outside", "in2"] {

@@ -21,7 +21,7 @@ charts = ["wordcraft-engine/charts"]
 smart-art = ["wordcraft-engine/smart-art"]
 wordart = ["wordcraft-engine/wordart"]
 ink = ["wordcraft-engine/ink"]
-mailings = ["wordcraft-engine/mailings"]
+mailings = ["references", "wordcraft-extensions/mailings", "dep:wordcraft-ext-mailings"]
 developer = ["wordcraft-engine/developer"]
 macros = ["wordcraft-engine/macros"]
 compare = ["wordcraft-engine/compare"]
@@ -44,6 +44,8 @@ wordcraft-layout = { workspace = true }
 wordcraft-render = { workspace = true }
 wordcraft-engine = { workspace = true }
 wordcraft-zotero = { workspace = true, optional = true }
+wordcraft-extensions = { workspace = true }
+wordcraft-ext-mailings = { workspace = true, optional = true }
 egui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

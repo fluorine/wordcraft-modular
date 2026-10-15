@@ -512,14 +512,14 @@ mod tests {
         assert!(a.file_dialog_open());
         answer(&shown, Some(&csv.to_string_lossy()));
         a.poll_file_dialog().unwrap().unwrap();
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).headers, vec!["First Name", "City"]);
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).rows.len(), 2);
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).headers, vec!["First Name", "City"]);
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).rows.len(), 2);
         assert!(body_text(&a).contains(UNSAVED), "the document stays open");
         // Cancelling loads nothing.
         a.run("ui.openRecipientList", json!({})).unwrap();
         answer(&shown, None);
         assert_eq!(a.poll_file_dialog().unwrap().unwrap(), json!({"cancelled": true}));
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).rows.len(), 2);
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).rows.len(), 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -557,12 +557,12 @@ mod tests {
         a.poll_file_dialog().unwrap().unwrap();
         let Some(crate::dialogs::Dialog::SelectTable { sheets, params, headers: true, .. }) = &a.dialog else { panic!("Select Table expected") };
         assert_eq!(sheets, &["Notes", "Guests"]);
-        assert!(wordcraft_engine::cmd::mailings::merge_state(&a.session).headers.is_empty(), "nothing loads before a sheet is chosen");
+        assert!(wordcraft_ext_mailings::merge_state(&a.session).headers.is_empty(), "nothing loads before a sheet is chosen");
         let mut p = params.clone();
         p["sheet"] = json!(2);
         a.load_recipients(p).unwrap();
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).headers, vec!["Name"]);
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).rows.len(), 2);
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).headers, vec!["Name"]);
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).rows.len(), 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

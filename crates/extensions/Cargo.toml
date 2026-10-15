@@ -1,0 +1,24 @@
+[package]
+name = "wordcraft-extensions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "WordCraft's extension crates (crates/ext-*), installed into the engine by one call"
+
+[lints]
+workspace = true
+
+[features]
+# One feature per extension crate; `full` is all of them.
+default = ["full"]
+full = ["mailings"]
+mailings = ["dep:wordcraft-ext-mailings"]
+
+[dependencies]
+wordcraft-engine = { workspace = true }
+wordcraft-ext-mailings = { workspace = true, optional = true }
+
+[dev-dependencies]
+wordcraft-engine = { workspace = true, features = ["full"] }
+wordcraft-doc = { workspace = true }
+serde_json = { workspace = true }

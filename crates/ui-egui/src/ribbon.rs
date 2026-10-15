@@ -1708,7 +1708,7 @@ fn mailings(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Start Mail Merge", None, app, |ui, app| {
         // The kinds of merge document the engine makes, the current one checked.
         menu_button(ui, app, "mailMerge", Some("Start Mail\nMerge"), "Start Mail Merge", true, "mailings.start", |ui, app| {
-            let kind = wordcraft_engine::cmd::mailings::merge_state(&app.session).kind.clone();
+            let kind = crate::ext::merge_kind(&app.session);
             for (label, k) in [
                 ("Letters", "letters"),
                 ("E-mail Messages", "emails"),

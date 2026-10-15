@@ -580,7 +580,10 @@ impl SaveChoice {
 }
 
 impl WordApp {
-    pub fn new(session: Session, services: Services) -> Self {
+    pub fn new(mut session: Session, services: Services) -> Self {
+        // A session made before the extension crates were installed lacks their commands.
+        wordcraft_extensions::install_all();
+        session.registry = std::sync::Arc::new(wordcraft_engine::cmd::registry());
         // Numeral › System follows the system locale, found here rather than in layout.
         if let Some(tag) = sys_locale::get_locale() {
             wordcraft_engine::set_system_locale(&tag);
@@ -6374,7 +6377,7 @@ mod tests {
         // Applying the dialog's filter to a reloaded list gives the same records.
         a.run("mailings.recipients", json!({"csv": "Name,City\nAda,London\nAlan,Wilmslow\nGrace,London"})).unwrap();
         a.run("mailings.filterRecipients", params).unwrap();
-        let names: Vec<&str> = wordcraft_engine::cmd::mailings::merge_state(&a.session).rows.iter().map(|r| r[0].as_str()).collect();
+        let names: Vec<&str> = wordcraft_ext_mailings::merge_state(&a.session).rows.iter().map(|r| r[0].as_str()).collect();
         assert_eq!(names, ["Grace", "Ada"]);
         assert!(open_filters("recipients")[0].1.contains(&"xls"));
     }
@@ -6483,8 +6486,8 @@ mod tests {
         }));
         a.run("ui.openRecipientList", json!({})).unwrap();
         assert_eq!(*asked.borrow(), "recipients", "the host can offer CSV files");
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).headers, vec!["First Name", "City"]);
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).rows.len(), 2);
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).headers, vec!["First Name", "City"]);
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).rows.len(), 2);
         assert!(body_text(&a).contains(UNSAVED), "the document stays open");
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -6547,12 +6550,12 @@ mod tests {
         assert_eq!(*asked.borrow(), "recipients");
         inbox.lock().unwrap().push(("people.txt".into(), b"Name\tCity\nAda\tLondon\n".to_vec()));
         a.drain_inbox();
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).headers, vec!["Name", "City"]);
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).headers, vec!["Name", "City"]);
         assert!(!a.recipient_list_pending);
         assert!(body_text(&a).contains(UNSAVED), "the document stays open");
         inbox.lock().unwrap().push(("more.csv".into(), b"Name\nBo\nCy\n".to_vec()));
         a.drain_inbox();
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).rows.len(), 2);
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).rows.len(), 2);
         // A CSV picked through the picker must not turn the next .txt drop into recipients.
         a.run("ui.openRecipientList", json!({})).unwrap();
         inbox.lock().unwrap().push(("people.csv".into(), b"Name,City\nAda,London\n".to_vec()));
@@ -6562,7 +6565,7 @@ mod tests {
         a.drain_inbox();
         assert_eq!(prompt(&a), Some("saveChanges"), "the TXT opens like any document");
         a.run("ui.saveChanges", json!({"answer": "dontSave"})).unwrap();
-        assert_eq!(wordcraft_engine::cmd::mailings::merge_state(&a.session).headers, vec!["Name", "City"], "the recipients stay");
+        assert_eq!(wordcraft_ext_mailings::merge_state(&a.session).headers, vec!["Name", "City"], "the recipients stay");
         assert!(body_text(&a).contains("A plain text document."), "the TXT opened as a document");
         // A cancelled picker leaves nothing pending once the user does something else.
         a.run("ui.openRecipientList", json!({})).unwrap();

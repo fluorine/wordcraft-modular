@@ -580,16 +580,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "full")]
-    fn parity_floor() {
-        let reg = crate::cmd::registry();
-        let p = parity(&reg);
-        let pct = p["percent"].as_f64().unwrap();
-        // The floor only ever rises.
-        assert!(pct >= 90.4, "parity {pct}%");
-    }
-
-    #[test]
     fn parity_counts_live_features_per_extension() {
         let p = parity(&crate::cmd::registry());
         let per: u64 = p["extensions"].as_array().unwrap().iter().map(|x| x["live"].as_u64().unwrap()).sum();

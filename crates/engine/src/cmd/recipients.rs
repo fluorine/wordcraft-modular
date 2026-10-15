@@ -115,7 +115,7 @@ pub struct SortKey {
 /// Orders two cells: numbers (compared numerically) before text (compared
 /// case-insensitively). This is a total order, so `sort_by` stays consistent
 /// (and can't panic) on columns that mix numbers and text, such as `9`, `10`, `1A`.
-pub(crate) fn compare_cells(a: &str, b: &str) -> std::cmp::Ordering {
+pub fn compare_cells(a: &str, b: &str) -> std::cmp::Ordering {
     use std::cmp::Ordering::{Greater, Less};
     let number = |s: &str| s.parse::<f64>().ok().filter(|x| x.is_finite());
     let (a, b) = (a.trim(), b.trim());

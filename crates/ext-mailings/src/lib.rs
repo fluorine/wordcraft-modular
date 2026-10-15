@@ -1,16 +1,18 @@
 //! Mailings tab: mail merge (recipients from CSV/JSON or an Excel/OpenDocument spreadsheet,
 //! filtered and sorted; merge fields, preview, finish), envelopes and labels.
 
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
+
 use serde_json::{Value, json};
 use wordcraft_doc::para::InlineObject;
 use wordcraft_doc::props::{Align, CharProps};
 use wordcraft_doc::section::{SectionProps, SectionStart};
 use wordcraft_doc::{Block, Blocks, Document, Paragraph, Part, PartKind, Pos, StoryRef, Table, para_block};
 
-use super::{delete_selection, sel_result};
-use crate::{CmdError, CmdResult, CommandSpec, Selection, Session, p};
+use wordcraft_engine::cmd::{delete_selection, sel_result};
+use wordcraft_engine::{CmdError, CmdResult, CommandSpec, Selection, Session, p};
 
-pub use super::recipients::{FilterOp, FilterRule, RECIPIENT_EXTENSIONS, SortKey, is_spreadsheet_name, select_records};
+pub use wordcraft_engine::cmd::recipients::{FilterOp, FilterRule, RECIPIENT_EXTENSIONS, SortKey, is_spreadsheet_name, select_records};
 
 /// The mail-merge data source and preview state (lives in the session, not the document).
 #[derive(Clone, Debug, Default)]
@@ -162,6 +164,14 @@ fn has_list(s: &Session) -> Option<&'static str> {
 /// `directory` changes how Finish & Merge joins the records (no page break between them).
 pub const MERGE_KINDS: [&str; 6] = ["letters", "emails", "envelopes", "labels", "directory", "normal"];
 
+/// This extension, for [`wordcraft_engine::extensions::install`].
+pub const PROVIDER: wordcraft_engine::extensions::Provider = wordcraft_engine::extensions::Provider { id: "mailings", specs, hooks: Vec::new };
+
+/// Adds mail merge to the registries this process builds from now on.
+pub fn install() {
+    wordcraft_engine::extensions::install(PROVIDER);
+}
+
 pub fn specs() -> Vec<CommandSpec> {
     vec![
         CommandSpec::new("mailings.start", "Start Mail Merge", "Mailings › Start Mail Merge", |s, v| {
@@ -196,7 +206,7 @@ pub fn specs() -> Vec<CommandSpec> {
             }))
         })
         .params(r#"{"rows"?: [{field: value}] | [[value]], "fields"?: [string]} (no params: the list as {headers, rows (every record), records (how many merge), rules, sort})"#)
-        .key(super::non_mac("Alt+Shift+E"))
+        .key(wordcraft_engine::cmd::non_mac("Alt+Shift+E"))
         .when(has_list)
         .pure(),
         CommandSpec::new("mailings.filterRecipients", "Filter Recipients", "Mailings › Start Mail Merge › Edit Recipient List", |s, v| {
@@ -227,7 +237,7 @@ pub fn specs() -> Vec<CommandSpec> {
             insert_field(s, &format!("MERGEFIELD {}", quote(&f)), &format!("«{f}»"))
         })
         .params(r#"{"field": string}"#)
-        .key(super::non_mac("Alt+Shift+F")),
+        .key(wordcraft_engine::cmd::non_mac("Alt+Shift+F")),
         CommandSpec::new("mailings.addressBlock", "Address Block", "Mailings › Write & Insert Fields", |s, _| {
             insert_field(s, "ADDRESSBLOCK", "«AddressBlock»")
         }),
@@ -267,7 +277,7 @@ pub fn specs() -> Vec<CommandSpec> {
             refresh(s);
             Ok(json!({"preview": merge_state(s).preview, "record": merge_state(s).record + 1}))
         })
-        .key(super::non_mac("Alt+Shift+K"))
+        .key(wordcraft_engine::cmd::non_mac("Alt+Shift+K"))
         .when(has_recipients),
         CommandSpec::new("mailings.next", "Next Record", "Mailings › Preview Results", |s, _| step(s, 1)).when(has_recipients),
         CommandSpec::new("mailings.previous", "Previous Record", "Mailings › Preview Results", |s, _| step(s, -1)).when(has_recipients),
@@ -296,7 +306,7 @@ pub fn specs() -> Vec<CommandSpec> {
         .pure(),
         CommandSpec::new("mailings.finish", "Finish & Merge", "Mailings › Finish", finish)
             .params(r#"{"path"?: string (save the merged document), "from"?: n, "to"?: n}"#)
-            .key(super::non_mac("Alt+Shift+N"))
+            .key(wordcraft_engine::cmd::non_mac("Alt+Shift+N"))
             .when(has_recipients),
         CommandSpec::new("mailings.envelopes", "Envelopes", "Mailings › Create", envelopes).params(
             r#"{"delivery": string, "return"?: string, "size"?: "Envelope #10|#9|Monarch|DL|C4|C5|C6|B5", "width"?: pt, "height"?: pt, "add"?: bool (add to this document instead of a new one)}"#,
@@ -331,8 +341,8 @@ fn insert_field(s: &mut Session, instr: &str, placeholder: &str) -> CmdResult {
     sel_result(s)
 }
 
-pub use super::parse_csv;
-pub use super::stationery::{ENVELOPE_SIZES, LABEL_PRODUCTS, LabelProduct};
+pub use wordcraft_engine::cmd::parse_csv;
+pub use wordcraft_engine::cmd::stationery::{ENVELOPE_SIZES, LABEL_PRODUCTS, LabelProduct};
 
 /// Most records and fields a recipient list keeps.
 const MAX_RECORDS: usize = 100_000;
@@ -387,7 +397,7 @@ fn recipients(s: &mut Session, v: &Value) -> CmdResult {
             parse_csv(c)
         } else {
             let (bytes, ext) = if let Some(d) = p::str(v, "data") {
-                let b = super::insert::base64_decode(d.trim()).ok_or_else(|| CmdError::Params("`data` isn't valid base64".into()))?;
+                let b = wordcraft_engine::cmd::insert::base64_decode(d.trim()).ok_or_else(|| CmdError::Params("`data` isn't valid base64".into()))?;
                 (b, p::str(v, "path").and_then(extension))
             } else if let Some(path) = p::str(v, "path") {
                 (read_file(path)?, extension(path))
@@ -456,7 +466,7 @@ fn recipients(s: &mut Session, v: &Value) -> CmdResult {
 fn decode(bytes: &[u8], v: &Value) -> Result<String, CmdError> {
     match p::str(v, "encoding").map(str::trim).filter(|e| !e.is_empty()) {
         Some(label) => wordcraft_formats::txt::decode_as(bytes, label).ok_or_else(|| CmdError::Params(format!("unknown `encoding` `{label}`"))),
-        None => Ok(crate::io::decode_text(bytes)),
+        None => Ok(wordcraft_engine::io::decode_text(bytes)),
     }
 }
 
@@ -466,7 +476,7 @@ fn extension(path: &str) -> Option<String> {
 }
 
 fn read_file(path: &str) -> Result<Vec<u8>, CmdError> {
-    crate::io::read_file(path).map_err(CmdError::Failed)
+    wordcraft_engine::io::read_file(path).map_err(CmdError::Failed)
 }
 
 /// Field names and records from a table's rows: with `headers`, the first row names the fields
@@ -800,7 +810,7 @@ fn finish(s: &mut Session, v: &Value) -> CmdResult {
     }
     out.ensure_nonempty();
     if let Some(path) = p::str(v, "path") {
-        crate::io::save_path(std::path::Path::new(path), &out).map_err(CmdError::Failed)?;
+        wordcraft_engine::io::save_path(std::path::Path::new(path), &out).map_err(CmdError::Failed)?;
         return Ok(json!({"records": count, "path": path}));
     }
     s.set_document(out);
@@ -1031,6 +1041,12 @@ fn labels(s: &mut Session, v: &Value) -> CmdResult {
 mod tests {
     use super::*;
 
+    /// A session with mail merge installed.
+    fn session(doc: Document) -> Session {
+        install();
+        Session::new(doc)
+    }
+
     #[test]
     fn csv_parsing() {
         let r = parse_csv("Name,City\n\"Smith, Ann\",Paris\r\nBo,\"Oslo \"\"N\"\"\"\n\n");
@@ -1040,7 +1056,7 @@ mod tests {
 
     #[test]
     fn merge_end_to_end() {
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         s.run("mailings.recipients", &json!({"csv": "First Name,Last Name,City\nAda,Lovelace,London\nAlan,Turing,Wilmslow"})).unwrap();
         s.run("mailings.greetingLine", &json!({})).unwrap();
         s.run("text.newParagraph", &json!({})).unwrap();
@@ -1078,8 +1094,8 @@ mod tests {
             z.start_file(name, zip::write::SimpleFileOptions::default()).unwrap();
             z.write_all(body.as_bytes()).unwrap();
         }
-        let data = super::super::insert::base64_encode(&z.finish().unwrap().into_inner());
-        let mut s = Session::new(Document::new());
+        let data = wordcraft_engine::cmd::insert::base64_encode(&z.finish().unwrap().into_inner());
+        let mut s = session(Document::new());
         // Two sheets and none chosen: the names come back and nothing loads.
         let r = s.run("mailings.recipients", &json!({"data": data})).unwrap();
         assert_eq!(r, json!({"sheets": ["Notes", "Guests"], "chooseSheet": true}));
@@ -1098,7 +1114,7 @@ mod tests {
 
     #[test]
     fn recipients_from_fields_and_array_rows() {
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         let r = s
             .run("mailings.recipients", &json!({"fields": ["Last Name", " City ", "Age"], "rows": [["Lovelace", "London", 36], ["Turing"], 7]}))
             .unwrap();
@@ -1120,7 +1136,7 @@ mod tests {
     /// Start Mail Merge takes only the kinds it knows; Edit Recipient List needs a list.
     #[test]
     fn merge_kinds_and_edit_list_needs_recipients() {
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         for k in MERGE_KINDS {
             assert_eq!(s.run("mailings.start", &json!({"kind": k})).unwrap(), json!({"kind": k}));
         }
@@ -1136,7 +1152,7 @@ mod tests {
     }
 
     fn merged_text(rule: Option<Value>, rows: Value) -> String {
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         s.run("mailings.recipients", &json!({ "rows": rows })).unwrap();
         s.run("mailings.start", &json!({"kind": "directory"})).unwrap();
         if let Some(r) = rule {
@@ -1164,7 +1180,7 @@ mod tests {
     /// copy starts after it.
     #[test]
     fn next_record_advances_following_fields() {
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         s.run("mailings.recipients", &json!({"rows": [{"Name": "Alpha"}, {"Name": "Beta"}, {"Name": "Gamma"}]})).unwrap();
         s.run("mailings.start", &json!({"kind": "directory"})).unwrap();
         s.run("mailings.insertField", &json!({"field": "Name"})).unwrap();
@@ -1181,7 +1197,7 @@ mod tests {
     /// #429: an IF rule shows its true / false text in Preview Results, as Finish & Merge does.
     #[test]
     fn if_rule_previews_its_result() {
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         s.run("mailings.recipients", &json!({"rows": [{"Name": "Alpha", "Flag": "yes"}, {"Name": "Beta", "Flag": "no"}]})).unwrap();
         s.run("mailings.start", &json!({"kind": "directory"})).unwrap();
         s.run("mailings.rules", &json!({"rule": "IF", "field": "Flag", "value": "yes", "then": "Selected", "else": "Other"})).unwrap();
@@ -1199,7 +1215,7 @@ mod tests {
     /// own header.
     #[test]
     fn header_and_footer_fields_merge() {
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         s.run("mailings.recipients", &json!({"rows": [{"Name": "Alpha"}, {"Name": "Beta"}]})).unwrap();
         let hdr = s.run("insert.header", &json!({"text": "Recipient: "})).unwrap()["story"].as_u64().unwrap() as u32;
         s.run("caret.docEnd", &json!({})).unwrap();
@@ -1223,7 +1239,7 @@ mod tests {
 
     #[test]
     fn envelopes_and_labels() {
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         s.run("mailings.envelopes", &json!({"delivery": "Jo Doe\n1 Main St"})).unwrap();
         assert!(s.doc.last_section.page_w > s.doc.last_section.page_h);
         s.run("mailings.labels", &json!({"text": "Hello"})).unwrap();
@@ -1234,7 +1250,7 @@ mod tests {
     /// lays out a sheet of the chosen product, or a single label at a row and column.
     #[test]
     fn envelope_sizes_add_to_document_and_label_products() {
-        let mut s = Session::new(Document::from_text("Dear Jo,"));
+        let mut s = session(Document::from_text("Dear Jo,"));
         let r = s.run("mailings.envelopes", &json!({"delivery": "Jo Doe\n1 Main St", "return": "Me", "size": "C5", "add": true})).unwrap();
         assert_eq!((r["width"].as_f64().map(|w| w.round()), r["height"].as_f64().map(|h| h.round())), (Some(649.0), Some(459.0)));
         let secs = s.doc.sections();
@@ -1260,7 +1276,7 @@ mod tests {
     }
 
     fn b64(b: &[u8]) -> String {
-        super::super::insert::base64_encode(b)
+        wordcraft_engine::cmd::insert::base64_encode(b)
     }
 
     /// #778: a CSV saved by a Chinese-locale spreadsheet is GBK, not UTF-8; one saved as
@@ -1270,7 +1286,7 @@ mod tests {
         let text = "物料编号,送检日期,检验日期,批号,数量\nPLND0119,2024/4/16,2024/4/16,4164001,12\nE655,2024/4/17,2024/4/17,4174001,1\n";
         let (gbk, _, bad) = encoding_rs::GBK.encode(text);
         assert!(!bad && std::str::from_utf8(&gbk).is_err());
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         let r = s.run("mailings.recipients", &json!({"path": "list.csv", "data": b64(&gbk)})).unwrap();
         assert_eq!(r["fields"], json!(["物料编号", "送检日期", "检验日期", "批号", "数量"]));
         assert_eq!(merge_state(&s).rows[1], ["E655", "2024/4/17", "2024/4/17", "4174001", "1"]);
@@ -1311,7 +1327,7 @@ mod tests {
             vec![row(&["姓名", "城市", "数量"]), row(&["张三", "北京", "12"]), row(&["李四", "上海", "2"])],
         )])
         .unwrap();
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         let r = s.run("mailings.recipients", &json!({"path": "名单.xls", "data": b64(&book)})).unwrap();
         assert_eq!(r, json!({"fields": ["姓名", "城市", "数量"], "records": 2, "sheet": "收件人"}));
         assert_eq!(merge_state(&s).rows[1], ["李四", "上海", "2"]);
@@ -1329,7 +1345,7 @@ mod tests {
     }
 
     fn people() -> Session {
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         s.run(
             "mailings.recipients",
             &json!({"csv": "Name,City,Age,Email\nAda,London,36,ada@x.org\nAlan,Wilmslow,41,\nGrace,New York,85,grace@navy.mil\nKatherine,Hampton,101,\nLinus,Helsinki,9,linus@kernel.org"}),
@@ -1456,7 +1472,7 @@ mod tests {
             .collect();
         let r: Vec<Vec<String>> = vals.iter().map(|v| vec![v.clone()]).collect();
         let out = sorted(&r, false);
-        assert!(out.windows(2).all(|w| crate::cmd::recipients::compare_cells(&w[0], &w[1]) != std::cmp::Ordering::Greater));
+        assert!(out.windows(2).all(|w| wordcraft_engine::cmd::recipients::compare_cells(&w[0], &w[1]) != std::cmp::Ordering::Greater));
     }
 
     /// #778: preview, Finish & Merge and labels use only the filtered records, in sort order; a

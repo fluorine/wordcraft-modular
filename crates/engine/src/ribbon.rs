@@ -469,9 +469,9 @@ mod tests {
     #[test]
     fn a_turned_off_extension_hides_its_tab() {
         let mut s = crate::Session::new(wordcraft_doc::Document::new());
-        assert!(super::tab_enabled(&s, "Mailings"));
-        s.run("extensions.set", &serde_json::json!({"id": "mailings", "enabled": false})).unwrap();
-        assert!(!super::tab_enabled(&s, "Mailings") && super::tab_enabled(&s, "Home"));
+        assert!(super::tab_enabled(&s, "Developer"));
+        s.run("extensions.set", &serde_json::json!({"id": "developer", "enabled": false})).unwrap();
+        assert!(!super::tab_enabled(&s, "Developer") && super::tab_enabled(&s, "Home"));
     }
 
     use serde_json::json;

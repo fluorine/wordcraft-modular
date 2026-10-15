@@ -31,8 +31,6 @@ pub mod ink_shape;
 pub mod insert;
 pub mod inspector;
 pub mod lists;
-#[cfg(feature = "mailings")]
-pub mod mailings;
 pub mod moves;
 pub mod objects;
 pub mod options;
@@ -104,8 +102,6 @@ pub fn registry() -> Registry {
     #[cfg(feature = "references")]
     v.extend(crate::extensions::tag(references::specs(), "references"));
     v.extend(crate::extensions::tag(fields::specs(), "core"));
-    #[cfg(feature = "mailings")]
-    v.extend(crate::extensions::tag(mailings::specs(), "mailings"));
     #[cfg(feature = "references")]
     v.extend(crate::extensions::tag(citations::specs(), "references"));
     #[cfg(feature = "references")]
@@ -134,7 +130,12 @@ pub fn registry() -> Registry {
     #[cfg(feature = "developer")]
     v.extend(crate::extensions::tag(controls::specs(), "developer"));
     v.extend(crate::extensions::tag(extensions::specs(), "core"));
-    Registry::new(v).with_hooks(hooks().into_iter().filter(|h| crate::extensions::compiled(h.ext)).collect())
+    let mut hooks = hooks();
+    for p in crate::extensions::installed() {
+        v.extend(crate::extensions::tag((p.specs)(), p.id));
+        hooks.extend((p.hooks)());
+    }
+    Registry::new(v).with_hooks(hooks.into_iter().filter(|h| crate::extensions::compiled(h.ext)).collect())
 }
 
 /// The extension hooks around every command, in call order.

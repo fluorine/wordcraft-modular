@@ -40,7 +40,7 @@ pub fn ink_tool_active(s: &Session) -> bool {
 pub fn merge_list(s: &Session) -> (Vec<String>, Vec<Vec<String>>) {
     #[cfg(feature = "mailings")]
     {
-        let m = wordcraft_engine::cmd::mailings::merge_state(s);
+        let m = wordcraft_ext_mailings::merge_state(s);
         (m.headers.clone(), m.rows.clone())
     }
     #[cfg(not(feature = "mailings"))]
@@ -62,7 +62,7 @@ pub struct MergeSource {
 pub fn merge_source(s: &Session) -> MergeSource {
     #[cfg(feature = "mailings")]
     {
-        let m = wordcraft_engine::cmd::mailings::merge_state(s);
+        let m = wordcraft_ext_mailings::merge_state(s);
         MergeSource { headers: m.headers.clone(), source: m.source.clone(), filter: m.filter.clone(), sort: m.sort.clone() }
     }
     #[cfg(not(feature = "mailings"))]
@@ -80,6 +80,17 @@ pub fn ref_targets(s: &Session, to: &str) -> Vec<String> {
     {
         let _ = (s, to);
         Vec::new()
+    }
+}
+
+/// The mail-merge document type (`letters`, `envelopes`…), empty before Start Mail Merge.
+pub fn merge_kind(s: &Session) -> String {
+    #[cfg(feature = "mailings")]
+    return wordcraft_ext_mailings::merge_state(s).kind.clone();
+    #[cfg(not(feature = "mailings"))]
+    {
+        let _ = s;
+        String::new()
     }
 }
 

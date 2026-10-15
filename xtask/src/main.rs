@@ -140,11 +140,11 @@ fn wasm_set() -> Result<Vec<String>, String> {
         .collect())
 }
 
-/// The engine's extension features: the `[features]` keys other than `default` and `full`.
-fn engine_features() -> Result<Vec<String>, String> {
-    let path = root().join("crates/engine/Cargo.toml");
+/// A crate's extension features: the `[features]` keys other than `default` and `full`.
+fn extension_features(dir: &str) -> Result<Vec<String>, String> {
+    let path = root().join(dir).join("Cargo.toml");
     let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?.replace("\r\n", "\n");
-    let section = text.split("\n[features]\n").nth(1).ok_or("crates/engine/Cargo.toml has no [features]")?;
+    let section = text.split("\n[features]\n").nth(1).ok_or(format!("{dir}/Cargo.toml has no [features]"))?;
     let section = section.split("\n[").next().unwrap_or(section);
     Ok(section
         .lines()
@@ -155,11 +155,11 @@ fn engine_features() -> Result<Vec<String>, String> {
 
 /// Every extension must build alone, and the engine and the front end with none of them.
 fn cmd_features() -> Result<(), String> {
-    let mut sets = vec![None];
-    sets.extend(engine_features()?.into_iter().map(Some));
     let mut failed = Vec::new();
-    // The front end forwards the same features to the engine.
-    for pkg in ["wordcraft-engine", "wordcraft-ui-egui"] {
+    // The front end has a feature for each engine extension and each extension crate.
+    for (pkg, dir) in [("wordcraft-engine", "crates/engine"), ("wordcraft-ui-egui", "crates/ui-egui")] {
+        let mut sets = vec![None];
+        sets.extend(extension_features(dir)?.into_iter().map(Some));
         for f in &sets {
             let mut c = cargo();
             c.args(["clippy", "-p", pkg, "--no-default-features"]);
