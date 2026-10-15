@@ -51,6 +51,7 @@ pub const TABLE: &[(&str, Class)] = &[
     // The extension layer: extension crates, then the bundle that installs them.
     ("ext-mailings", Class::Layer(5)),
     ("ext-design", Class::Layer(5)),
+    ("ext-templates", Class::Layer(5)),
     ("extensions", Class::Layer(5)),
     ("ui-egui", Class::Layer(6)),
     ("testkit", Class::Testkit),
@@ -65,7 +66,8 @@ pub const TABLE: &[(&str, Class)] = &[
 /// The L0 foundation is a small chain: `raster` builds on `color` and
 /// `geom`, which the §3 diagram draws on one line. The GPU backend (`gpu`)
 /// reuses the CPU reference (`compose`) for LUTs and parity tests.
-pub const INTRA_LAYER_ORDER: &[&[&str]] = &[&["doc", "fonts"], &["ext-mailings", "extensions", "mcp"], &["ext-design", "extensions"]];
+pub const INTRA_LAYER_ORDER: &[&[&str]] =
+    &[&["doc", "fonts"], &["ext-mailings", "extensions", "mcp"], &["ext-templates", "extensions"], &["ext-design", "extensions"]];
 
 fn intra_layer_allowed(from: &str, to: &str) -> bool {
     let (from, to) = (short_name(from), short_name(to));

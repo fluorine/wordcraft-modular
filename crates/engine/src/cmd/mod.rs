@@ -53,8 +53,6 @@ pub mod table_formula;
 pub mod table_mouse;
 pub mod table_resize;
 pub mod table_style;
-#[cfg(feature = "templates")]
-pub mod templates;
 pub mod text;
 pub mod tools;
 pub mod view;
@@ -117,8 +115,6 @@ pub fn registry() -> Registry {
     #[cfg(feature = "shapes")]
     v.extend(crate::extensions::tag(connectors::specs(), "shapes"));
     v.extend(crate::extensions::tag(tools::specs(), "core"));
-    #[cfg(feature = "templates")]
-    v.extend(crate::extensions::tag(templates::specs(), "templates"));
     #[cfg(feature = "restrict-editing")]
     v.extend(crate::extensions::tag(protect::specs(), "restrict-editing"));
     #[cfg(feature = "read-aloud")]

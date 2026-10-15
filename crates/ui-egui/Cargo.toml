@@ -28,7 +28,7 @@ compare = ["wordcraft-engine/compare"]
 read-aloud = ["wordcraft-engine/read-aloud"]
 accessibility = ["wordcraft-engine/accessibility"]
 design = ["wordcraft-extensions/design", "dep:wordcraft-ext-design"]
-templates = ["wordcraft-engine/templates"]
+templates = ["wordcraft-extensions/templates", "dep:wordcraft-ext-templates"]
 restrict-editing = ["wordcraft-engine/restrict-editing"]
 pdf-export = ["wordcraft-engine/pdf-export"]
 doc-legacy = ["wordcraft-engine/doc-legacy"]
@@ -46,6 +46,7 @@ wordcraft-engine = { workspace = true }
 wordcraft-zotero = { workspace = true, optional = true }
 wordcraft-extensions = { workspace = true }
 wordcraft-ext-mailings = { workspace = true, optional = true }
+wordcraft-ext-templates = { workspace = true, optional = true }
 wordcraft-ext-design = { workspace = true, optional = true }
 egui = { workspace = true }
 serde = { workspace = true }

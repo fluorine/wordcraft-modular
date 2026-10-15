@@ -121,7 +121,7 @@ pub fn installed() -> Vec<Provider> {
 }
 
 /// Extensions built as their own crate (`crates/ext-*`) rather than an engine feature.
-pub const CRATES: &[&str] = &["mailings", "design"];
+pub const CRATES: &[&str] = &["mailings", "templates", "design"];
 
 /// Each extension and whether its cargo feature is on.
 const BUILT: &[(&str, bool)] = &[
@@ -139,7 +139,6 @@ const BUILT: &[(&str, bool)] = &[
     ("compare", cfg!(feature = "compare")),
     ("read-aloud", cfg!(feature = "read-aloud")),
     ("accessibility", cfg!(feature = "accessibility")),
-    ("templates", cfg!(feature = "templates")),
     ("restrict-editing", cfg!(feature = "restrict-editing")),
     ("pdf-export", cfg!(feature = "pdf-export")),
     ("doc-legacy", cfg!(feature = "doc-legacy")),

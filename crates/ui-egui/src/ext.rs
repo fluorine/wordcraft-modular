@@ -172,7 +172,7 @@ pub fn equation_normal_text(s: &Session) -> bool {
 /// The document's styles as the Organizer lists them.
 pub fn template_styles(doc: &wordcraft_doc::Document) -> serde_json::Value {
     #[cfg(feature = "templates")]
-    return wordcraft_engine::cmd::templates::style_list(doc);
+    return wordcraft_ext_templates::style_list(doc);
     #[cfg(not(feature = "templates"))]
     {
         let _ = doc;

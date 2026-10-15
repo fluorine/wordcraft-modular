@@ -7,6 +7,8 @@
 //! The template path comes from the document, so it is never read on its own (not on open
 //! either): only an explicit `tools.updateStyles` or `tools.attachTemplate` with `update` reads it.
 
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
+
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -15,8 +17,8 @@ use wordcraft_doc::Document;
 use wordcraft_doc::numbering::{AbstractNum, Num};
 use wordcraft_doc::styles::{Style, StyleKind};
 
-use super::para::touch_all;
-use crate::{CmdError, CmdResult, CommandSpec, Session, p};
+use wordcraft_engine::cmd::para::touch_all;
+use wordcraft_engine::{CmdError, CmdResult, CommandSpec, Session, p};
 
 /// Longest template path or style name list we take from params.
 const MAX_PATH: usize = 32 * 1024;
@@ -24,6 +26,14 @@ const MAX_PATH: usize = 32 * 1024;
 const MAX_COPY: usize = 10_000;
 /// Longest style name (Word's limit).
 const MAX_NAME: usize = 253;
+
+/// This extension, for [`wordcraft_engine::extensions::install`].
+pub const PROVIDER: wordcraft_engine::extensions::Provider = wordcraft_engine::extensions::Provider { id: "templates", specs, hooks: Vec::new };
+
+/// Adds this extension to the registries this process builds from now on.
+pub fn install() {
+    wordcraft_engine::extensions::install(PROVIDER);
+}
 
 pub fn specs() -> Vec<CommandSpec> {
     const LOC: &str = "View › Templates › Templates and Add-ins";
@@ -192,10 +202,10 @@ fn load_other(name: &str, data: Option<&str>, base: Option<&Path>) -> Result<Doc
     }
     match data {
         Some(d) => {
-            let bytes = super::insert::base64_decode(d).ok_or_else(|| CmdError::Params("bad base64".into()))?;
-            crate::io::open_bytes(&local.to_string_lossy(), &bytes).map_err(CmdError::Failed)
+            let bytes = wordcraft_engine::cmd::insert::base64_decode(d).ok_or_else(|| CmdError::Params("bad base64".into()))?;
+            wordcraft_engine::io::open_bytes(&local.to_string_lossy(), &bytes).map_err(CmdError::Failed)
         }
-        None => crate::io::open_path(&local).map_err(CmdError::Failed),
+        None => wordcraft_engine::io::open_path(&local).map_err(CmdError::Failed),
     }
 }
 
@@ -377,6 +387,11 @@ fn import_num(doc: &mut Document, src: &Document, num: u32, map: &HashMap<String
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn session(doc: wordcraft_doc::Document) -> Session {
+        install();
+        Session::new(doc)
+    }
     use wordcraft_doc::numbering::ListKind;
     use wordcraft_doc::props::{CharProps, NumRef};
 
@@ -418,14 +433,14 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("Report.dotx");
-        crate::io::save_path(&path, doc).unwrap();
+        wordcraft_engine::io::save_path(&path, doc).unwrap();
         path
     }
 
     #[test]
     fn update_styles_from_template_is_one_undo_step() {
         let path = save("update", &template());
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         s.run("tools.attachTemplate", &json!({"path": path.to_string_lossy()})).unwrap();
         assert_eq!(s.doc.settings.attached_template.as_deref(), Some(path.to_string_lossy().as_ref()));
         let before = s.doc.styles.clone();
@@ -449,7 +464,7 @@ mod tests {
     fn organizer_copies_renames_and_undoes() {
         let path = save("organizer", &template());
         let p = path.to_string_lossy().to_string();
-        let mut s = Session::new(Document::new());
+        let mut s = session(Document::new());
         let listed = s.run("styles.organizer", &json!({"path": p})).unwrap();
         assert!(listed["file"]["styles"].as_array().unwrap().iter().any(|x| x["name"] == "Callout"));
         let r = s.run("styles.copyFrom", &json!({"path": p, "styles": ["Callout"]})).unwrap();
@@ -475,8 +490,8 @@ mod tests {
         d.settings.attached_template = Some("Report.dotx".into());
         d.settings.link_styles = true;
         let doc_path = path.with_file_name("Letter.docx");
-        crate::io::save_path(&doc_path, &d).unwrap();
-        let mut s = Session::new(Document::new());
+        wordcraft_engine::io::save_path(&doc_path, &d).unwrap();
+        let mut s = session(Document::new());
         s.run("file.open", &json!({"path": doc_path.to_string_lossy()})).unwrap();
         assert_eq!(s.doc.settings.attached_template.as_deref(), Some("Report.dotx"), "the reference is kept");
         assert!(s.doc.settings.link_styles);
