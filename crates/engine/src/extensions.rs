@@ -335,6 +335,7 @@ mod tests {
     const ALLOWED_CALLS: &[(&str, &str)] = &[
         // Comments-only protection lets replies through; a name check, not a call.
         ("protect", "review.reply"),
+        ("protect", "developer.properties"),
     ];
 
     #[test]

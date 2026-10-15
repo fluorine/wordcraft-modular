@@ -27,6 +27,8 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     c("ui.closeDialog", "Close Dialog", "Dialogs"),
     c("ui.changePicture", "Change Picture", "Picture Format › Adjust"),
     c("ui.contextMenu", "Context Menu", "Page"),
+    c("ui.crop", "Crop", "Picture Format › Size"),
+    c("ui.recoveryDiscard", "Recover", "File › Recover"),
     c("ui.collapseRibbon", "Collapse the Ribbon", "Ribbon"),
     c("ui.keytips", "Key Tips", "Ribbon"),
     c("ui.dark", "Dark Mode", "View"),

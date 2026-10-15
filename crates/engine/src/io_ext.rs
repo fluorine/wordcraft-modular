@@ -7,7 +7,7 @@ use wordcraft_doc::Document;
 pub fn open(ext: &str, bytes: &[u8], page: &wordcraft_doc::SectionProps) -> Option<Result<Document, String>> {
     match ext {
         "docx" | "docm" | "dotx" | "dotm" => Some(wordcraft_docx::read(bytes).map_err(|e| e.to_string())),
-        "doc" | "dot" => Some(read_doc(bytes)),
+        "doc" | "dot" => Some(read_doc(bytes, None).map(|(d, _)| d)),
         // Word XML Document (Flat OPC) or Word 2003 XML, told apart by the root element.
         "xml" => Some(wordcraft_docx::read_xml(bytes).map_err(|e| e.to_string())),
         // HTML, Markdown, ODT, RTF…: pictures fit the text width (see `io::fit_pictures`).
@@ -35,14 +35,26 @@ pub fn save(ext: &str, doc: &Document, opts: &crate::io::ExportOptions) -> Optio
     }
 }
 
-/// A Word 97-2003 document (`doc-legacy`).
-pub fn read_doc(bytes: &[u8]) -> Result<Document, String> {
+/// A Word 97-2003 document (`doc-legacy`), and whether it was encrypted.
+pub fn read_doc(bytes: &[u8], password: Option<&str>) -> Result<(Document, bool), String> {
     #[cfg(feature = "doc-legacy")]
-    return wordcraft_docbin::read(bytes).map_err(|e| e.to_string());
+    return read_docbin(bytes, password);
     #[cfg(not(feature = "doc-legacy"))]
     {
-        let _ = bytes;
+        let _ = (bytes, password);
         Err(crate::extensions::missing_format("doc"))
+    }
+}
+
+#[cfg(feature = "doc-legacy")]
+fn read_docbin(bytes: &[u8], password: Option<&str>) -> Result<(Document, bool), String> {
+    use wordcraft_docbin::DocbinError;
+    let encrypted = wordcraft_docbin::is_encrypted(bytes);
+    match wordcraft_docbin::read_with_password(bytes, password) {
+        Ok(doc) => Ok((doc, encrypted)),
+        Err(DocbinError::PasswordRequired) => Err(wordcraft_docx::PASSWORD_REQUIRED.to_string()),
+        Err(DocbinError::WrongPassword) => Err(wordcraft_docx::WRONG_PASSWORD.to_string()),
+        Err(e) => Err(e.to_string()),
     }
 }
 
