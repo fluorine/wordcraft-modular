@@ -1322,7 +1322,7 @@ fn design(app: &mut WordApp, ui: &mut Ui) {
     #[cfg(feature = "design")]
     group(ui, "Themes", None, app, |ui, app| {
         menu_button(ui, app, "themes", Some("Themes"), "Themes", true, "design.themes", |ui, app| {
-            for (name, ..) in wordcraft_engine::cmd::design::THEMES {
+            for (name, ..) in wordcraft_ext_design::THEMES {
                 mi(ui, app, name, "design.theme", json!({"name": name}));
             }
         });
@@ -1332,12 +1332,12 @@ fn design(app: &mut WordApp, ui: &mut Ui) {
         #[cfg(feature = "design")]
         stack(ui, |ui| {
             menu_button(ui, app, "colors", Some("Colors"), "Theme Colors", false, "design.themeColors", |ui, app| {
-                for (name, ..) in wordcraft_engine::cmd::design::THEMES {
+                for (name, ..) in wordcraft_ext_design::THEMES {
                     mi(ui, app, name, "design.themeColors", json!({"name": name}));
                 }
             });
             menu_button(ui, app, "fonts", Some("Fonts"), "Theme Fonts", false, "design.themeFonts", |ui, app| {
-                for (name, h, b, _) in wordcraft_engine::cmd::design::THEMES {
+                for (name, h, b, _) in wordcraft_ext_design::THEMES {
                     mi_text(ui, app, &format!("{}: {h} / {b}", tl!(name)), "design.themeFonts", json!({"heading": h, "body": b}));
                 }
             });

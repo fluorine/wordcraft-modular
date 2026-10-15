@@ -4395,14 +4395,6 @@ fn border_sides_apply_exactly() {
     assert!(b.between.is_none());
     run(&mut s, "para.borders", json!({"sides": {}}));
     assert!(!s.doc.para_at(&s.sel.focus).and_then(|p| p.props.borders).unwrap().any_visible());
-    run(&mut s, "design.pageBorders", json!({"sides": {"top": {"style": "dashed", "width": 3.0}}, "applyTo": "document"}));
-    let pb = s.doc.last_section.page_borders.unwrap();
-    assert_eq!(pb.top.map(|t| (t.style, t.width)), Some((BorderStyle::Dashed, 3.0)));
-    assert!(pb.left.is_none());
-    run(&mut s, "design.pageBorders", json!({"kind": "box", "style": "thick"}));
-    assert_eq!(s.doc.last_section.page_borders.unwrap().left.map(|t| t.style), Some(BorderStyle::Thick));
-    run(&mut s, "design.pageBorders", json!({"sides": {}}));
-    assert!(s.doc.last_section.page_borders.is_none());
 }
 
 /// Encrypt with Password (#55): a document saved with a password opens only with it, keeps it
@@ -4941,8 +4933,6 @@ fn colour_commands_take_any_custom_hex() {
     run(&mut s, "para.shading", json!({"color": "#C0FFEE"}));
     let shading = s.doc.para_at(&s.sel.focus).and_then(|p| p.props.shading);
     assert_eq!(shading, wordcraft_doc::Rgb::parse("C0FFEE"));
-    run(&mut s, "design.pageColor", json!({"color": "123ABC"}));
-    assert_eq!(s.doc.settings.page_color, wordcraft_doc::Rgb::parse("123ABC"));
 }
 
 /// A document whose content is another format than its extension says opens by what it holds,

@@ -11,12 +11,14 @@ workspace = true
 [features]
 # One feature per extension crate; `full` is all of them.
 default = ["full"]
-full = ["mailings"]
+full = ["mailings", "design"]
 mailings = ["dep:wordcraft-ext-mailings"]
+design = ["dep:wordcraft-ext-design"]
 
 [dependencies]
 wordcraft-engine = { workspace = true }
 wordcraft-ext-mailings = { workspace = true, optional = true }
+wordcraft-ext-design = { workspace = true, optional = true }
 
 [dev-dependencies]
 wordcraft-engine = { workspace = true, features = ["full"] }

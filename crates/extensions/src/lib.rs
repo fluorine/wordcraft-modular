@@ -7,6 +7,8 @@
 pub fn install_all() {
     #[cfg(feature = "mailings")]
     wordcraft_ext_mailings::install();
+    #[cfg(feature = "design")]
+    wordcraft_ext_design::install();
 }
 
 #[cfg(test)]

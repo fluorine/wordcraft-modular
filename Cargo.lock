@@ -5263,6 +5263,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "wordcraft-ext-design"
+version = "0.7.0"
+dependencies = [
+ "serde_json",
+ "wordcraft-doc",
+ "wordcraft-engine",
+]
+
+[[package]]
 name = "wordcraft-ext-mailings"
 version = "0.7.0"
 dependencies = [
@@ -5281,6 +5290,7 @@ dependencies = [
  "serde_json",
  "wordcraft-doc",
  "wordcraft-engine",
+ "wordcraft-ext-design",
  "wordcraft-ext-mailings",
 ]
 
@@ -5421,6 +5431,7 @@ dependencies = [
  "unicode-bidi",
  "wordcraft-doc",
  "wordcraft-engine",
+ "wordcraft-ext-design",
  "wordcraft-ext-mailings",
  "wordcraft-extensions",
  "wordcraft-fonts",

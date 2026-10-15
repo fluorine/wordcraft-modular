@@ -11,8 +11,6 @@ pub mod column;
 #[cfg(feature = "shapes")]
 pub mod connectors;
 pub mod controls;
-#[cfg(feature = "design")]
-pub mod design;
 #[cfg(feature = "ink")]
 pub mod draw;
 pub mod edit;
@@ -97,8 +95,6 @@ pub fn registry() -> Registry {
     v.extend(crate::extensions::tag(review::specs(), "core"));
     v.extend(crate::extensions::tag(file::specs(), "core"));
     v.extend(crate::extensions::tag(options::specs(), "core"));
-    #[cfg(feature = "design")]
-    v.extend(crate::extensions::tag(design::specs(), "design"));
     #[cfg(feature = "references")]
     v.extend(crate::extensions::tag(references::specs(), "references"));
     v.extend(crate::extensions::tag(fields::specs(), "core"));

@@ -1,11 +1,13 @@
 //! Design tab: themes, style sets, colours, fonts, paragraph spacing, watermark, page colour, borders.
 
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
+
 use serde_json::{Value, json};
 use wordcraft_doc::props::{Border, BorderStyle, Borders, LineSpacing, Rgb, TextColor};
 use wordcraft_doc::{Watermark, styles};
 
-use super::sel_result;
-use crate::{CmdError, CmdResult, CommandSpec, Session, p};
+use wordcraft_engine::cmd::sel_result;
+use wordcraft_engine::{CmdError, CmdResult, CommandSpec, Session, p};
 
 /// Our own themes: (name, heading font, body font, accent colours).
 pub const THEMES: &[(&str, &str, &str, [Rgb; 6])] = &[
@@ -46,6 +48,14 @@ pub const THEMES: &[(&str, &str, &str, [Rgb; 6])] = &[
         [Rgb(0x58, 0x81, 0x57), Rgb(0x3A, 0x5A, 0x40), Rgb(0xA3, 0xB1, 0x8A), Rgb(0xDA, 0xD7, 0xCD), Rgb(0x34, 0x4E, 0x41), Rgb(0xBC, 0x6C, 0x25)],
     ),
 ];
+
+/// This extension, for [`wordcraft_engine::extensions::install`].
+pub const PROVIDER: wordcraft_engine::extensions::Provider = wordcraft_engine::extensions::Provider { id: "design", specs, hooks: Vec::new };
+
+/// Adds this extension to the registries this process builds from now on.
+pub fn install() {
+    wordcraft_engine::extensions::install(PROVIDER);
+}
 
 pub fn specs() -> Vec<CommandSpec> {
     vec![
@@ -218,7 +228,7 @@ fn watermark(s: &mut Session, v: &Value) -> CmdResult {
 /// Page borders of the caret's section (or every section with `applyTo: "document"`).
 fn page_borders(s: &mut Session, v: &Value) -> CmdResult {
     let borders = match v.get("sides") {
-        Some(sides) => Some(super::para::border_sides(sides, 24.0, 24.0)?).filter(Borders::any_visible),
+        Some(sides) => Some(wordcraft_engine::cmd::para::border_sides(sides, 24.0, 24.0)?).filter(Borders::any_visible),
         None => {
             let kind = p::str(v, "kind").unwrap_or("box");
             let width = p::f32(v, "width").unwrap_or(1.0).clamp(0.25, 6.0);
