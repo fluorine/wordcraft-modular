@@ -5,9 +5,9 @@
 use std::sync::Arc;
 
 use wordcraft_doc::numbering::{AbstractNum, Level, ListKind, Num, levels_for};
-use wordcraft_doc::para::{InlineObject, OBJ, PAGE_BREAK, Run};
+use wordcraft_doc::para::{Float, InlineObject, OBJ, PAGE_BREAK, Run, ShapeKind};
 use wordcraft_doc::props::{
-    Border, BorderStyle, Borders, CellProps, CharProps, NumRef, ParaProps, PropChange, RowProps, TextColor, Underline, VMerge, VertAlign,
+    Border, BorderStyle, Borders, CellProps, CharProps, NumRef, ParaProps, PropChange, RowProps, TextColor, Underline, VAlign, VMerge, VertAlign,
 };
 use wordcraft_doc::section::NumFormat;
 use wordcraft_doc::styles::{Style, StyleKind};
@@ -74,6 +74,29 @@ pub struct Img {
     pub w: f32,
     pub h: f32,
     pub alt: String,
+    /// Where it floats, when it isn't in line with the text (ODT anchored frames).
+    pub float: Option<Float>,
+}
+
+/// A drawing shape: a rectangle, ellipse or text box, with its text as blocks (ODT drawing
+/// shapes and text-box frames).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Shape {
+    pub kind: ShapeKind,
+    /// Size, points.
+    pub w: f32,
+    pub h: f32,
+    pub fill: Option<Rgb>,
+    pub stroke: Option<Rgb>,
+    /// Outline width, points.
+    pub stroke_width: f32,
+    pub float: Float,
+    /// Internal margins (left, top, right, bottom), EMU; `None` = Word's defaults.
+    pub inset: Option<[u32; 4]>,
+    /// Where the text sits between the shape's top and bottom.
+    pub valign: VAlign,
+    /// The shape's text; empty = no text box.
+    pub blocks: Vec<FBlock>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -91,6 +114,8 @@ pub enum Inline {
         linear: String,
         display: bool,
     },
+    /// A drawing shape anchored here.
+    Shape(Box<Shape>),
     /// A field (`PAGE`, `NUMPAGES`…) with its last result.
     Field {
         instr: String,
@@ -184,7 +209,7 @@ impl Para {
         for i in &self.inlines {
             match i {
                 Inline::Text(t, _) | Inline::Equation { linear: t, .. } | Inline::Field { result: t, .. } => s.push_str(t),
-                Inline::Image(_) | Inline::Anchor(_) | Inline::Figure(_) => {}
+                Inline::Image(_) | Inline::Anchor(_) | Inline::Figure(_) | Inline::Shape(_) => {}
             }
         }
         s
@@ -200,7 +225,7 @@ impl Para {
                     _ => s.push_str(t),
                 },
                 Inline::Equation { linear: t, .. } | Inline::Field { result: t, .. } => s.push_str(t),
-                Inline::Image(_) | Inline::Anchor(_) | Inline::Figure(_) => {}
+                Inline::Image(_) | Inline::Anchor(_) | Inline::Figure(_) | Inline::Shape(_) => {}
             }
         }
         s
@@ -483,6 +508,8 @@ struct Builder<'a> {
     doc: &'a mut Document,
     /// Revisions already in `doc` by (kind, author, date), so each change is added once.
     revs: std::collections::HashMap<(u8, RevMark), u32>,
+    /// Text boxes open around the blocks being built (shapes in shapes are bounded).
+    shape_depth: usize,
 }
 
 fn rev_key(kind: RevisionKind) -> u8 {
@@ -502,7 +529,7 @@ impl<'a> Builder<'a> {
                 revs.entry((rev_key(r.kind), mark)).or_insert(i as u32);
             }
         }
-        Builder { doc, revs }
+        Builder { doc, revs, shape_depth: 0 }
     }
 
     /// The document revision for a tracked change, added the first time it is seen.
@@ -564,8 +591,14 @@ impl<'a> Builder<'a> {
                 Inline::Image(img) => {
                     let key = self.doc.add_media(img.data.to_vec(), &img.ext);
                     let (w, h) = (finite_or(img.w, 72.0).clamp(1.0, 1584.0), finite_or(img.h, 72.0).clamp(1.0, 1584.0));
-                    let obj = InlineObject::Image { media: key, w, h, alt: img.alt.clone(), float: Default::default(), crop: [0.0; 4], ole: None };
+                    let float = img.float.clone().unwrap_or_default();
+                    let obj = InlineObject::Image { media: key, w, h, alt: img.alt.clone(), float, crop: [0.0; 4], ole: None };
                     append(&mut out, "", &CharProps::default(), Some(obj));
+                }
+                Inline::Shape(s) => {
+                    if let Some(obj) = self.shape(s) {
+                        append(&mut out, "", &CharProps::default(), Some(obj));
+                    }
                 }
                 Inline::Field { instr, result, fmt } => {
                     let result = clean_text(result);
@@ -591,6 +624,46 @@ impl<'a> Builder<'a> {
         out.normalize();
         out.touch();
         out
+    }
+
+    /// A drawing shape, its text in a text-box part of its own. `None` past [`MAX_DEPTH`] shapes
+    /// in shapes.
+    fn shape(&mut self, s: &Shape) -> Option<InlineObject> {
+        if self.shape_depth >= MAX_DEPTH {
+            return None;
+        }
+        let story = if s.blocks.is_empty() {
+            None
+        } else {
+            self.shape_depth += 1;
+            let mut blocks = self.blocks(&s.blocks, 0);
+            self.shape_depth -= 1;
+            if blocks.is_empty() {
+                blocks.push(para_block(Paragraph::new()));
+            }
+            let id = self.doc.add_part(wordcraft_doc::PartKind::TextBox, blocks);
+            if let Some(part) = self.doc.parts.get_mut(&id) {
+                part.body.inset = s.inset.map(|v| v.map(|e| e.min(wordcraft_doc::MAX_TEXT_BOX_INSET)));
+                part.body.anchor = s.valign;
+            }
+            Some(id)
+        };
+        let size = |v: f32| finite_or(v, 72.0).clamp(1.0, 1584.0);
+        let stroke_width = finite_or(s.stroke_width, 0.0).clamp(0.0, 1584.0);
+        let kind = if story.is_some() && s.kind == ShapeKind::Rectangle { ShapeKind::TextBox } else { s.kind };
+        Some(InlineObject::Shape {
+            kind,
+            w: size(s.w),
+            h: size(s.h),
+            fill: s.fill,
+            stroke: s.stroke,
+            stroke_width,
+            float: s.float.clone(),
+            story,
+            freeform: None,
+            effects: Default::default(),
+            extra: Default::default(),
+        })
     }
 
     /// A new list instance whose levels follow the kinds used in `group` (first use per level).
@@ -977,14 +1050,19 @@ fn flow_paras_in(doc: &Document, p: &Paragraph, tracked: bool) -> Vec<Para> {
                 continue;
             }
             match obj {
-                Some(InlineObject::Image { media, w, h, alt, .. }) => {
+                Some(InlineObject::Image { media, w, h, alt, float, .. }) => {
                     if !buf.is_empty() {
                         out.push_text(&std::mem::take(&mut buf), &f);
                     }
                     match doc.media.get(media) {
-                        Some(data) => {
-                            out.inlines.push(Inline::Image(Img { data: data.clone(), ext: media_ext(media, data), w: *w, h: *h, alt: alt.clone() }))
-                        }
+                        Some(data) => out.inlines.push(Inline::Image(Img {
+                            data: data.clone(),
+                            ext: media_ext(media, data),
+                            w: *w,
+                            h: *h,
+                            alt: alt.clone(),
+                            float: (float.wrap != wordcraft_doc::para::Wrap::Inline).then(|| float.clone()),
+                        })),
                         None if !alt.is_empty() => buf.push_str(alt),
                         None => {}
                     }
@@ -1169,7 +1247,7 @@ pub fn make_img(data: impl Into<Arc<Vec<u8>>>, w: Option<f32>, h: Option<f32>, a
         h *= 468.0 / w;
         w = 468.0;
     }
-    Some(Img { data, ext: ext.to_string(), w: w.clamp(1.0, 1584.0), h: h.clamp(1.0, 1584.0), alt: alt.to_string() })
+    Some(Img { data, ext: ext.to_string(), w: w.clamp(1.0, 1584.0), h: h.clamp(1.0, 1584.0), alt: alt.to_string(), float: None })
 }
 
 const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
