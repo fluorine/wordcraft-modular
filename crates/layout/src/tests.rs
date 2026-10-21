@@ -454,6 +454,8 @@ fn deleted_text_adds_no_line_break_opportunity_without_markup() {
     // "xx ab\u{ad}cdef" in a column where "xx ab-" and "abcdef" fit but "xx abcdef" does not; only
     // the soft hyphen (5..7) is track-deleted.
     let mut d = Document::from_text("xx ab\u{ad}cdef");
+    // The bundled font, so the widths are the same whatever fonts the machine has.
+    d.styles.default_chr.font = Some("Source Sans 3".into());
     d.format_range(&Pos::body(0, 5), &Pos::body(0, 7), &|c| c.del = Some(0)).unwrap();
     d.format_paragraphs(&Pos::body(0, 0), &Pos::body(0, 0), &|p| p.indent_right = Some(468.0 - 40.0)).unwrap();
     let line_starts = |hide_deleted: bool| {
@@ -490,6 +492,7 @@ fn hidden_text_adds_no_line_break_opportunity_when_not_shown() {
     // but "xx abcdef" does not. Measured in Word (hidden text not printed): "xx" / "abcdef" both times.
     for hidden in ["\u{ad}", " "] {
         let mut d = Document::from_text(&format!("xx ab{hidden}cdef"));
+        d.styles.default_chr.font = Some("Source Sans 3".into());
         let end = 5 + hidden.len();
         d.format_range(&Pos::body(0, 5), &Pos::body(0, end), &|c| c.hidden = Some(true)).unwrap();
         d.format_paragraphs(&Pos::body(0, 0), &Pos::body(0, 0), &|p| p.indent_right = Some(468.0 - 40.0)).unwrap();
@@ -3523,6 +3526,113 @@ fn text_boxes_show_in_headers_footers_cells_and_notes() {
     assert_eq!(l.header_footer_text_box_at(0, r.x + 5.0, r.y + 5.0), Some(inline));
 }
 
+/// A float placed `y` points down from its paragraph's top, with text wrapping around it.
+fn para_float(y: f32) -> wordcraft_doc::para::Float {
+    wordcraft_doc::para::Float { wrap: wordcraft_doc::para::Wrap::Square, v_rel: wordcraft_doc::para::Anchor::Paragraph, y, ..Default::default() }
+}
+
+/// The first paragraph whose caret is at least `y` down page 1.
+fn first_para_below(l: &DocLayout, n: usize, y: f32) -> usize {
+    (0..n).find(|i| l.caret(&Pos::body(*i, 0)).is_some_and(|c| c.page == 0 && c.top >= y)).expect("a paragraph low on page 1")
+}
+
+#[test]
+fn a_paragraph_whose_float_would_run_past_the_bottom_margin_moves_with_it() {
+    // As LibreOffice lays it out: the paragraph and its picture start the next page instead of
+    // the picture running over the footer.
+    let n = 60;
+    let mut d = Document::from_text(&"Body paragraph.\n".repeat(n));
+    let at = first_para_below(&lay(&d), n, 600.0);
+    let id = text_box_at(&mut d, &Pos::body(at, 0), "Picture", 200.0, 200.0, para_float(0.0));
+    let l = lay(&d);
+    let b = l.text_box(id, 0).expect("placed");
+    assert_eq!(b.page, 1);
+    assert_eq!(l.caret(&Pos::body(at, 0)).map(|c| c.page), Some(1));
+    assert_eq!(l.caret(&Pos::body(at - 1, 0)).map(|c| c.page), Some(0));
+    let s = &d.last_section;
+    assert!(b.rect.y + b.rect.h <= s.page_h - s.margin_bottom, "{:?}", b.rect);
+    // A float that fits where it is keeps its paragraph there.
+    let mut d = Document::from_text(&"Body paragraph.\n".repeat(n));
+    let id = text_box_at(&mut d, &Pos::body(at, 0), "Small", 40.0, 20.0, para_float(0.0));
+    let l = lay(&d);
+    assert_eq!(l.text_box(id, 0).map(|b| b.page), Some(0));
+    assert_eq!(l.caret(&Pos::body(at, 0)).map(|c| c.page), Some(0));
+}
+
+#[test]
+fn a_float_taller_than_the_page_does_not_move_its_paragraph() {
+    // An empty page wouldn't hold it either: it stays (and pages still end).
+    let n = 60;
+    let mut d = Document::from_text(&"Body paragraph.\n".repeat(n));
+    let at = first_para_below(&lay(&d), n, 600.0);
+    text_box_at(&mut d, &Pos::body(at, 0), "Huge", 200.0, 900.0, para_float(0.0));
+    let l = lay(&d);
+    assert_eq!(l.caret(&Pos::body(at, 0)).map(|c| c.page), Some(0));
+}
+
+#[test]
+fn keep_with_next_counts_the_next_paragraphs_float() {
+    // A heading kept with a paragraph whose picture moves it to the next page goes along.
+    let n = 60;
+    let mut d = Document::from_text(&"Body paragraph.\n".repeat(n));
+    let at = first_para_below(&lay(&d), n, 600.0);
+    text_box_at(&mut d, &Pos::body(at, 0), "Picture", 200.0, 200.0, para_float(0.0));
+    let heading = at - 1;
+    if let Some(Block::Para(p)) = d.body.get_mut(heading).map(Arc::make_mut) {
+        p.props.keep_next = Some(true);
+    }
+    let l = lay(&d);
+    assert_eq!(l.caret(&Pos::body(heading, 0)).map(|c| c.page), Some(1));
+    assert_eq!(l.caret(&Pos::body(at, 0)).map(|c| c.page), Some(1));
+}
+
+#[test]
+fn a_rotated_float_moves_its_paragraph_by_its_rotated_bounds() {
+    // Unrotated, a wide flat box fits; turned upright it runs past the bottom margin.
+    let n = 60;
+    let mut d = Document::from_text(&"Body paragraph.\n".repeat(n));
+    // The bundled font, so the widths are the same whatever fonts the machine has.
+    d.styles.default_chr.font = Some("Source Sans 3".into());
+    let at = first_para_below(&lay(&d), n, 600.0);
+    let id = text_box_at(&mut d, &Pos::body(at, 0), "Picture", 200.0, 20.0, wordcraft_doc::para::Float { rot: 90.0, ..para_float(0.0) });
+    let l = lay(&d);
+    assert_eq!(l.caret(&Pos::body(at, 0)).map(|c| c.page), Some(1));
+    assert_eq!(l.text_box(id, 0).map(|b| b.page), Some(1));
+}
+
+#[test]
+fn keep_with_next_chains_count_each_kept_paragraphs_float() {
+    // A heading kept with a kept paragraph whose picture moves it goes along with it.
+    let n = 60;
+    let mut d = Document::from_text(&"Body paragraph.\n".repeat(n));
+    let at = first_para_below(&lay(&d), n, 600.0);
+    text_box_at(&mut d, &Pos::body(at, 0), "Picture", 200.0, 200.0, para_float(0.0));
+    for i in [at - 1, at] {
+        if let Some(Block::Para(p)) = d.body.get_mut(i).map(Arc::make_mut) {
+            p.props.keep_next = Some(true);
+        }
+    }
+    let l = lay(&d);
+    assert_eq!(l.caret(&Pos::body(at, 0)).map(|c| c.page), Some(1));
+    assert_eq!(l.caret(&Pos::body(at - 1, 0)).map(|c| c.page), Some(1));
+}
+
+#[test]
+fn keep_with_next_ignores_a_float_left_out_of_the_layout() {
+    // A float in hidden text is not placed, so a kept heading doesn't move for it.
+    let n = 60;
+    let mut d = Document::from_text(&"Body paragraph.\n".repeat(n));
+    let at = first_para_below(&lay(&d), n, 600.0);
+    let hidden = wordcraft_doc::CharProps { hidden: Some(true), ..Default::default() };
+    d.insert_object(&Pos::body(at, 0), rect_shape(200.0, 200.0, para_float(0.0)), &hidden).unwrap();
+    if let Some(Block::Para(p)) = d.body.get_mut(at - 1).map(Arc::make_mut) {
+        p.props.keep_next = Some(true);
+    }
+    let l = lay(&d);
+    assert_eq!(l.caret(&Pos::body(at - 1, 0)).map(|c| c.page), Some(0));
+    assert_eq!(l.caret(&Pos::body(at, 0)).map(|c| c.page), Some(0));
+}
+
 #[test]
 fn footnotes_inside_text_boxes_are_numbered_and_placed() {
     let mut d = Document::from_text(&"Body text line.\n".repeat(30));
@@ -5704,7 +5814,12 @@ fn wrapped_shape_doc(kind: wordcraft_doc::para::ShapeKind, w: f32, h: f32, float
 #[test]
 fn tight_wrap_follows_an_ellipse() {
     use wordcraft_doc::para::{Float, ShapeKind, Wrap};
-    let spans = |wrap| line_spans(&lay(&wrapped_shape_doc(ShapeKind::Ellipse, 160.0, 160.0, Float { wrap, ..Default::default() })));
+    let spans = |wrap| {
+        let mut d = wrapped_shape_doc(ShapeKind::Ellipse, 160.0, 160.0, Float { wrap, ..Default::default() });
+        // The bundled font, so the lines are the same whatever fonts the machine has.
+        d.styles.default_chr.font = Some("Source Sans 3".into());
+        line_spans(&lay(&d))
+    };
     let (square, tight, through) = (spans(Wrap::Square), spans(Wrap::Tight), spans(Wrap::Through));
     // Square: every line beside the shape starts past its frame and distance from text.
     assert!(square.iter().filter(|l| l.0 < 160.0).all(|l| l.2 >= 169.0 - 0.01), "{square:?}");

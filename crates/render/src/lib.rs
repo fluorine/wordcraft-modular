@@ -1577,40 +1577,39 @@ mod tests {
     #[test]
     fn legacy_font_effects_are_drawn() {
         use wordcraft_doc::CharProps;
-        // Dark and grey pixel counts, and the grey pixels' mean offset from the dark ones.
         let shot = |c: CharProps| {
             let mut d = Document::from_text("x");
-            let cp = CharProps { size: Some(40.0), bold: Some(true), ..c };
+            // The bundled font, so the glyphs are the same whatever fonts the machine has.
+            let cp = CharProps { font: Some("Source Sans 3".into()), size: Some(40.0), bold: Some(true), ..c };
             d.body = vec![wordcraft_doc::para_block(wordcraft_doc::Paragraph::with_text("HHHH", cp))];
             let l = layout(&d, &mut LayoutCache::new(), &LayoutOptions::default());
-            let img = render_page(&d, &l.pages[0], 2.0, &RenderOptions::default());
-            let (mut dark, mut grey) = ((0.0, 0.0, 0.0f64), (0.0, 0.0, 0.0f64));
-            for (x, y) in (100..800).flat_map(|x| (100..300).map(move |y| (x, y))) {
-                let v = img.pixel(x, y)[0];
-                // The copy is solid RGB 128; a wider range would count the glyph's own
-                // antialiasing, whose centroid hides the copy's offset on some fonts.
-                let acc = match v {
-                    0..60 => &mut dark,
-                    120..=136 => &mut grey,
-                    _ => continue,
-                };
-                *acc = (acc.0 + 1.0, acc.1 + f64::from(x), acc.2 + f64::from(y));
-            }
-            let mean = |a: (f64, f64, f64)| (a.1 / a.0.max(1.0), a.2 / a.0.max(1.0));
-            let ((dx, dy), (gx, gy)) = (mean(dark), mean(grey));
-            (dark.0, grey.0, (gx - dx, gy - dy))
+            render_page(&d, &l.pages[0], 2.0, &RenderOptions::default())
         };
-        let (plain_dark, plain_grey, _) = shot(CharProps::default());
+        let pixels = || (100..800).flat_map(|x| (100..300).map(move |y| (x, y)));
+        // Pixel count and mean position of the pixels `keep` picks.
+        let centroid = |keep: &dyn Fn(u32, u32) -> bool| {
+            let (n, sx, sy) =
+                pixels().filter(|&(x, y)| keep(x, y)).fold((0.0, 0.0, 0.0f64), |(n, sx, sy), (x, y)| (n + 1.0, sx + f64::from(x), sy + f64::from(y)));
+            (n, sx / f64::max(n, 1.0), sy / f64::max(n, 1.0))
+        };
+        let plain = shot(CharProps::default());
+        let (plain_dark, dx, dy) = centroid(&|x, y| plain.pixel(x, y)[0] < 60);
         assert!(plain_dark > 2000.0, "plain {plain_dark}");
-        let (dark, _, _) = shot(CharProps { outline: Some(true), ..Default::default() });
+        let outline = shot(CharProps { outline: Some(true), ..Default::default() });
+        let (dark, _, _) = centroid(&|x, y| outline.pixel(x, y)[0] < 60);
         assert!(dark < plain_dark / 3.0, "outline is hollow: {dark} vs {plain_dark}");
         for (c, sign) in [
             (CharProps { shadow: Some(true), ..Default::default() }, 1.0),
             (CharProps { emboss: Some(true), ..Default::default() }, 1.0),
             (CharProps { engrave: Some(true), ..Default::default() }, -1.0),
         ] {
-            let (_, grey, (ox, oy)) = shot(c);
-            assert!(grey > plain_grey * 2.0, "a grey copy: {grey} vs {plain_grey}");
+            // The grey copy (solid RGB 128) where the plain text leaves paper: the part the
+            // letters don't cover, on the copy's side of them whatever the font. Counting grey
+            // pixels anywhere would count the letters' own antialiasing too.
+            let img = shot(c);
+            let (grey, gx, gy) = centroid(&|x, y| (120..=136).contains(&img.pixel(x, y)[0]) && plain.pixel(x, y)[0] > 250);
+            let (ox, oy) = (gx - dx, gy - dy);
+            assert!(grey > 500.0, "a grey copy: {grey}");
             assert!(ox * sign > 1.0 && oy * sign > 1.0, "grey copy offset {ox} {oy}");
         }
     }

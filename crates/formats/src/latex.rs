@@ -266,6 +266,10 @@ impl Writer {
                 }
                 Inline::Anchor(name) => o.push_str(&format!("\\hypertarget{{{}}}{{}}", escape_url(name))),
                 Inline::Figure(_) => {}
+                Inline::Field { result, fmt, .. } => {
+                    let s = self.span(result, fmt);
+                    o.push_str(&s);
+                }
                 Inline::Equation { linear, display } => {
                     self.uses.math = true;
                     let src = linear_to_latex(linear);
