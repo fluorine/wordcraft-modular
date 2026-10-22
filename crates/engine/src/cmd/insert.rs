@@ -889,9 +889,11 @@ fn japanese_numeral(n: usize) -> String {
 /// weekday.
 ///
 /// Besides the Gregorian items, the Japanese ones of [MS-OE376] 2.16.4.1 are supported: `g`/`gg`/
-/// `ggg` (and any longer run) the era's Latin initial, its one kanji and its full name; `e`/`ee`
-/// and their other spelling `n`/`nn` the era year; `A`, `O`, `C` and `I` the day, month, seconds
-/// and minutes in Japanese numerals; `aaa`/`aaaa` the weekday's one kanji and its full name.
+/// `ggg` the era's Latin initial, its one kanji and its full name, a longer run grouped from the
+/// left (`ggg`, then `gg`, then `g`); `e`/`ee` and their other spelling `n`/`nn` the era year,
+/// grouped the same way (`ee`, then `e`); `A`, `O`, `C` and `I` the day, month, seconds and minutes
+/// in Japanese numerals, repeated for each instance; `aaa`/`aaaa` the weekday's one kanji and its
+/// full name.
 pub fn format_date_parts(fmt: &str, y: i64, m: usize, d: u32, (hh, mm, ss): (u32, u32, u32), days_since: i64) -> String {
     const MONTHS: [&str; 12] =
         ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -925,9 +927,10 @@ pub fn format_date_parts(fmt: &str, y: i64, m: usize, d: u32, (hh, mm, ss): (u32
             continue;
         }
         // `A/P` (or `a/p`) is the other spelling of that token, and must be read before `A`, which
-        // is the Japanese day numeral ([MS-OE376] 2.16.4.1).
+        // is the Japanese day numeral ([MS-OE376] 2.16.4.1). The short spelling is Word's single
+        // letter, in the case the picture gives it.
         if chars.get(i..i + 3).is_some_and(|w| w.iter().collect::<String>().eq_ignore_ascii_case("a/p")) {
-            out.push_str(if hh < 12 { "AM" } else { "PM" });
+            out.push(if hh < 12 { c } else { chars.get(i + 2).copied().unwrap_or('P') });
             i += 3;
             continue;
         }
@@ -955,20 +958,33 @@ pub fn format_date_parts(fmt: &str, y: i64, m: usize, d: u32, (hh, mm, ss): (u32
             ('s', 2..) => out.push_str(&format!("{ss:02}")),
             ('s', _) => out.push_str(&ss.to_string()),
             // Japanese era items ([MS-OE376] 2.16.4.1): `g` the Latin initial, `gg` one kanji,
-            // `ggg` (and any longer run) the full name; `e`/`ee` and their other spelling `n`/`nn`
-            // the era year. The reference composes a longer run into groups from the left
-            // (`ggg` + `g`); like `MMMMM`/`yyyyy` here, the longest form renders once.
-            ('g', 1) => out.push_str(&era_g),
-            ('g', 2) => out.push_str(&era_gg),
-            ('g', 3..) => out.push_str(&era_ggg),
-            ('e' | 'n', 1) => out.push_str(&era_e),
-            ('e' | 'n', 2..) => out.push_str(&era_ee),
-            // Japanese numerals in counting form: day, month, seconds and minutes. A longer run
-            // renders the item once, as the other items here do.
-            ('A', _) => out.push_str(&japanese_numeral(d as usize)),
-            ('O', _) => out.push_str(&japanese_numeral(m)),
-            ('C', _) => out.push_str(&japanese_numeral(ss as usize)),
-            ('I', _) => out.push_str(&japanese_numeral(mm as usize)),
+            // `ggg` the full name. A longer run is grouped from the left as the reference says
+            // (`ggg` first, then `gg`, then `g`), so `gggg` is 令和 followed by R.
+            ('g', _) => {
+                for _ in 0..n / 3 {
+                    out.push_str(&era_ggg);
+                }
+                match n % 3 {
+                    2 => out.push_str(&era_gg),
+                    1 => out.push_str(&era_g),
+                    _ => {}
+                }
+            }
+            // `e`/`ee` and their other spelling `n`/`nn` the era year, grouped `ee` then `e`.
+            ('e' | 'n', _) => {
+                for _ in 0..n / 2 {
+                    out.push_str(&era_ee);
+                }
+                if n % 2 == 1 {
+                    out.push_str(&era_e);
+                }
+            }
+            // Japanese numerals in counting form: day, month, seconds and minutes. Every instance
+            // repeats the content, as the reference specifies (`AA` is 十七十七).
+            ('A', _) => out.push_str(&japanese_numeral(d as usize).repeat(n)),
+            ('O', _) => out.push_str(&japanese_numeral(m).repeat(n)),
+            ('C', _) => out.push_str(&japanese_numeral(ss as usize).repeat(n)),
+            ('I', _) => out.push_str(&japanese_numeral(mm as usize).repeat(n)),
             // `aaa` the weekday's one kanji, `aaaa` its full name. Word gates both on the run's
             // `w:lang` (ja-JP or ko-KR; literal text otherwise); the picture here has no run
             // language and the user wrote the item, so it renders.
@@ -1425,10 +1441,17 @@ mod tests {
         assert_eq!(jp("ge.m.d", 2026, 10, 17), "R8.5.17");
         assert_eq!(jp("ggge年", 1989, 1, 7), "昭和64年");
         assert_eq!(jp("g gg ggg", 2026, 10, 17), "R 令 令和");
+        // A longer run is grouped from the left: `gggg` is `ggg` + `g`, `ggggg` is `ggg` + `gg`.
+        assert_eq!(jp("gggg", 2026, 10, 17), "令和R");
+        assert_eq!(jp("ggggg", 2026, 10, 17), "令和令");
+        assert_eq!(jp("gggggg", 2026, 10, 17), "令和令和");
+        assert_eq!(jp("eee", 2026, 10, 17), "088", "`ee` + `e`");
+        assert_eq!(jp("eeee", 2026, 10, 17), "0808");
         assert_eq!(jp("ggge年", 1912, 7, 29), "明治45年");
         // `n`/`nn` are `e`/`ee` under the reference's other spelling.
         assert_eq!(jp("gggn年", 2026, 10, 17), "令和8年");
         assert_eq!(jp("gggnn年", 2026, 10, 17), "令和08年");
+        assert_eq!(jp("nnn", 2026, 10, 17), "088");
     }
 
     /// The era changes are day-accurate: each side of every boundary has its own era and year.
@@ -1482,6 +1505,11 @@ mod tests {
         assert_eq!(format_date_parts("C", 2026, 10, 17, (13, 5, 31), 0), "三十一");
         assert_eq!(format_date_parts("I", 2026, 10, 17, (13, 27, 9), 0), "二十七");
         assert_eq!(format_date_parts("I:C", 2026, 10, 17, (13, 0, 0), 0), "零:零", "zero is 零");
+        // Every instance repeats the content, as the reference specifies.
+        assert_eq!(jp("AA", 2026, 10, 17), "十七十七");
+        assert_eq!(jp("OO", 2026, 10, 17), "十十");
+        assert_eq!(format_date_parts("CC", 2026, 10, 17, (13, 5, 31), 0), "三十一三十一");
+        assert_eq!(format_date_parts("II", 2026, 10, 17, (13, 27, 9), 0), "二十七二十七");
     }
 
     /// The weekday items: `aaa` the one kanji, `aaaa` the full name, both from `days_since`
@@ -1510,17 +1538,20 @@ mod tests {
         // A quoted literal still passes through as it did (quotes are not a token here).
         assert_eq!(jp(r#""No. " dddd"#, 2026, 10, 17), r#""No. " Saturday"#);
         // A longer run of `g` does not change the meaning of the tokens after it.
-        assert_eq!(jp("gggg M/d/yyyy", 2026, 10, 17), "令和 10/17/2026");
-        assert_eq!(jp("gggge年M月d日", 2026, 10, 17), "令和8年10月17日");
+        assert_eq!(jp("gggg M/d/yyyy", 2026, 10, 17), "令和R 10/17/2026");
+        assert_eq!(jp("gggge年M月d日", 2026, 10, 17), "令和R8年10月17日");
     }
 
     /// `A/P` is Word's other spelling of the AM/PM token, read before `A`, the Japanese day
     /// numeral ([MS-OE376] 2.16.4.1); the day item therefore needs no other delimiter.
     #[test]
     fn am_pm_can_be_spelled_a_slash_p() {
-        assert_eq!(jp("h:mm A/P", 2026, 10, 17), "1:05 PM");
-        assert_eq!(format_date_parts("h:mm A/P", 2026, 10, 17, (9, 5, 0), 0), "9:05 AM");
-        assert_eq!(format_date_parts("h:mm a/p", 2026, 10, 17, (9, 5, 0), 0), "9:05 AM");
+        assert_eq!(jp("h:mm A/P", 2026, 10, 17), "1:05 P");
+        assert_eq!(format_date_parts("h:mm A/P", 2026, 10, 17, (9, 5, 0), 0), "9:05 A");
+        assert_eq!(format_date_parts("h:mm a/p", 2026, 10, 17, (9, 5, 0), 0), "9:05 a");
+        // The short spelling is one letter, in the picture's case, chosen from the hour.
+        assert_eq!(format_date_parts("h:mm A/P", 2026, 10, 17, (12, 0, 0), 0), "12:00 P");
+        assert_eq!(format_date_parts("h:mm a/p", 2026, 10, 17, (13, 5, 0), 0), "1:05 p");
         assert_eq!(jp("A日", 2026, 10, 17), "十七日");
     }
 }
