@@ -1035,11 +1035,9 @@ fn lines(
                     });
                 }
             }
-            // 縦中横 glyphs are placed across the line one by one: a decoration along the run's
-            // line span would cut across them (Word draws it under each upright glyph instead).
-            if down && rc.vert {
-                continue;
-            }
+            // 縦中横 glyphs are placed across the line one by one, so a decoration along the run's
+            // line span is not Word's per-upright-glyph one; draw it along the span until that is
+            // done, or the run loses its underline, strikethrough and tracked-change marks.
             // Decorations across the run (underline skips trailing spaces of the line). Right-to-left
             // text inside a run can split it into several visual spans.
             let mut end_k = run_end;

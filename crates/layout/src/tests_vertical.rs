@@ -3,7 +3,7 @@
 
 use super::*;
 use wordcraft_doc::Pos;
-use wordcraft_doc::props::{CharProps, EastAsianLayout};
+use wordcraft_doc::props::{CharProps, EastAsianLayout, Underline};
 
 fn lay(doc: &Document) -> DocLayout {
     let mut c = LayoutCache::new();
@@ -221,6 +221,62 @@ fn tate_chu_yoko_stands_upright_across_a_top_to_bottom_line() {
     let hdraws = display::page_display(&h, &hl.pages[0], &Default::default());
     assert!(hdraws.iter().all(|d| !matches!(d, display::Draw::Turned { .. })), "horizontal text is not turned");
     assert!(hdraws.iter().all(|d| !matches!(d, display::Draw::Rotated { .. })), "horizontal text draws no upright glyphs of its own");
+}
+
+/// A `vert` run keeps its decorations and tracked-change marks: its underline, strikethrough and
+/// double strike, a deleted run's strike and an inserted run's underline each still emit a
+/// [`display::Draw::Line`]. Drawn along the run's line span (Word draws them under each upright
+/// glyph); skipping the block left a deleted or inserted `vert` run looking like ordinary text.
+#[test]
+fn tate_chu_yoko_keeps_its_decorations_and_revision_marks() {
+    let text = "12";
+    // The whole run, marked `vert`, carrying `f`'s formatting.
+    let vert_doc = |f: &dyn Fn(&mut CharProps)| -> Document {
+        let mut d = Document::from_text(text);
+        d.last_section.text_direction = TextDirection::Down;
+        let p = d.para_mut(StoryRef::Body, &Path::top(0)).unwrap();
+        p.format(0, text.len(), &|c: &mut CharProps| {
+            c.east_asian_layout = Some(EastAsianLayout { vert: Some(true), ..Default::default() });
+            f(c);
+        })
+        .unwrap();
+        d
+    };
+    // The lines drawn inside the turned line's frame, the run's decorations: x0, y0, x1, y1, stroke.
+    let lines = |d: &Document| -> Vec<(f32, f32, f32, f32, display::Stroke)> {
+        let l = lay(d);
+        display::page_display(d, &l.pages[0], &Default::default())
+            .into_iter()
+            .flat_map(|x| match x {
+                display::Draw::Turned { items, .. } => items,
+                _ => Vec::new(),
+            })
+            .filter_map(|i| if let display::Draw::Line { x0, y0, x1, y1, stroke, .. } = i { Some((x0, y0, x1, y1, stroke)) } else { None })
+            .collect()
+    };
+    let underline = lines(&vert_doc(&|c: &mut CharProps| c.underline = Some(Underline::Single)));
+    assert_eq!(underline.len(), 1, "an underlined vert run draws its line: {underline:?}");
+    let (x0, uy, x1, uy1, stroke) = underline[0];
+    assert!(x1 > x0 && uy1 == uy, "the underline runs along the line: {underline:?}");
+    assert_eq!(stroke, display::Stroke::Solid, "{underline:?}");
+    let strike = lines(&vert_doc(&|c: &mut CharProps| c.strike = Some(true)));
+    assert_eq!(strike.len(), 1, "a struck vert run draws its line: {strike:?}");
+    assert!(strike[0].1 < uy, "the strike sits above the underline across the line: {strike:?} {underline:?}");
+    let double = lines(&vert_doc(&|c: &mut CharProps| c.double_strike = Some(true)));
+    assert_eq!(double.len(), 1, "a double-struck vert run draws its line: {double:?}");
+    assert_eq!(double[0].4, display::Stroke::Double, "{double:?}");
+    // A tracked deletion is struck through and an insertion underlined (the default marks), where
+    // the run's own decoration goes.
+    let mut deleted = vert_doc(&|c: &mut CharProps| c.del = Some(0));
+    deleted.revisions.push(wordcraft_doc::Revision::new(wordcraft_doc::RevisionKind::Delete, "Ana", ""));
+    let deletion = lines(&deleted);
+    assert_eq!(deletion.len(), 1, "a deleted vert run is struck through: {deletion:?}");
+    assert!((deletion[0].1 - strike[0].1).abs() < 0.01, "the deletion mark sits where the strike does: {deletion:?} {strike:?}");
+    let mut inserted = vert_doc(&|c: &mut CharProps| c.ins = Some(0));
+    inserted.revisions.push(wordcraft_doc::Revision::new(wordcraft_doc::RevisionKind::Insert, "Ana", ""));
+    let insertion = lines(&inserted);
+    assert_eq!(insertion.len(), 1, "an inserted vert run is underlined: {insertion:?}");
+    assert!((insertion[0].1 - uy).abs() < 0.01, "the insertion mark sits where the underline does: {insertion:?} {underline:?}");
 }
 
 #[test]
