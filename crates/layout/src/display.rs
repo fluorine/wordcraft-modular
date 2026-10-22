@@ -1155,7 +1155,12 @@ fn lines(
                 if down && rc.vert {
                     // 縦中横: the run across the line, upright (see [`tate_chu_yoko`]).
                     let start = x + line.cl_left(run_start).unwrap_or(0.0);
-                    let end = x + line.cl_left(run_end).unwrap_or(0.0);
+                    // A bidirectional line's visible boxes stop at its last cluster: a run that
+                    // ends the line ends at that cluster's trailing edge, not at zero.
+                    let end = x + match line.vis.last() {
+                        Some(last) if run_end == line.c1 => last.trailing(),
+                        _ => line.cl_left(run_end).unwrap_or(0.0),
+                    };
                     out.extend(tate_chu_yoko(
                         st.face,
                         st.size,
@@ -2002,11 +2007,11 @@ fn canvas_background(rect: Rect, c: &wordcraft_doc::para::CanvasStyle) -> Draw {
 /// Draws a horizontal-in-vertical run (`w:eastAsianLayout/@w:vert`, 縦中横) in top-to-bottom text:
 /// Word turns the run 90 degrees left from the way vertical text lies, so its characters stand
 /// upright side by side across the line, reading left to right, inside the length the run takes
-/// along the line (a pair of half-width digits fits one character's height). Every glyph is drawn
-/// on its own in a frame turned -90° about the em square the page's +90° turn cancels. `start` and
-/// `end` are the run's extent along the line (page coordinates of the unturned frame), `base` its
-/// baseline. The glyphs, text and ranges are the run's, as [`lines`] built them; `x_scale` is the
-/// run's character scale (`w:w`), applied to each glyph as elsewhere.
+/// along the line (a pair of half-width digits fits one character's height). Every cluster is
+/// drawn on its own in a frame turned -90° about the em square the page's +90° turn cancels. `start`
+/// and `end` are the run's extent along the line (page coordinates of the unturned frame), `base`
+/// its baseline. The glyphs, text and ranges are the run's, as [`lines`] built them; `x_scale` is
+/// the run's character scale (`w:w`), applied to each glyph as elsewhere.
 fn tate_chu_yoko(
     face: FaceRef,
     size: f32,
@@ -2024,33 +2029,51 @@ fn tate_chu_yoko(
     end: f32,
     base: f32,
 ) -> Vec<Draw> {
-    let n = glyphs.len();
+    // One slot per cluster: a cluster shaped to several glyphs (a base letter and its combining
+    // mark, a field result's letters) stands in one slot, its glyphs keeping their places in it,
+    // and its text is drawn once.
+    let mut slots: Vec<std::ops::Range<usize>> = Vec::with_capacity(glyphs.len());
+    for i in 0..glyphs.len() {
+        match slots.last_mut() {
+            Some(last) if ranges.get(i).is_some() && ranges.get(i) == ranges.get(last.start) => last.end = i + 1,
+            _ => slots.push(i..i + 1),
+        }
+    }
+    let n = slots.len();
     let len = (end - start).max(0.0);
-    // One slot per glyph across the run's length; a pair of half-width digits makes one character.
+    // One slot per cluster across the run's length; a pair of half-width digits makes one character.
     let step = if n > 0 && len > 0.0 { len / n as f32 } else { size };
     // The em square's centre across the line, where upright East Asian characters put it.
     let across = base - size * 0.38;
-    // The run's centre along the line: every glyph is drawn there, across the line.
+    // The run's centre along the line: every cluster is drawn there, across the line.
     let cx = start + len / 2.0;
     let mut out = Vec::with_capacity(n);
-    for (k, (gid, _, _)) in glyphs.iter().enumerate() {
-        // Reading order runs left to right on the turned page, so the first character is the
-        // leftmost: x of a glyph is `turn origin - cy`, and frame y grows toward the line's start.
-        let cy = across + (n as f32 - 1.0) * 0.5 * step - k as f32 * step;
-        // The glyph's own advance centres its ink in its em square (`size` when it is the only
-        // glyph and there is no next one to measure against).
-        let advance = match (glyphs.get(k + 1), glyphs.get(k)) {
-            (Some(next), Some(g)) => (g.1 - next.1).abs(),
-            _ => match (glyphs.get(k), k.checked_sub(1).and_then(|p| glyphs.get(p))) {
-                (Some(g), Some(prev)) => (g.1 - prev.1).abs(),
-                _ => size,
-            },
+    for (k, slot) in slots.iter().enumerate() {
+        let Some(&first) = glyphs.get(slot.start) else { continue };
+        // The cluster's advance along the line, which centres its ink in its em square: up to the
+        // next cluster's first glyph, else the cluster's own width from the face (a lone half-width
+        // digit is narrower than a whole em), so the glyph does not shift along the line.
+        let advance = match glyphs.get(slot.end) {
+            Some(next) => (first.1 - next.1).abs(),
+            None => slot
+                .clone()
+                .filter_map(|i| {
+                    glyphs.get(i).map(|&(gid, gx, _)| gx + face.advance(gid) as f32 * size / face.upem.max(1.0) as f32 * x_scale - first.1)
+                })
+                .fold(0.0, f32::max)
+                .abs(),
         };
-        let (pen_x, pen_y) = (cx - advance / 2.0, cy + size * 0.38);
-        let (t, range) = match ranges.get(k).and_then(|r| text.get(r.clone())) {
+        // Reading order runs left to right on the turned page, so the first cluster is the
+        // leftmost: x of a cluster is `turn origin - cy`, and frame y grows toward the line's start.
+        let cy = across + (n as f32 - 1.0) * 0.5 * step - k as f32 * step;
+        let (t, range) = match ranges.get(slot.start).and_then(|r| text.get(r.clone())) {
             Some(t) => (t.to_string(), 0..t.len()),
             None => (String::new(), 0..0),
         };
+        let items = slot
+            .clone()
+            .filter_map(|i| glyphs.get(i).map(|&(gid, gx, gy)| (gid, cx - advance / 2.0 + (gx - first.1), cy + size * 0.38 + (gy - first.2))))
+            .collect();
         out.push(Draw::Rotated {
             cx,
             cy,
@@ -2058,14 +2081,14 @@ fn tate_chu_yoko(
             items: vec![Draw::Glyphs {
                 face,
                 size,
-                glyphs: vec![(*gid, pen_x, pen_y)],
+                glyphs: items,
                 color,
                 alpha,
                 synth_bold,
                 synth_italic,
                 text: t,
                 link: link.clone(),
-                ranges: vec![range],
+                ranges: vec![range.clone(); slot.end - slot.start],
                 text_bg,
                 x_scale,
             }],

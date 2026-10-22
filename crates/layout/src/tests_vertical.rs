@@ -29,6 +29,36 @@ fn body_lines(l: &DocLayout) -> Vec<(f32, f32, TextDirection)> {
         .collect()
 }
 
+/// Body paragraph `i`'s laid-out lines, on the page they are drawn on.
+fn para_of(l: &DocLayout, i: usize) -> std::sync::Arc<ParaLayout> {
+    for page in &l.pages {
+        for it in &page.items {
+            if let Placed::Lines { para, path, .. } = it
+                && path.0 == [i as u32]
+            {
+                return para.clone();
+            }
+        }
+    }
+    panic!("paragraph {i} is laid out");
+}
+
+/// The upright glyphs drawn inside a page's turned lines: their text, page x and y, and spin.
+fn rotated_marks(draws: &[display::Draw]) -> Vec<(String, f32, f32, f32)> {
+    let mut out = Vec::new();
+    for d in draws {
+        let display::Draw::Turned { x, y, turn, items } = d else { continue };
+        for it in items {
+            let display::Draw::Rotated { cx, cy, spin, items } = it else { continue };
+            let t: String =
+                items.iter().filter_map(|i| if let display::Draw::Glyphs { text, .. } = i { Some(text.as_str()) } else { None }).collect();
+            let (px, py) = crate::turn_point(*turn, *x, *y, *cx, *cy);
+            out.push((t, px, py, spin.deg));
+        }
+    }
+    out
+}
+
 #[test]
 fn top_to_bottom_section_stacks_lines_from_the_right() {
     let d = vertical_doc(TextDirection::Down);
@@ -127,21 +157,11 @@ fn tate_chu_yoko_stands_upright_across_a_top_to_bottom_line() {
     d.last_section.text_direction = TextDirection::Down;
     mark(&mut d, true);
     let l = lay(&d);
-    let para = |l: &DocLayout| {
-        l.pages[0]
-            .items
-            .iter()
-            .find_map(|it| match it {
-                Placed::Lines { para, path, .. } if path.0 == [0] => Some(para.clone()),
-                _ => None,
-            })
-            .expect("the paragraph's lines")
-    };
-    let pl = para(&l);
+    let pl = para_of(&l, 0);
     // The layout is unchanged: the digits keep their shaped advances along the line.
     let mut off_doc = d.clone();
     mark(&mut off_doc, false);
-    let off_pl = para(&lay(&off_doc));
+    let off_pl = para_of(&lay(&off_doc), 0);
     assert_eq!(
         pl.clusters.iter().map(|c| (c.start, c.adv)).collect::<Vec<_>>(),
         off_pl.clusters.iter().map(|c| (c.start, c.adv)).collect::<Vec<_>>(),
@@ -157,21 +177,7 @@ fn tate_chu_yoko_stands_upright_across_a_top_to_bottom_line() {
     // The display turns the two digits upright, side by side across the line: one page height,
     // the first left of the second by half the pair's length.
     let draws = display::page_display(&d, &l.pages[0], &Default::default());
-    let rotated = |draws: &[display::Draw]| -> Vec<(String, f32, f32, f32)> {
-        let mut out = Vec::new();
-        for d in draws {
-            let display::Draw::Turned { x, y, turn, items } = d else { continue };
-            for it in items {
-                let display::Draw::Rotated { cx, cy, spin, items } = it else { continue };
-                let t: String =
-                    items.iter().filter_map(|i| if let display::Draw::Glyphs { text, .. } = i { Some(text.as_str()) } else { None }).collect();
-                let (px, py) = crate::turn_point(*turn, *x, *y, *cx, *cy);
-                out.push((t, px, py, spin.deg));
-            }
-        }
-        out
-    };
-    let marks = rotated(&draws);
+    let marks = rotated_marks(&draws);
     let one = marks.iter().find(|m| m.0 == "1").expect("the first digit drawn on its own");
     let two = marks.iter().find(|m| m.0 == "2").expect("the second digit drawn on its own");
     assert_eq!((one.3, two.3), (270.0, 270.0), "upright like the ideographs: {one:?} {two:?}");
@@ -205,7 +211,7 @@ fn tate_chu_yoko_stands_upright_across_a_top_to_bottom_line() {
 
     // Without vert the digits keep lying with the line: no upright glyphs of their own.
     let off_l = lay(&off_doc);
-    let off_marks = rotated(&display::page_display(&off_doc, &off_l.pages[0], &Default::default()));
+    let off_marks = rotated_marks(&display::page_display(&off_doc, &off_l.pages[0], &Default::default()));
     assert!(off_marks.iter().all(|m| m.0 != "1" && m.0 != "2"), "without vert the digits lie with the line: {off_marks:?}");
     let off_lying = display::page_display(&off_doc, &off_l.pages[0], &Default::default()).iter().any(|d| match d {
         display::Draw::Turned { items, .. } => items.iter().any(|i| matches!(i, display::Draw::Glyphs { text, .. } if text.contains("12"))),
@@ -277,6 +283,107 @@ fn tate_chu_yoko_keeps_its_decorations_and_revision_marks() {
     let insertion = lines(&inserted);
     assert_eq!(insertion.len(), 1, "an inserted vert run is underlined: {insertion:?}");
     assert!((insertion[0].1 - uy).abs() < 0.01, "the insertion mark sits where the underline does: {insertion:?} {underline:?}");
+}
+
+/// A `vert` run that ends a bidirectional line still takes its own length along the line: the
+/// line's visible boxes stop at its last cluster, so the run ends at that cluster's trailing edge
+/// (it read as zero, and the digits stood a whole em apart instead of half the run's length).
+#[test]
+fn tate_chu_yoko_at_the_end_of_a_bidi_line_takes_its_length() {
+    let text = "שלום 12";
+    let start = text.rfind('1').expect("a digit");
+    let mut d = Document::from_text(text);
+    d.last_section.text_direction = TextDirection::Down;
+    d.para_mut(StoryRef::Body, &Path::top(0))
+        .unwrap()
+        .format(start, start + 2, &|c: &mut CharProps| {
+            c.east_asian_layout = Some(EastAsianLayout { vert: Some(true), ..Default::default() });
+        })
+        .unwrap();
+    let l = lay(&d);
+    let pl = para_of(&l, 0);
+    let line = pl.lines.first().expect("one line");
+    assert!(!line.vis.is_empty(), "the Hebrew text makes the line bidirectional");
+    let k1 = pl.clusters.iter().position(|c| c.start == start).expect("the first digit's cluster");
+    let k2 = k1 + 1;
+    assert_eq!(k2 + 1, line.c1, "the vert run ends the line");
+    let len = line.cl_right(k2).expect("the run's trailing edge") - line.cl_left(k1).expect("the run's start");
+
+    // Half the run's length apart across the line, as in a plain line.
+    let marks = rotated_marks(&display::page_display(&d, &l.pages[0], &Default::default()));
+    let one = marks.iter().find(|m| m.0 == "1").expect("the first digit drawn on its own");
+    let two = marks.iter().find(|m| m.0 == "2").expect("the second digit drawn on its own");
+    assert!((one.2 - two.2).abs() < 0.01, "one page height for both: {one:?} {two:?}");
+    assert!(one.1 < two.1, "the first digit is left of the second: {one:?} {two:?}");
+    assert!((two.1 - one.1 - len / 2.0).abs() < 0.05, "half the run's length apart: {} against {}", two.1 - one.1, len / 2.0);
+}
+
+/// A `vert` run of one half-width digit takes the glyph's own advance: centring it in a whole em
+/// shifted its advance box along the line by the rest of the em (a quarter em for a half-width
+/// digit). The cluster's advance also holds the automatic space before the next character.
+#[test]
+fn tate_chu_yoko_a_lone_digit_keeps_its_advance() {
+    let text = "あ1い";
+    let start = text.find('1').expect("a digit");
+    let mut d = Document::from_text(text);
+    d.last_section.text_direction = TextDirection::Down;
+    d.para_mut(StoryRef::Body, &Path::top(0))
+        .unwrap()
+        .format(start, start + 1, &|c: &mut CharProps| {
+            c.east_asian_layout = Some(EastAsianLayout { vert: Some(true), ..Default::default() });
+        })
+        .unwrap();
+    let l = lay(&d);
+    let pl = para_of(&l, 0);
+    let k = pl.clusters.iter().position(|c| c.start == start).expect("the digit's cluster");
+    let st = &pl.styles[pl.clusters[k].style as usize];
+    let g = &pl.glyphs[pl.clusters[k].g0 as usize];
+    let own = st.face.advance(g.gid) as f32 * st.size / st.face.upem.max(1.0) as f32;
+
+    let draws = display::page_display(&d, &l.pages[0], &Default::default());
+    let mut pens = Vec::new();
+    for d in &draws {
+        let display::Draw::Turned { items, .. } = d else { continue };
+        for it in items {
+            let display::Draw::Rotated { cx, items, .. } = it else { continue };
+            for i in items {
+                if let display::Draw::Glyphs { text, glyphs, .. } = i
+                    && text == "1"
+                {
+                    pens.extend(glyphs.iter().map(|g| (g.1, *cx)));
+                }
+            }
+        }
+    }
+    assert_eq!(pens.len(), 1, "the digit drawn once");
+    let (pen_x, cx) = pens[0];
+    assert!((2.0 * (cx - pen_x) - own).abs() < 0.05, "the digit's advance box centred on its slot: {} against {}", 2.0 * (cx - pen_x), own);
+}
+
+/// A `vert` cluster shaped to two glyphs (a digit and its combining mark) stands in one slot, its
+/// text drawn once: each glyph took a slot of its own and the cluster was drawn twice.
+#[test]
+fn tate_chu_yoko_keeps_a_multi_glyph_cluster_in_one_slot() {
+    let text = "あ1\u{301}い";
+    let start = text.find('1').expect("a digit");
+    let end = start + '1'.len_utf8() + '\u{301}'.len_utf8();
+    let mut d = Document::from_text(text);
+    d.last_section.text_direction = TextDirection::Down;
+    d.para_mut(StoryRef::Body, &Path::top(0))
+        .unwrap()
+        .format(start, end, &|c: &mut CharProps| {
+            c.east_asian_layout = Some(EastAsianLayout { vert: Some(true), ..Default::default() });
+        })
+        .unwrap();
+    let l = lay(&d);
+    let pl = para_of(&l, 0);
+    let k = pl.clusters.iter().position(|c| c.start == start).expect("the digit's cluster");
+    let c = &pl.clusters[k];
+    assert_eq!(c.g1 - c.g0, 2, "the digit and its mark shape to two glyphs");
+    let cluster = "1\u{301}";
+    let marks = rotated_marks(&display::page_display(&d, &l.pages[0], &Default::default()));
+    let drawn = marks.iter().filter(|m| m.0 == cluster).count();
+    assert_eq!(drawn, 1, "the cluster is drawn in one slot, its text once: {marks:?}");
 }
 
 #[test]
