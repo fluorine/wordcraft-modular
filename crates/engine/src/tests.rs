@@ -2133,7 +2133,7 @@ fn layout_size_takes_the_japanese_paper_names() {
         ("Japanese Postcard", 100.0, 148.0),
         ("Japanese Postcard (Double)", 148.0, 200.0),
         ("Japanese Envelope #3", 120.0, 235.0),
-        ("Japanese Envelope #4", 90.0, 225.0),
+        ("Japanese Envelope #4", 90.0, 205.0),
         ("Japanese Envelope Kaku #2", 240.0, 332.0),
         ("Japanese Envelope Kaku #3", 216.0, 277.0),
         ("Japanese Envelope Kaku #20", 229.0, 324.0),

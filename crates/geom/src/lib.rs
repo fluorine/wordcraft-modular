@@ -293,7 +293,7 @@ pub const PAPER_SIZES: &[(&str, f32, f32)] = &[
     ("Japanese Postcard", 283.46, 419.53),          // はがき 100 × 148 mm
     ("Japanese Postcard (Double)", 419.53, 566.93), // 往復はがき 148 × 200 mm
     ("Japanese Envelope #3", 340.16, 666.14),       // 封筒 長形3号 120 × 235 mm
-    ("Japanese Envelope #4", 255.12, 637.80),       // 封筒 長形40 90 × 225 mm
+    ("Japanese Envelope #4", 255.12, 581.10),       // 封筒 長形4号 90 × 205 mm
     ("Japanese Envelope Kaku #2", 680.31, 941.10),  // 封筒 角形2号 240 × 332 mm
     ("Japanese Envelope Kaku #3", 612.28, 785.20),  // 封筒 角形3号 216 × 277 mm
     ("Japanese Envelope Kaku #20", 649.13, 918.43), // 封筒 角形20 229 × 324 mm
@@ -436,7 +436,7 @@ mod tests {
             ("Japanese Postcard", 100.0, 148.0),
             ("Japanese Postcard (Double)", 148.0, 200.0),
             ("Japanese Envelope #3", 120.0, 235.0),
-            ("Japanese Envelope #4", 90.0, 225.0),
+            ("Japanese Envelope #4", 90.0, 205.0),
             ("Japanese Envelope Kaku #2", 240.0, 332.0),
             ("Japanese Envelope Kaku #3", 216.0, 277.0),
             ("Japanese Envelope Kaku #20", 229.0, 324.0),
