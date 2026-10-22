@@ -9213,3 +9213,32 @@ fn table_cell_margins_preserves_unpassed_sides() {
     let margins = s.doc.table(StoryRef::Body, &tp).unwrap().props.cell_margins.unwrap();
     assert_eq!(margins, [0.0, 10.0, 0.0, 15.0]);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn opening_a_docx_with_a_damaged_part_says_so() {
+    let dir = std::env::temp_dir().join(format!("wordcraft-engine-damaged-part-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("damaged.docx");
+    let mut s = s();
+    run(&mut s, "text.insert", json!({"text": "Hello"}));
+    run(&mut s, "file.save", json!({"path": path.to_string_lossy()}));
+    let mut open = Session::new(wordcraft_doc::Document::new());
+    run(&mut open, "file.open", json!({"path": path.to_string_lossy()}));
+    assert_eq!(open.status, "", "a sound file opens without a word");
+
+    // Change a byte inside the data of the part `word/settings.xml`, found by its local header.
+    let mut bytes = std::fs::read(&path).unwrap();
+    let at = bytes.windows(17).position(|w| w == b"word/settings.xml").unwrap() - 30;
+    let (name_len, extra_len) =
+        (u16::from_le_bytes([bytes[at + 26], bytes[at + 27]]) as usize, u16::from_le_bytes([bytes[at + 28], bytes[at + 29]]) as usize);
+    let data = at + 30 + name_len + extra_len;
+    bytes[data + 4] ^= 0xFF;
+    std::fs::write(&path, &bytes).unwrap();
+    let mut damaged = Session::new(wordcraft_doc::Document::new());
+    run(&mut damaged, "file.open", json!({"path": path.to_string_lossy()}));
+    assert!(damaged.status.contains("damaged"), "{:?}", damaged.status);
+    assert_eq!(damaged.doc.plain_text(StoryRef::Body), "Hello", "the text still opens");
+    let _ = std::fs::remove_dir_all(&dir);
+}

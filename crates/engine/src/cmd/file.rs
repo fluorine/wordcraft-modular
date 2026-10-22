@@ -244,9 +244,13 @@ fn open(s: &mut Session, v: &Value) -> CmdResult {
     {
         doc.styles.default_chr.lang = Some(lang.clone());
     }
+    let damaged = !doc.skipped_parts.is_empty();
     s.set_document(doc);
     if let Some(z) = s.doc.settings.zoom {
         super::view::restore_zoom(s, z);
+    }
+    if damaged {
+        s.status = "Part of this file is damaged and was left out. Check the document before you save it.".into();
     }
     s.path = Some(path.into());
     // Like Word, a document opened with a password is saved with it again.
