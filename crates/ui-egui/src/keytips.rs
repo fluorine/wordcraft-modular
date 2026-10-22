@@ -451,6 +451,58 @@ fn controls(tab: &str) -> Vec<Control> {
             c("Convert to Text", "table.toText"),
             c("Formula", "table.formula"),
         ],
+        // Menus match by their tooltip, buttons by command id.
+        "Picture Format" => vec![
+            m("Brightness, contrast and sharpness", "picture.corrections"),
+            m("Saturation and recolor", "picture.color"),
+            m("Recolor a one-color picture, such as an icon", "picture.iconColor"),
+            m("Picture transparency", "picture.transparency"),
+            c("Change Picture", "ui.changePicture"),
+            c("Reset Picture", "picture.reset"),
+            m("Frames and effects", "picture.style"),
+            m("Picture border", "picture.border"),
+            c("Alt Text", "view.altTextPane"),
+            c("Position", "arrange.position"),
+            m("Wrap Text", "arrange.wrapText"),
+            m("Rotate", "arrange.rotate"),
+            m("Align", "arrange.align"),
+            m("Group", "arrange.group"),
+            c("Crop", "ui.crop"),
+        ],
+        "Shape Format" => vec![
+            m("Shape Fill", "shape.fill"),
+            m("Shape Outline", "shape.outline"),
+            m("Shadow, glow and soft edges", "shape.effects"),
+            c("Alt Text", "view.altTextPane"),
+            m("Drawing Canvas", "canvas.fit"),
+            m("WordArt Styles", "wordArt.style"),
+            m("Text Fill", "wordArt.textFill"),
+            m("Text Outline", "wordArt.textOutline"),
+            m("Text Effects", "wordArt.transform"),
+            m("Text Direction", "shape.textDirection"),
+            m("Align Text", "shape.alignText"),
+            c("Break Link", "shape.breakLink"),
+            c("Create Link", "ui.linkTextBox"),
+            c("Position", "arrange.position"),
+            m("Wrap Text", "arrange.wrapText"),
+            m("Rotate", "arrange.rotate"),
+            m("Align", "arrange.align"),
+        ],
+        "SmartArt Design" => vec![
+            c("Add Shape", "smartArt.addShape"),
+            c("Promote", "smartArt.promote"),
+            c("Demote", "smartArt.demote"),
+            c("Text Pane", "smartArt.textPane"),
+            m("Change Colors", "smartArt.colors"),
+            c("Reset Graphic", "smartArt.reset"),
+        ],
+        "Chart Design" => vec![
+            m("Chart Title", "chart.title"),
+            m("Legend", "chart.legend"),
+            m("Data Labels", "chart.dataLabels"),
+            c("Edit Data", "chart.editData"),
+            c("Change Chart Type", "chart.type"),
+        ],
         _ => Vec::new(),
     }
 }
@@ -1285,6 +1337,23 @@ mod tests {
         // Nothing selected: no contextual badge.
         let b = app();
         assert_eq!(tab_letter_for(&b, "Shape Format"), "");
+    }
+
+    /// Entering a contextual tab by its letter badges its controls, as the fixed tabs do.
+    #[test]
+    fn contextual_tabs_badge_their_controls() {
+        for tab in ["Picture Format", "Shape Format", "SmartArt Design", "Chart Design"] {
+            let a = app();
+            let ids: Vec<&str> = controls(tab).iter().filter_map(|c| if let Target::Cmd { id, .. } = &c.target { Some(*id) } else { None }).collect();
+            assert!(ids.iter().all(|id| a.session.registry.get(id).is_some() || id.starts_with("ui.")), "{tab}: unknown command id");
+            let letters = letters_for(&a, tab);
+            assert!(!letters.is_empty(), "{tab} has controls");
+            let mut seen = letters.clone();
+            seen.sort();
+            seen.dedup();
+            assert_eq!(seen.len(), letters.len(), "{tab}: letters are unique");
+            assert!(letters.iter().all(|l| !l.is_empty() && !l.starts_with('?')), "{tab}: every control has a letter");
+        }
     }
 
     #[test]
