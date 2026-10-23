@@ -536,7 +536,16 @@ fn comments_round_trip() {
     p.insert_object(end, InlineObject::CommentEnd { id: 0 }, &CharProps::default()).unwrap();
     d.body = vec![para_block(p.clone())];
     let r = rt(&d);
-    assert_eq!(paras(&r)[0].objects, p.objects);
+    // The reply made here is written with its parent's anchors, as Word saves a reply (Word for
+    // Mac drops a reply without them), and comes back with them; a second save keeps them as they are.
+    let anchored = [
+        InlineObject::CommentStart { id: 0 },
+        InlineObject::CommentStart { id: 1 },
+        InlineObject::CommentEnd { id: 0 },
+        InlineObject::CommentEnd { id: 1 },
+    ];
+    assert_eq!(paras(&r)[0].objects, anchored);
+    assert_eq!(paras(&rt(&r))[0].objects, anchored);
     assert_eq!(r.comments.len(), 2);
     for (id, c) in &d.comments {
         let g = r.comments.get(id).expect("comment");
