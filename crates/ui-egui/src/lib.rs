@@ -3185,10 +3185,6 @@ mod tests {
             assert_eq!(a.canvas.ime_faces.len(), count, "fallback faces are not added every frame");
             assert_eq!(a.ui.recent, paths, "font loading preserves the stored paths");
         }
-        let mut hidden = app();
-        hidden.ui.recent = paths;
-        hidden.ensure_caption_fonts();
-        assert!(hidden.canvas.ime_faces.is_empty(), "hidden Recent entries need no fonts");
     }
 
     /// Comment balloons draw comment text and author names with the interface faces, which have

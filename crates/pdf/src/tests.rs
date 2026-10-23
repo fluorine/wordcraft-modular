@@ -427,6 +427,11 @@ fn thai_pdf_uses_the_same_glyph_positions_and_line_breaks_as_layout() {
     use wordcraft_layout::display::{DisplayOptions, Draw, page_display};
     use wordcraft_layout::{LineEnd, Placed};
 
+    if wordcraft_fonts::FontDb::global().fallback_for('\u{0E19}', 0).is_none() {
+        eprintln!("skipped: no Thai font installed");
+        return;
+    }
+
     struct Positions(Vec<(f64, f64)>);
     impl Device<'_> for Positions {
         fn set_soft_mask(&mut self, _: Option<SoftMask<'_>>) {}
