@@ -4117,6 +4117,23 @@ fn a_paragraph_whose_float_would_run_past_the_bottom_margin_moves_with_it() {
 }
 
 #[test]
+fn a_kept_float_clears_its_paragraphs_footnotes() {
+    // The float fits above the bottom margin, but not above the footnote its paragraph brings.
+    let n = 60;
+    let d = Document::from_text(&"Body paragraph.\n".repeat(n));
+    let s = &d.last_section;
+    let at = first_para_below(&lay(&d), n, s.page_h - s.margin_bottom - 240.0);
+    let mut d = Document::from_text(&"Body paragraph.\n".repeat(n));
+    let id = text_box_at(&mut d, &Pos::body(at, 0), "Picture", 200.0, 200.0, para_float(0.0));
+    let l = lay(&d);
+    assert_eq!(l.text_box(id, 0).map(|b| b.page), Some(0), "fits without the note");
+    footnote(&mut d, &Pos::body(at, 4), &"A long footnote that takes several lines at the bottom of the page. ".repeat(6));
+    let l = lay(&d);
+    assert_eq!(l.text_box(id, 0).map(|b| b.page), Some(1));
+    assert_eq!(l.caret(&Pos::body(at, 0)).map(|c| c.page), Some(1));
+}
+
+#[test]
 fn a_float_taller_than_the_page_does_not_move_its_paragraph() {
     // An empty page wouldn't hold it either: it stays (and pages still end).
     let n = 60;

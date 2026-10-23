@@ -3811,7 +3811,26 @@ fn place_para_in_flow(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block:
             .fold(f32::NEG_INFINITY, f32::max);
         // How far below the paragraph's top it reaches, against an empty column.
         let need = reach - (guess - space_before);
-        if reach.is_finite() && reach + shift > pb.bottom + 0.01 && need <= pb.uncapped_bottom() - pb.top {
+        // The footnotes of the lines beside it go to the bottom of its page too: it has to clear them.
+        let mut notes_h = 0.0;
+        if reach.is_finite() {
+            let mut seen = Vec::new();
+            for (ci, id) in para_notes(ctx.doc, p, &pl) {
+                if !seen.contains(&id)
+                    && !pb.notes.iter().any(|x| x.id == id)
+                    && pl.lines.iter().any(|l| ci >= l.c0 && ci < l.c1 && l.top < need)
+                    && let Some(part) = ctx.doc.parts.get(&id).filter(|p| p.kind == wordcraft_doc::PartKind::Footnote)
+                {
+                    seen.push(id);
+                    let blocks = part.blocks.clone();
+                    notes_h += layout_box(ctx, StoryRef::Part(id), &blocks, &[], pb.sect.text_width(), BoxContext::Other, 0, None).height;
+                }
+            }
+            if notes_h > 0.0 && pb.notes.is_empty() {
+                notes_h += pb.seps.sep_h(false);
+            }
+        }
+        if reach.is_finite() && reach + shift > pb.bottom - notes_h + 0.01 && need + notes_h <= pb.uncapped_bottom() - pb.top {
             pb.advance(block, body_top);
             pb.y += pl.rp.space_before.min(0.0);
             applied_before = pl.rp.space_before.min(0.0);
