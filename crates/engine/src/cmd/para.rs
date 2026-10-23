@@ -197,7 +197,7 @@ pub fn specs() -> Vec<CommandSpec> {
             fmt(s, &|p| p.outline_level = l)
         }),
         CommandSpec::new("para.set", "Set Paragraph Formatting", "Home › Paragraph › Paragraph", set_props).params(
-            r#"{"props": ParaProps, "onPage"?: {"align"?: "left|center|right|justify|distribute", "left"?: pt, "right"?: pt} (alignment and indents as seen on the page: each paragraph's own direction, after `props`, says which edge is its start)}"#,
+            r#"{"props": ParaProps, "onPage"?: {"align"?: "left|center|right|justify|distribute|thaiDistribute", "left"?: pt, "right"?: pt} (alignment and indents as seen on the page: each paragraph's own direction, after `props`, says which edge is its start)}"#,
         ),
         CommandSpec::new("para.dialog", "Paragraph Settings", "Home › Paragraph", |s, _| {
             s.push_ui_request(json!({"open": "paragraph"}));
@@ -395,6 +395,7 @@ fn set_props(s: &mut Session, v: &Value) -> CmdResult {
         Some("right") => Some(Align::Right),
         Some("justify" | "both") => Some(Align::Justify),
         Some("distribute") => Some(Align::Distribute),
+        Some("thaiDistribute") => Some(Align::ThaiDistribute),
         Some(x) => return Err(CmdError::Params(format!("unknown alignment `{x}`"))),
     };
     let indent = |k: &str| p::f32(&page, k).map(|x| x.clamp(-1584.0, 1584.0));
