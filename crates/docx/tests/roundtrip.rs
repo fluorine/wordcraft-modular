@@ -7,7 +7,7 @@ use wordcraft_doc::numbering::ListKind;
 use wordcraft_doc::para::{Anchor, Float, FloatAlign, NoteKind, ShapeKind, Wrap};
 use wordcraft_doc::props::{
     Align, Border, BorderStyle, Borders, CharProps, HeightRule, Highlight, LineSpacing, NumRef, ParaProps, Rgb, RowProps, TabAlign, TabLeader,
-    TabStop, TableLook, TextColor, TextDirection, Underline, VAlign, VMerge, VertAlign,
+    TabStop, TableLook, TableProps, TextColor, TextDirection, Underline, VAlign, VMerge, VertAlign,
 };
 use wordcraft_doc::section::{Columns, DocGrid, DocGridType, LineNumberRestart, LineNumbering, NumFormat, PageVAlign, SectionProps, SectionStart};
 use wordcraft_doc::styles::{Style, StyleKind};
@@ -304,9 +304,10 @@ fn distributed_alignments_keep_their_docx_values_across_repeated_round_trips() {
 }
 
 #[test]
-fn unsupported_table_distributed_alignment_keeps_its_start_edge_fallback() {
+fn table_and_row_thai_distributed_alignment_keep_their_start_edge_fallback() {
     let mut table = Table::new(1, 1, 180.0);
     table.props.align = Some(Align::ThaiDistribute);
+    table.rows[0].props.exceptions = Some(Box::new(TableProps { align: Some(Align::ThaiDistribute), ..Default::default() }));
     let mut d = Document::new();
     d.body = vec![Arc::new(Block::Table(table))];
 
@@ -318,10 +319,13 @@ fn unsupported_table_distributed_alignment_keeps_its_start_edge_fallback() {
         document_xml
     };
     assert!(document_xml.contains("<w:jc w:val=\"left\"/>"), "table distributed alignment falls back to start: {document_xml}");
+    assert_eq!(document_xml.matches("<w:jc w:val=\"left\"/>").count(), 2, "both table and row exception use a valid table alignment: {document_xml}");
+    assert!(!document_xml.contains("thaiDistribute"), "table properties never use paragraph-only thaiDistribute: {document_xml}");
 
     let back = wordcraft_docx::read(&bytes).unwrap();
     let got = back.body.first().and_then(|b| b.as_table()).expect("round-tripped table");
     assert_eq!(got.props.align, Some(Align::Left));
+    assert_eq!(got.rows[0].props.exceptions.as_ref().and_then(|p| p.align), Some(Align::Left));
 }
 
 #[test]
