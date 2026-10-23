@@ -26,6 +26,7 @@ use std::io::{Cursor, Read, Write};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use wordcraft_doc::para::{Float, ShapeKind};
+use wordcraft_doc::props::VAlign;
 use wordcraft_doc::props::{TabAlign, TabLeader, TabStop};
 use wordcraft_doc::section::{Columns, SectionStart};
 use wordcraft_doc::{Align, Document, RevisionKind, Rgb, SectionProps};
@@ -117,8 +118,8 @@ struct Writer {
     last_list: Option<String>,
     /// The page the block being written starts.
     master: Option<SecStart>,
-    /// Cell styles by shading.
-    cell_styles: Vec<Option<Rgb>>,
+    /// Cell styles by (shading, vertical-alignment).
+    cell_styles: Vec<(Option<Rgb>, Option<VAlign>)>,
     pictures: Vec<(String, std::sync::Arc<Vec<u8>>, String)>,
     /// `text:changed-region` elements written so far.
     regions: Vec<String>,
@@ -361,7 +362,9 @@ impl Writer {
 
     fn plain_inlines(&mut self, inl: &[Inline], out: &mut String) {
         let mut prev_space = true;
-        let inl = model::equations_as_text(inl);
+        let eq = model::equations_as_text(inl);
+        // ODF has no ruby: its base text goes through the text path below.
+        let inl = model::ruby_as_text(&eq);
         let last = inl.len().saturating_sub(1);
         for (idx, i) in inl.iter().enumerate() {
             match i {
@@ -438,6 +441,8 @@ impl Writer {
                     prev_space = false;
                 }
                 Inline::Anchor(a) => out.push_str(&format!("<text:bookmark text:name=\"{}\"/>", x(a))),
+                // Read as its base text by `ruby_as_text` above.
+                Inline::Ruby { .. } => {}
                 Inline::Figure(_) | Inline::Equation { .. } | Inline::Field { .. } | Inline::Shape(_) => {}
             }
         }
@@ -462,7 +467,8 @@ impl Writer {
                 "</text:p>"
             }
         };
-        let tracked = paras.len() > 1 || p.inlines.iter().any(|i| matches!(i, Inline::Text(_, f) if f.ins.is_some() || f.del.is_some()));
+        let tracked = paras.len() > 1
+            || p.inlines.iter().any(|i| matches!(i, Inline::Text(_, f) | Inline::Ruby { fmt: f, .. } if f.ins.is_some() || f.del.is_some()));
         if tracked {
             let mut items = Vec::new();
             for (k, q) in paras.iter().enumerate() {
@@ -590,11 +596,12 @@ impl Writer {
         }
     }
 
-    fn cell_style(&mut self, shading: Option<Rgb>) -> String {
-        let k = match self.cell_styles.iter().position(|s| *s == shading) {
+    fn cell_style(&mut self, shading: Option<Rgb>, valign: Option<VAlign>) -> String {
+        let key = (shading, valign);
+        let k = match self.cell_styles.iter().position(|s| *s == key) {
             Some(k) => k,
             None => {
-                self.cell_styles.push(shading);
+                self.cell_styles.push(key);
                 self.cell_styles.len() - 1
             }
         };
@@ -632,7 +639,7 @@ impl Writer {
                     }
                     continue;
                 }
-                let st = self.cell_style(c.shading);
+                let st = self.cell_style(c.shading, c.valign);
                 let mut attrs = format!(" table:style-name=\"{st}\" office:value-type=\"string\"");
                 if span > 1 {
                     attrs.push_str(&format!(" table:number-columns-spanned=\"{span}\""));
@@ -715,10 +722,16 @@ impl Writer {
                 ));
             }
         }
-        for (i, sh) in self.cell_styles.iter().enumerate() {
+        for (i, (sh, va)) in self.cell_styles.iter().enumerate() {
             let bg = sh.map(|c| format!(" fo:background-color=\"#{}\"", c.hex().to_ascii_lowercase())).unwrap_or_default();
+            let va_str = match va {
+                Some(VAlign::Top) => " style:vertical-align=\"top\"",
+                Some(VAlign::Center) => " style:vertical-align=\"middle\"",
+                Some(VAlign::Bottom) => " style:vertical-align=\"bottom\"",
+                None => "",
+            };
             s.push_str(&format!(
-                "<style:style style:name=\"Cell{}\" style:family=\"table-cell\"><style:table-cell-properties fo:padding=\"4pt\" fo:border=\"0.5pt solid #000000\"{bg}/></style:style>",
+                "<style:style style:name=\"Cell{}\" style:family=\"table-cell\"><style:table-cell-properties fo:padding=\"4pt\" fo:border=\"0.5pt solid #000000\"{bg}{va_str}/></style:style>",
                 i + 1
             ));
         }
@@ -741,7 +754,7 @@ impl Item<'_> {
     /// Its tracked insertion and deletion.
     fn marks(&self) -> (Option<&RevMark>, Option<&RevMark>) {
         match self {
-            Item::Inl(Inline::Text(_, f)) => (f.ins.as_ref(), f.del.as_ref()),
+            Item::Inl(Inline::Text(_, f) | Inline::Ruby { fmt: f, .. }) => (f.ins.as_ref(), f.del.as_ref()),
             Item::Inl(_) => (None, None),
             Item::Mark(p) => (p.mark_ins.as_deref(), p.mark_del.as_deref()),
         }
@@ -808,28 +821,22 @@ fn join_deleted_marks(blocks: &[FBlock]) -> Option<(Vec<FBlock>, HashMap<usize, 
 fn now_iso() -> String {
     let t = now_unix();
     let (days, secs) = (t.div_euclid(86_400), t.rem_euclid(86_400));
-    // Days since 1970-01-01 → civil date (Howard Hinnant's algorithm).
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
+    // Reuse the crate's 400-year-cycle converter (chrono within a cycle, cycles carried in the
+    // year) so a clock past chrono's range keeps the proleptic Gregorian date the old hand-rolled
+    // code gave, never the epoch. `{y:04}` rather than `%Y`, which writes a `+` before year 10000.
+    let (y, m, d) = crate::sheet::civil(days);
     format!("{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z", secs / 3600, secs / 60 % 60, secs % 60)
 }
 
 /// Seconds since the Unix epoch: the system clock, or the browser's on the web.
 fn now_unix() -> i64 {
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
     {
         use std::time::{SystemTime, UNIX_EPOCH};
         SystemTime::now().duration_since(UNIX_EPOCH).ok().and_then(|d| i64::try_from(d.as_secs()).ok()).unwrap_or(0)
     }
     // `SystemTime::now()` panics on wasm32-unknown-unknown, so ask the browser's clock.
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
     {
         let ms = js_sys::Date::now();
         if ms.is_finite() && ms > 0.0 { (ms / 1000.0) as i64 } else { 0 }
@@ -1077,6 +1084,10 @@ struct StyleInfo {
     border_bottom: bool,
     /// `fo:background-color` of a table-cell style's `style:table-cell-properties`.
     cell_background: Option<Rgb>,
+    /// `style:vertical-align` of a table-cell style's `style:table-cell-properties`.
+    cell_valign: Option<VAlign>,
+    /// `style:column-width` of a table-column style's `style:table-column-properties`, in points.
+    column_width: Option<f32>,
     /// `style:master-page-name` of a paragraph or table style: its paragraphs (tables) start a
     /// page of that master page. Empty: explicitly none, which stops the lookup up the chain.
     master_page: Option<String>,
@@ -1138,7 +1149,7 @@ fn column_sep(a: &Attrs) -> bool {
 
 /// Length → points.
 fn length(v: &str) -> Option<f32> {
-    let v = v.trim();
+    let v = v.trim().to_ascii_lowercase();
     let num = |s: &str| s.trim().parse::<f32>().ok().filter(|x| x.is_finite());
     if let Some(n) = v.strip_suffix("pt") {
         num(n)
@@ -1153,7 +1164,7 @@ fn length(v: &str) -> Option<f32> {
     } else if let Some(n) = v.strip_suffix("px") {
         num(n).map(|x| x * 0.75)
     } else {
-        num(v)
+        num(&v)
     }
 }
 
@@ -1222,6 +1233,62 @@ fn events(xml: &[u8], mut f: impl FnMut(Ev)) {
     }
 }
 
+/// An embedded ODF formula sub-document's `content.xml`, read for its `math:math` element
+/// (ODF 1.3 §10.4.3.2 wraps it in `office:document-content`/`office:body`/`office:math`, but
+/// some writers emit it bare): the first element named `math` in document order, with its
+/// subtree, passed to [`crate::mathml::read`]. `None` when there's no such element, it holds
+/// nothing, or the XML is malformed. Nesting and element count are bounded like other XML here.
+fn read_formula(xml: &[u8]) -> Option<(String, bool)> {
+    use crate::mathml::{El, Item, MAX_NODES, local};
+    let mut stack: Vec<El> = Vec::new();
+    let mut math: Option<El> = None;
+    let mut over = 0usize;
+    let mut count = 0usize;
+    events(xml, |ev| {
+        if math.is_some() {
+            return;
+        }
+        count += 1;
+        if count > MAX_NODES * 4 {
+            math = stack.drain(..).next();
+            return;
+        }
+        match ev {
+            Ev::Start(q, a) => {
+                if stack.is_empty() && local(&q) != "math" {
+                    return;
+                }
+                if stack.len() < wordcraft_doc::math::MAX_DEPTH {
+                    stack.push(El { name: q, attrs: a, children: Vec::new() });
+                } else {
+                    over += 1;
+                }
+            }
+            Ev::End(_) => {
+                if over > 0 {
+                    over -= 1;
+                } else if stack.len() > 1 {
+                    if let Some(done) = stack.pop()
+                        && let Some(parent) = stack.last_mut()
+                    {
+                        parent.children.push(Item::El(done));
+                    }
+                } else if stack.len() == 1 {
+                    math = stack.pop();
+                }
+            }
+            Ev::Text(t) => {
+                if over == 0
+                    && let Some(top) = stack.last_mut()
+                {
+                    top.children.push(Item::Text(t));
+                }
+            }
+        }
+    });
+    crate::mathml::read(&math?)
+}
+
 #[derive(Default)]
 struct Styles {
     map: HashMap<String, StyleInfo>,
@@ -1277,24 +1344,42 @@ impl Styles {
                 "text-properties" => {
                     if let Some((_, s)) = &mut cur {
                         let d = &mut s.fmt;
-                        if let Some(w) = get(&a, "fo:font-weight") {
-                            d.bold = Some(w == "bold" || w.parse::<u32>().is_ok_and(|n| n >= 600));
+                        let is_bold = |w: &str| {
+                            let w = w.trim();
+                            w.eq_ignore_ascii_case("bold") || w.parse::<u32>().is_ok_and(|n| n >= 600)
+                        };
+                        // The fo: value governs Latin text; the Asian and complex-script values
+                        // stand in only when a style sets nothing else.
+                        let weight =
+                            get(&a, "fo:font-weight").or_else(|| get(&a, "style:font-weight-asian")).or_else(|| get(&a, "style:font-weight-complex"));
+                        if let Some(w) = weight {
+                            d.bold = Some(is_bold(w));
                         }
-                        if let Some(v) = get(&a, "fo:font-style") {
-                            d.italic = Some(v == "italic" || v == "oblique");
+                        let is_italic = |v: &str| {
+                            let v = v.trim();
+                            v.eq_ignore_ascii_case("italic") || v.eq_ignore_ascii_case("oblique")
+                        };
+                        let style =
+                            get(&a, "fo:font-style").or_else(|| get(&a, "style:font-style-asian")).or_else(|| get(&a, "style:font-style-complex"));
+                        if let Some(v) = style {
+                            d.italic = Some(is_italic(v));
                         }
-                        if let Some(v) = get(&a, "style:text-underline-style") {
-                            d.underline = Some(v != "none");
+                        let is_not_none = |v: &str| !v.trim().eq_ignore_ascii_case("none");
+                        // The line style decides; the line type counts only when no style is given.
+                        let ul = get(&a, "style:text-underline-style").or_else(|| get(&a, "style:text-underline-type"));
+                        if let Some(v) = ul {
+                            d.underline = Some(is_not_none(v));
                         }
-                        if let Some(v) = get(&a, "style:text-line-through-style") {
-                            d.strike = Some(v != "none");
+                        let strike = get(&a, "style:text-line-through-style").or_else(|| get(&a, "style:text-line-through-type"));
+                        if let Some(v) = strike {
+                            d.strike = Some(is_not_none(v));
                         }
                         if let Some(v) = get(&a, "style:text-position") {
                             let v = v.trim();
                             let first = v.split_whitespace().next().unwrap_or("");
                             let pct = first.trim_end_matches('%').parse::<f32>().unwrap_or(0.0);
-                            d.sup = Some(first == "super" || pct > 0.0);
-                            d.sub = Some(first == "sub" || pct < 0.0);
+                            d.sup = Some(first.eq_ignore_ascii_case("super") || pct > 0.0);
+                            d.sub = Some(first.eq_ignore_ascii_case("sub") || pct < 0.0);
                         }
                         if let Some(c) = get(&a, "fo:color").and_then(model::parse_color) {
                             d.color = Some(c);
@@ -1307,7 +1392,7 @@ impl Styles {
                         }
                         if let Some(fam) = get(&a, "fo:font-family").or_else(|| get(&a, "style:font-name")) {
                             let fam = fam.split(',').next().unwrap_or("").trim().trim_matches(['\'', '"']).to_string();
-                            if model::is_mono(&fam) || get(&a, "style:font-pitch") == Some("fixed") {
+                            if model::is_mono(&fam) || get(&a, "style:font-pitch").is_some_and(|p| p.trim().eq_ignore_ascii_case("fixed")) {
                                 d.code = Some(true);
                             } else if !fam.is_empty() {
                                 d.font = Some(fam);
@@ -1341,23 +1426,38 @@ impl Styles {
                         s.page_number = Some(v.trim().parse::<u32>().ok().map(|n| n.min(32_767)));
                     }
                 }
-                "table-cell-properties" => {
+                "table-column-properties" => {
                     if let Some((_, s)) = &mut cur
-                        && let Some(c) = get(&a, "fo:background-color").and_then(model::parse_color)
+                        && let Some(w) = get(&a, "style:column-width").and_then(length)
                     {
-                        s.cell_background = Some(c);
+                        s.column_width = Some(w);
+                    }
+                }
+                "table-cell-properties" => {
+                    if let Some((_, s)) = &mut cur {
+                        if let Some(c) = get(&a, "fo:background-color").and_then(model::parse_color) {
+                            s.cell_background = Some(c);
+                        }
+                        if let Some(va) = get(&a, "style:vertical-align") {
+                            s.cell_valign = match va.trim() {
+                                "top" => Some(VAlign::Top),
+                                "middle" | "center" => Some(VAlign::Center),
+                                "bottom" => Some(VAlign::Bottom),
+                                _ => None,
+                            };
+                        }
                     }
                 }
                 "paragraph-properties" => {
                     if let Some((_, s)) = &mut cur {
-                        s.align = match get(&a, "fo:text-align") {
+                        s.align = match get(&a, "fo:text-align").map(|v| v.trim().to_ascii_lowercase()).as_deref() {
                             Some("center") => Some(Align::Center),
                             Some("end") | Some("right") => Some(Align::Right),
                             Some("justify") => Some(Align::Justify),
                             Some("start") | Some("left") => Some(Align::Left),
                             _ => s.align,
                         };
-                        if get(&a, "fo:break-before") == Some("page") {
+                        if get(&a, "fo:break-before").is_some_and(|b| b.trim().eq_ignore_ascii_case("page")) {
                             s.page_break = true;
                         }
                         match get(&a, "fo:keep-with-next") {
@@ -1368,7 +1468,7 @@ impl Styles {
                         if let Some(v) = get(&a, "style:page-number") {
                             s.page_number = Some(v.trim().parse::<u32>().ok().map(|n| n.min(32_767)));
                         }
-                        if get(&a, "fo:border-bottom").is_some_and(|b| b != "none") {
+                        if get(&a, "fo:border-bottom").is_some_and(|b| !b.trim().eq_ignore_ascii_case("none")) {
                             s.border_bottom = true;
                         }
                     }
@@ -1467,9 +1567,19 @@ impl Styles {
         self.chain(name).iter().find_map(|(_, s)| s.columns.clone())
     }
 
+    /// Width in points of a table-column style (whole chain).
+    fn column_width(&self, name: &str) -> Option<f32> {
+        self.chain(name).iter().find_map(|(_, s)| s.column_width)
+    }
+
     /// Background colour of a table-cell style (whole chain).
     fn cell_background(&self, name: &str) -> Option<Rgb> {
         self.chain(name).iter().find_map(|(_, s)| s.cell_background)
+    }
+
+    /// Vertical alignment of a table-cell style (whole chain).
+    fn cell_valign(&self, name: &str) -> Option<VAlign> {
+        self.chain(name).iter().find_map(|(_, s)| s.cell_valign)
     }
 
     /// Paragraph kind, alignment, page break, rule, keep-with-next and base formatting. The text formatting of
@@ -1528,6 +1638,16 @@ struct TableB {
     row: Vec<Cell>,
     /// Covered cells still owed to the previous cell's column span.
     hcover: usize,
+    /// Widths in points of the `table:table-column`s so far, 0 where the style gives none.
+    widths: Vec<f32>,
+}
+
+impl TableB {
+    fn finish(self) -> FTable {
+        // A column without a width leaves the whole grid to the equal split.
+        let widths = if self.widths.iter().all(|w| *w > 0.0) { self.widths } else { Vec::new() };
+        FTable { rows: self.rows, widths, borderless: false }
+    }
 }
 
 /// A `text:changed-region` read from `text:tracked-changes`.
@@ -1571,6 +1691,8 @@ struct Frame {
     float: Option<Float>,
     /// Its graphic style.
     style: Option<String>,
+    /// An equation read from an embedded `draw:object`: its linear form and whether it is display.
+    eq: Option<(String, bool)>,
 }
 
 /// A drawing shape being read, and the reading state of the paragraph it is anchored in, put
@@ -1731,7 +1853,7 @@ impl<'a> Body<'a> {
         let mut blocks = self.containers.pop().unwrap_or_default();
         for t in self.tables.drain(..) {
             if !t.rows.is_empty() {
-                blocks.push(FBlock::Table(FTable { rows: t.rows, widths: Vec::new(), borderless: false }));
+                blocks.push(FBlock::Table(t.finish()));
             }
         }
         blocks
@@ -2231,7 +2353,15 @@ impl Body<'_> {
                     self.skip = 1;
                     return;
                 }
-                self.tables.push(TableB { rows: Vec::new(), row: Vec::new(), hcover: 0 });
+                self.tables.push(TableB { rows: Vec::new(), row: Vec::new(), hcover: 0, widths: Vec::new() });
+            }
+            "table-column" => {
+                let w = get(a, "table:style-name").and_then(|n| self.styles.column_width(n)).unwrap_or(0.0);
+                let n = get(a, "table:number-columns-repeated").and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(1).max(1);
+                if let Some(t) = self.tables.last_mut() {
+                    let room = wordcraft_doc::table::MAX_COLS.saturating_sub(t.widths.len());
+                    t.widths.extend(std::iter::repeat_n(w, n.min(room)));
+                }
             }
             "table-row" => {
                 if let Some(t) = self.tables.last_mut() {
@@ -2244,10 +2374,11 @@ impl Body<'_> {
                 let span = get(a, "table:number-columns-spanned").and_then(|v| v.trim().parse::<u32>().ok()).unwrap_or(1).clamp(1, 63);
                 let rows = get(a, "table:number-rows-spanned").and_then(|v| v.trim().parse::<u32>().ok()).unwrap_or(1).clamp(1, 1000);
                 let shading = get(a, "table:style-name").and_then(|s| self.styles.cell_background(s));
+                let valign = get(a, "table:style-name").and_then(|s| self.styles.cell_valign(s));
                 if let Some(t) = self.tables.last_mut() {
                     t.hcover = span as usize - 1;
                 }
-                self.cells.push(Cell { colspan: span, rowspan: rows, shading, ..Default::default() });
+                self.cells.push(Cell { colspan: span, rowspan: rows, shading, valign, ..Default::default() });
                 self.containers.push(Vec::new());
                 self.lists_saved.push((std::mem::take(&mut self.lists), std::mem::take(&mut self.item_used)));
             }
@@ -2268,15 +2399,31 @@ impl Body<'_> {
                     alt: String::new(),
                     float: self.styles.float(a, false),
                     style: get(a, "draw:style-name").map(String::from),
+                    eq: None,
                 });
             }
             "image" => {
                 if let Some(href) = get(a, "xlink:href")
                     && let Some(fr) = &mut self.frame
                     && fr.data.is_none()
+                    && fr.eq.is_none()
                 {
                     let path = href.trim_start_matches("./");
                     fr.data = (self.zip)(path);
+                }
+            }
+            // An embedded object (ODF 1.3 §10.4.3): a formula sub-document's `content.xml` holds
+            // a `math:math` tree (#3099). Other object kinds have none, so the frame still falls
+            // back to its `draw:image` replacement preview, read at `end` below.
+            "object" => {
+                if let Some(href) = get(a, "xlink:href")
+                    && let Some(fr) = &mut self.frame
+                    && fr.eq.is_none()
+                {
+                    let path = format!("{}/content.xml", href.trim_start_matches("./").trim_end_matches('/'));
+                    if let Some(xml) = (self.zip)(&path) {
+                        fr.eq = read_formula(&xml);
+                    }
                 }
             }
             "desc" | "title" if self.frame.is_some() => self.in_desc = true,
@@ -2540,7 +2687,7 @@ impl Body<'_> {
                 if let Some(t) = self.tables.pop()
                     && !t.rows.is_empty()
                 {
-                    self.container().push(FBlock::Table(FTable { rows: t.rows, widths: Vec::new(), borderless: false }));
+                    self.container().push(FBlock::Table(t.finish()));
                 }
             }
             "desc" | "title" => self.in_desc = false,
@@ -2551,11 +2698,17 @@ impl Body<'_> {
                 self.break_section(next);
             }
             "frame" => {
-                if let Some(Frame { w, h, data: Some(data), alt, float, .. }) = self.frame.take()
-                    && let Some(mut img) = make_img(data, w, h, alt.trim())
-                {
-                    img.float = float;
-                    self.push_inline(Inline::Image(img));
+                if let Some(Frame { w, h, data, alt, float, eq, .. }) = self.frame.take() {
+                    let inline = match eq {
+                        Some((linear, display)) => Some(Inline::Equation { linear, display }),
+                        None => data.and_then(|data| make_img(data, w, h, alt.trim())).map(|mut img| {
+                            img.float = float;
+                            Inline::Image(img)
+                        }),
+                    };
+                    if let Some(inline) = inline {
+                        self.push_inline(inline);
+                    }
                 }
                 self.frame = None;
             }
@@ -2864,6 +3017,12 @@ mod tests {
         assert_eq!(length("1in"), Some(72.0));
         assert_eq!(length("12pt"), Some(12.0));
         assert!((length("2.54cm").unwrap() - 72.0).abs() < 0.01);
+        assert_eq!(length("1IN"), Some(72.0));
+        assert_eq!(length("12PT"), Some(12.0));
+        assert!((length("2.54CM").unwrap() - 72.0).abs() < 0.01);
+        assert!((length("25.4MM").unwrap() - 72.0).abs() < 0.01);
+        assert_eq!(length("1pc"), Some(12.0));
+        assert_eq!(length("10PX"), Some(7.5));
         assert_eq!(length("x"), None);
     }
 
@@ -2979,6 +3138,68 @@ mod tests {
         assert_eq!(imgs.len(), 3);
         assert!(imgs.iter().all(|i| i.data.as_slice() == png.as_slice()));
         assert_eq!(import(&pkg).unwrap().media.len(), 1);
+    }
+
+    #[test]
+    fn embedded_formula_object_reads_its_mathml() {
+        // #3099: LibreOffice saves an equation as a `draw:object` (a formula sub-document whose
+        // own `content.xml` is MathML) plus a `draw:image` replacement preview in LibreOffice's
+        // own metafile format, which WordCraft can't decode as a picture. The object's MathML
+        // must be read instead of silently dropping the frame (blank equation).
+        let math = r#"<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>E</mi><mo stretchy="false">=</mo><msup><mi mathvariant="italic">mc</mi><mn>2</mn></msup></mrow><annotation encoding="StarMath 5.0">E=mc^2</annotation></semantics></math>"#;
+        let frame = r#"<draw:frame svg:width="0.5in" svg:height="0.2in"><draw:object xlink:href="./Object 1"/><draw:image xlink:href="./ObjectReplacements/Object 1"/></draw:frame>"#;
+        let content = format!(
+            r#"<office:document-content {NS_T}><office:body><office:text><text:p>{frame}</text:p></office:text></office:body></office:document-content>"#
+        );
+        let pkg = zip_of(&[
+            ("content.xml", content.as_bytes()),
+            ("Object 1/content.xml", math.as_bytes()),
+            // Not a format `sniff_image` recognizes: proves the equation wins over this fallback.
+            ("ObjectReplacements/Object 1", &[0u8; 50]),
+        ]);
+        let flow = parse(&pkg).unwrap();
+        let eqs: Vec<(String, bool)> = paras(&flow)
+            .into_iter()
+            .flat_map(|p| &p.inlines)
+            .filter_map(|i| if let Inline::Equation { linear, display } = i { Some((linear.clone(), *display)) } else { None })
+            .collect();
+        assert_eq!(eqs, vec![("E=mc^2".to_string(), true)]);
+    }
+
+    #[test]
+    fn a_trailing_slash_on_the_object_href_still_resolves() {
+        // Some ODF producers write the object folder with a trailing slash
+        // (`xlink:href="./Object 1/"`); that must not double the slash before `content.xml`.
+        let math = r#"<math><mi>x</mi></math>"#;
+        let frame = r#"<draw:frame svg:width="1in" svg:height="1in"><draw:object xlink:href="./Object 1/"/></draw:frame>"#;
+        let content = format!(
+            r#"<office:document-content {NS_T}><office:body><office:text><text:p>{frame}</text:p></office:text></office:body></office:document-content>"#
+        );
+        let pkg = zip_of(&[("content.xml", content.as_bytes()), ("Object 1/content.xml", math.as_bytes())]);
+        let flow = parse(&pkg).unwrap();
+        let eqs: Vec<(String, bool)> = paras(&flow)
+            .into_iter()
+            .flat_map(|p| &p.inlines)
+            .filter_map(|i| if let Inline::Equation { linear, display } = i { Some((linear.clone(), *display)) } else { None })
+            .collect();
+        assert_eq!(eqs, vec![("x".to_string(), false)]);
+    }
+
+    #[test]
+    fn object_without_mathml_falls_back_to_its_replacement_image() {
+        // A non-formula embedded object (or one whose content.xml has no `math:math`) has no
+        // equation to read: the frame still shows its `draw:image` replacement, as before.
+        let png = [b"\x89PNG\r\n\x1a\n".as_slice(), &[7u8; 300]].concat();
+        let frame = r#"<draw:frame svg:width="1in" svg:height="1in"><draw:object xlink:href="./Object 1"/><draw:image xlink:href="Pictures/a.png"/></draw:frame>"#;
+        let content = format!(
+            r#"<office:document-content {NS_T}><office:body><office:text><text:p>{frame}</text:p></office:text></office:body></office:document-content>"#
+        );
+        let pkg = zip_of(&[("content.xml", content.as_bytes()), ("Object 1/content.xml", b"<office:spreadsheet/>"), ("Pictures/a.png", &png)]);
+        let flow = parse(&pkg).unwrap();
+        let imgs: Vec<&model::Img> =
+            paras(&flow).into_iter().flat_map(|p| &p.inlines).filter_map(|i| if let Inline::Image(img) = i { Some(img) } else { None }).collect();
+        assert_eq!(imgs.len(), 1);
+        assert!(imgs[0].data.as_slice() == png.as_slice());
     }
 
     const NS_T: &str = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0""#;
@@ -3108,6 +3329,54 @@ mod tests {
     }
 
     #[test]
+    fn table_column_styles_are_the_grid_widths() {
+        // A column's `style:column-width` (and `table:number-columns-repeated`) sets its width.
+        let content = format!(
+            r##"<office:document-content {NS_T}><office:automatic-styles><style:style style:name="Table1.A" style:family="table-column"><style:table-column-properties style:column-width="1in"/></style:style><style:style style:name="Table1.B" style:family="table-column"><style:table-column-properties style:column-width="2in"/></style:style></office:automatic-styles><office:body><office:text><table:table><table:table-column table:style-name="Table1.A"/><table:table-column table:style-name="Table1.B" table:number-columns-repeated="2"/><table:table-row><table:table-cell><text:p>A</text:p></table:table-cell><table:table-cell><text:p>B</text:p></table:table-cell><table:table-cell><text:p>C</text:p></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"##
+        );
+        let f = parse(&package(&content, None)).unwrap();
+        let Some(FBlock::Table(t)) = f.blocks.iter().find(|b| matches!(b, FBlock::Table(_))) else { panic!("no table") };
+        assert_eq!(t.widths, vec![72.0, 144.0, 144.0]);
+    }
+
+    #[test]
+    fn table_column_widths_survive_a_round_trip() {
+        // A width changed in the document is written and read back; the file's own widths are
+        // what the first import shows.
+        let content = format!(
+            r##"<office:document-content {NS_T}><office:automatic-styles><style:style style:name="Table1.A" style:family="table-column"><style:table-column-properties style:column-width="1in"/></style:style><style:style style:name="Table1.B" style:family="table-column"><style:table-column-properties style:column-width="3in"/></style:style></office:automatic-styles><office:body><office:text><table:table><table:table-column table:style-name="Table1.A"/><table:table-column table:style-name="Table1.B"/><table:table-row><table:table-cell><text:p>A</text:p></table:table-cell><table:table-cell><text:p>B</text:p></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"##
+        );
+        let grid = |doc: &Document| match doc
+            .body
+            .iter()
+            .find_map(|b| if let wordcraft_doc::Block::Table(t) = &**b { Some(t.grid.clone()) } else { None })
+        {
+            Some(g) => g,
+            None => panic!("no table"),
+        };
+        let mut doc = import(&package(&content, None)).unwrap();
+        assert_eq!(grid(&doc), vec![72.0, 216.0]);
+        let widths = vec![150.0, 100.0];
+        for b in doc.body.iter_mut() {
+            if let wordcraft_doc::Block::Table(t) = std::sync::Arc::make_mut(b) {
+                t.grid = widths.clone();
+            }
+        }
+        let back = import(&export(&doc).unwrap()).unwrap();
+        assert_eq!(grid(&back), widths);
+    }
+
+    #[test]
+    fn table_without_column_widths_keeps_the_equal_split() {
+        let content = format!(
+            r##"<office:document-content {NS_T}><office:body><office:text><table:table><table:table-column table:number-columns-repeated="2"/><table:table-row><table:table-cell><text:p>A</text:p></table:table-cell><table:table-cell><text:p>B</text:p></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"##
+        );
+        let f = parse(&package(&content, None)).unwrap();
+        let Some(FBlock::Table(t)) = f.blocks.iter().find(|b| matches!(b, FBlock::Table(_))) else { panic!("no table") };
+        assert!(t.widths.is_empty());
+    }
+
+    #[test]
     fn table_cell_style_background_is_shading() {
         // #437: `fo:background-color` on `style:table-cell-properties` is the cell's shading.
         let content = format!(
@@ -3117,6 +3386,23 @@ mod tests {
         let Some(FBlock::Table(t)) = f.blocks.iter().find(|b| matches!(b, FBlock::Table(_))) else { panic!("no table") };
         let row: Vec<_> = t.rows[0].iter().map(|c| (c.text(), c.shading)).collect();
         assert_eq!(row, vec![("Red".to_string(), Some(Rgb(255, 0, 0))), ("Plain".to_string(), None)]);
+    }
+
+    #[test]
+    fn table_cell_style_vertical_alignment() {
+        let content = format!(
+            r##"<office:document-content {NS_T}><office:automatic-styles><style:style style:name="MidCell" style:family="table-cell"><style:table-cell-properties style:vertical-align="middle"/></style:style><style:style style:name="BotCell" style:family="table-cell"><style:table-cell-properties style:vertical-align="bottom"/></style:style></office:automatic-styles><office:body><office:text><table:table><table:table-column table:number-columns-repeated="2"/><table:table-row><table:table-cell table:style-name="MidCell"><text:p>Mid</text:p></table:table-cell><table:table-cell table:style-name="BotCell"><text:p>Bot</text:p></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"##
+        );
+        let f = parse(&package(&content, None)).unwrap();
+        let Some(FBlock::Table(t)) = f.blocks.iter().find(|b| matches!(b, FBlock::Table(_))) else { panic!("no table") };
+        assert_eq!(t.rows[0][0].valign, Some(VAlign::Center));
+        assert_eq!(t.rows[0][1].valign, Some(VAlign::Bottom));
+        let doc = crate::model::to_doc(&f);
+        let bytes = export(&doc).unwrap();
+        let f2 = parse(&bytes).unwrap();
+        let Some(FBlock::Table(t2)) = f2.blocks.iter().find(|b| matches!(b, FBlock::Table(_))) else { panic!("no table in export") };
+        assert_eq!(t2.rows[0][0].valign, Some(VAlign::Center));
+        assert_eq!(t2.rows[0][1].valign, Some(VAlign::Bottom));
     }
 
     /// #1379: three master pages (A4 upright; A4 wide with page numbering restarting at 1; A4
@@ -3586,6 +3872,25 @@ mod tests {
     }
 
     #[test]
+    fn an_inserted_ruby_keeps_its_tracked_insertion() {
+        // ODF has no ruby: its base text is written as text, and the insertion on the ruby must
+        // still be a change range around that text, not plain untracked text.
+        use wordcraft_doc::RevisionKind::Insert;
+        let props = wordcraft_doc::props::CharProps::default();
+        let mut p = wordcraft_doc::Paragraph::with_text("before ", props.clone());
+        let n = p.len();
+        let mut ins = props.clone();
+        ins.ins = Some(0);
+        p.insert_object(n, crate::model::ruby_object("漢字".into(), "かんじ".into(), 20.0), &ins).unwrap();
+        let mut d = Document::new();
+        d.settings.track_changes = true;
+        d.revisions.push(wordcraft_doc::Revision::new(Insert, "Alice", "2024-03-01T10:00:00"));
+        d.body = vec![wordcraft_doc::para_block(p)];
+        let back = import(&export(&d).unwrap()).unwrap();
+        assert_eq!(rev_runs(&back), vec![(vec![("before ".to_string(), None), ("漢字".to_string(), Some(Insert))], None)]);
+    }
+
+    #[test]
     fn hostile_tracked_changes_are_bounded() {
         // Unknown and duplicate ids, a change-end without a start, nested regions, a deletion
         // inside a deletion, a change mark inside the deleted text and tracked changes inside a paragraph.
@@ -3749,7 +4054,7 @@ mod tests {
         assert_eq!(ps.len(), 1);
         let Some(InlineObject::Shape { kind, fill, stroke, float, story, w, .. }) = ps[0].objects.first() else { panic!("no shape: {:?}", ps[0]) };
         assert_eq!(*kind, ShapeKind::TextBox);
-        assert_eq!((*fill, *stroke), (Some(Rgb(0x1f, 0x49, 0x7d)), Some(Rgb(255, 255, 255))));
+        assert_eq!((fill.clone(), *stroke), (Some(wordcraft_doc::fill::Fill::solid(Rgb(0x1f, 0x49, 0x7d))), Some(Rgb(255, 255, 255))));
         assert_eq!(float.wrap, Wrap::BehindText);
         assert_eq!((float.h_rel, float.v_rel), (Anchor::Column, Anchor::Paragraph));
         assert!((float.y - -12.72 * 72.0 / 25.4).abs() < 0.01 && (float.x - -22.38 * 72.0 / 25.4).abs() < 0.01, "{float:?}");
@@ -3851,7 +4156,7 @@ mod tests {
         let Some(wordcraft_doc::Block::Para(p)) = d.body.first().map(|b| &**b) else { panic!("no paragraph") };
         let Some(InlineObject::Shape { kind, w, h, fill, stroke, stroke_width, float, story, .. }) = p.objects.first() else { panic!("{p:?}") };
         assert_eq!((*kind, *w, *h), (ShapeKind::TextBox, 144.0, 72.0));
-        assert_eq!((*fill, *stroke, *stroke_width), (Some(Rgb(255, 255, 0)), Some(Rgb(255, 0, 0)), 0.5));
+        assert_eq!((fill.clone(), *stroke, *stroke_width), (Some(wordcraft_doc::fill::Fill::solid(Rgb(255, 255, 0))), Some(Rgb(255, 0, 0)), 0.5));
         assert_eq!(float.wrap, Wrap::TopAndBottom);
         assert_eq!(d.plain_text(wordcraft_doc::StoryRef::Part(story.unwrap_or(0))), "Boxed");
         assert_eq!(p.text.replace(wordcraft_doc::para::OBJ, ""), "Text");
@@ -4015,5 +4320,57 @@ mod tests {
             let back = import(&export(&d).unwrap()).unwrap();
             assert_eq!(back.plain_text(wordcraft_doc::StoryRef::Body).trim_end_matches('\n'), t);
         }
+    }
+
+    #[test]
+    fn test_asian_complex_and_extended_text_properties() {
+        let content = format!(
+            r#"<office:document-content {NS_T}><office:automatic-styles>
+                <style:style style:name="AsianBold" style:family="paragraph"><style:text-properties style:font-weight-asian="bold"/></style:style>
+                <style:style style:name="ComplexItalic" style:family="paragraph"><style:text-properties style:font-style-complex="italic"/></style:style>
+                <style:style style:name="UlType" style:family="paragraph"><style:text-properties style:text-underline-type="single"/></style:style>
+                <style:style style:name="StrikeType" style:family="paragraph"><style:text-properties style:text-line-through-type="double"/></style:style>
+                <style:style style:name="CaseAlign" style:family="paragraph"><style:paragraph-properties fo:text-align="CENTER" fo:break-before="PAGE"/><style:text-properties fo:font-weight="BOLD"/></style:style>
+            </office:automatic-styles><office:body><office:text>
+                <text:p text:style-name="AsianBold">Asian</text:p>
+                <text:p text:style-name="ComplexItalic">Complex</text:p>
+                <text:p text:style-name="UlType">Underlined</text:p>
+                <text:p text:style-name="StrikeType">Struck</text:p>
+                <text:p text:style-name="CaseAlign">Centered</text:p>
+            </office:text></office:body></office:document-content>"#
+        );
+        let f = parse(&package(&content, None)).unwrap();
+        let ps = paras(&f);
+        assert_eq!(ps.len(), 5);
+
+        let fmt = |p: &Para| p.inlines.iter().find_map(|i| if let Inline::Text(_, f) = i { Some(f.clone()) } else { None }).unwrap();
+
+        assert!(fmt(ps[0]).bold);
+        assert!(fmt(ps[1]).italic);
+        assert!(fmt(ps[2]).underline);
+        assert!(fmt(ps[3]).strike);
+        assert!(fmt(ps[4]).bold);
+        assert_eq!(ps[4].align, Some(Align::Center));
+        assert!(ps[4].page_break);
+    }
+
+    #[test]
+    fn latin_attributes_win_over_asian_and_line_types() {
+        let content = format!(
+            r#"<office:document-content {NS_T}><office:automatic-styles>
+                <style:style style:name="AsianOnly" style:family="paragraph"><style:text-properties fo:font-weight="normal" style:font-weight-asian="bold" fo:font-style="normal" style:font-style-complex="italic"/></style:style>
+                <style:style style:name="NoLines" style:family="paragraph"><style:text-properties style:text-underline-style="none" style:text-underline-type="single" style:text-line-through-style="none" style:text-line-through-type="double"/></style:style>
+            </office:automatic-styles><office:body><office:text>
+                <text:p text:style-name="AsianOnly">Latin</text:p>
+                <text:p text:style-name="NoLines">Plain</text:p>
+            </office:text></office:body></office:document-content>"#
+        );
+        let f = parse(&package(&content, None)).unwrap();
+        let ps = paras(&f);
+        let fmt = |p: &Para| p.inlines.iter().find_map(|i| if let Inline::Text(_, f) = i { Some(f.clone()) } else { None }).unwrap();
+        assert!(!fmt(ps[0]).bold, "Asian bold does not make Latin text bold");
+        assert!(!fmt(ps[0]).italic, "complex-script italic does not make Latin text italic");
+        assert!(!fmt(ps[1]).underline, "a line type does not override a line style of none");
+        assert!(!fmt(ps[1]).strike);
     }
 }
