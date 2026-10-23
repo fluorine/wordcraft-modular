@@ -556,9 +556,10 @@ pub(crate) fn write_parts(doc: &Document, flavor: Flavor) -> Result<Vec<(String,
 }
 
 /// Replies made here have no anchors of their own, and Word for Mac shows a reply only when it
-/// has them (observed in Word for Mac 16.114: such a reply is dropped). Each is written with its
-/// parent's anchors, as Word saves a reply: both starts, then each end with its reference. Parent
-/// id → its replies without anchors, in id order.
+/// has them (observed in Word for Mac 16.114: such a reply is dropped). Each is written with the
+/// anchors of its parent, or of the nearest comment up its thread that has them, as Word saves a
+/// reply: both starts, then each end with its reference. Anchored comment id → its replies
+/// without anchors, in id order.
 fn unanchored_replies(doc: &Document) -> HashMap<u32, Vec<u32>> {
     let mut anchored = std::collections::HashSet::new();
     let stories = std::iter::once(wordcraft_doc::StoryRef::Body).chain(doc.parts.keys().map(|k| wordcraft_doc::StoryRef::Part(*k)));
@@ -571,13 +572,24 @@ fn unanchored_replies(doc: &Document) -> HashMap<u32, Vec<u32>> {
             }
         }
     }
+    // A reply to a reply made here has no anchored parent either: it takes the anchors of the
+    // nearest comment up its thread that has them.
+    let anchored_ancestor = |mut id: u32| {
+        for _ in 0..doc.comments.len() {
+            id = doc.comments.get(&id)?.parent?;
+            if anchored.contains(&id) {
+                return Some(id);
+            }
+        }
+        None
+    };
     let mut out: HashMap<u32, Vec<u32>> = HashMap::new();
     for (id, c) in &doc.comments {
-        if let Some(parent) = c.parent
+        if c.parent.is_some()
             && !anchored.contains(id)
-            && anchored.contains(&parent)
+            && let Some(root) = anchored_ancestor(*id)
         {
-            out.entry(parent).or_default().push(*id);
+            out.entry(root).or_default().push(*id);
         }
     }
     out
