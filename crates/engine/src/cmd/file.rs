@@ -326,7 +326,7 @@ fn save(s: &mut Session, v: &Value) -> CmdResult {
         Some(Value::Bool(confirmed)) => *confirmed,
         _ => return Err(CmdError::Params("`confirmDamaged` must be a boolean".into())),
     };
-    let confirmation_parts = s.damaged_source.as_ref().and_then(|(source, parts)| same_file_path(source, &path).then(|| parts.clone()));
+    let confirmation_parts = s.damaged_source.as_ref().and_then(|(source, parts)| crate::io::same_file_path(source, &path).then(|| parts.clone()));
     if let Some(skipped_parts) = confirmation_parts.filter(|_| !confirm_damaged) {
         s.push_ui_request(json!({
             "open": "confirmDamagedSave",
@@ -381,7 +381,7 @@ fn save(s: &mut Session, v: &Value) -> CmdResult {
     if own_file || ["docx", "docm", "dotx", "dotm", "odt", "rtf", "json", "xml"].contains(&ext.as_str()) {
         s.path = Some(path.clone());
         s.dirty = false;
-        if s.damaged_source.as_ref().is_some_and(|(source, _)| same_file_path(source, &path)) {
+        if s.damaged_source.as_ref().is_some_and(|(source, _)| crate::io::same_file_path(source, &path)) {
             s.damaged_source = None;
             s.doc.skipped_parts.clear();
         } else if s.damaged_source.is_none() {
@@ -390,16 +390,6 @@ fn save(s: &mut Session, v: &Value) -> CmdResult {
         s.relayout();
     }
     Ok(json!({"saved": true, "path": path.to_string_lossy(), "encrypted": encrypted}))
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn same_file_path(a: &std::path::Path, b: &std::path::Path) -> bool {
-    a == b || std::fs::canonicalize(a).ok().zip(std::fs::canonicalize(b).ok()).is_some_and(|(a, b)| a == b)
-}
-
-#[cfg(target_arch = "wasm32")]
-fn same_file_path(a: &std::path::Path, b: &std::path::Path) -> bool {
-    a == b
 }
 
 /// Does `path` hold a Word 2003 XML Document already (so a plain save keeps that format)?
