@@ -10194,9 +10194,28 @@ fn opening_a_docx_with_a_damaged_part_says_so() {
     *bytes.get_mut(data).expect("settings entry has data to corrupt") ^= 0xFF;
     std::fs::write(&path, &bytes).unwrap();
     let mut damaged = Session::new(wordcraft_doc::Document::new());
-    run(&mut damaged, "file.open", json!({"path": path.to_string_lossy()}));
+    let opened = run(&mut damaged, "file.open", json!({"path": path.to_string_lossy()}));
     assert!(damaged.status.contains("damaged"), "{:?}", damaged.status);
     assert_eq!(damaged.doc.plain_text(StoryRef::Body), "Hello", "the text still opens");
+    assert!(
+        opened["skippedParts"].as_array().is_some_and(|parts| parts.iter().any(|part| part == "word/settings.xml")),
+        "open result should identify the skipped part: {opened}"
+    );
+
+    // Saving over the damaged source is refused until the caller explicitly confirms it.
+    let damaged_bytes = std::fs::read(&path).unwrap();
+    let save_args = json!({"path": path.to_string_lossy()});
+    let refused = damaged.run("file.save", &save_args).unwrap();
+    assert_eq!(refused["saved"], false);
+    assert_eq!(refused["confirmationRequired"], "damagedDocx");
+    assert_eq!(std::fs::read(&path).unwrap(), damaged_bytes, "refused save must preserve the damaged source bytes");
+
+    let invalid = damaged.run("file.save", &json!({"path": path.to_string_lossy(), "confirmDamaged": "yes"}));
+    assert!(matches!(invalid, Err(crate::CmdError::Params(_))), "non-boolean confirmation must be rejected: {invalid:?}");
+
+    let confirmed = damaged.run("file.save", &json!({"path": path.to_string_lossy(), "confirmDamaged": true})).unwrap();
+    assert_eq!(confirmed["saved"], true);
+    assert!(damaged.damaged_source.is_none(), "confirmed overwrite clears the damaged-source guard");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
