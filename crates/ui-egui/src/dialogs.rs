@@ -2825,12 +2825,11 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                 match app.run("file.save", save_params) {
                     Ok(result) if result.get("saved").and_then(Value::as_bool) == Some(true) => {
                         app.dialog = None;
-                        if let Some(wait) = app.damaged_save_continuation.take() {
-                            if wait.document == app.session.document_id() {
-                                if let Err(error) = app.execute_user(&wait.then, wait.params) {
-                                    app.status(error);
-                                }
-                            }
+                        if let Some(wait) = app.damaged_save_continuation.take()
+                            && wait.document == app.session.document_id()
+                            && let Err(error) = app.execute_user(&wait.then, wait.params)
+                        {
+                            app.status(error);
                         }
                         return true;
                     }

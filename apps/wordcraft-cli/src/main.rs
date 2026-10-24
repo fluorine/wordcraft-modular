@@ -415,12 +415,8 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
             let confirm_damaged = rest.iter().any(|a| a == "--confirm-damaged");
             let password = password_from(&rest)?;
             let mut s = open(&i, password.as_deref())?;
-            if !s.doc.skipped_parts.is_empty() {
-                if s.path.as_deref().is_some_and(|source| same_file_path(source, Path::new(&o))) && !confirm_damaged {
-                    return Err(
-                        "convert: refusing to replace the damaged source; review the omitted parts and pass --confirm-damaged to continue".into()
-                    );
-                }
+            if !s.doc.skipped_parts.is_empty() && s.path.as_deref().is_some_and(|source| same_file_path(source, Path::new(&o))) && !confirm_damaged {
+                return Err("convert: refusing to replace the damaged source; review the omitted parts and pass --confirm-damaged to continue".into());
             }
             if rest.iter().any(|a| a == "--update-fields") {
                 s.run("references.updateFields", &json!({})).map_err(|e| e.to_string())?;
