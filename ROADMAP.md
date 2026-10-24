@@ -136,6 +136,7 @@ Ranked, to beta (detail and remaining milestones in [docs/roadmap.md](docs/roadm
 
 ## Progress log
 
+- 2026-10-24: Contextual KeyTips (#3854): use each tab's initial when free, then the first free letter; document the six app-assigned letters and note that Equation and Outlining do not yet badge controls.
 - 2026-10-22: Headers and footers: while editing the header, a single click in the footer edits the footer with the caret where clicked (and the reverse, and another page's own header or footer). The click went to the header being edited and the view scrolled back up to it, so a double-click on the footer rarely landed unless both were on screen.
 - 2026-10-21: Bullets and Numbering toggle off style-inherited lists at their effective level, including basedOn chains and numbered ListParagraph styles; other paragraphs and list definitions stay unchanged (related to #3459).
 
@@ -572,6 +573,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-24 | trivial | Progress log: contextual-tab KeyTips and their current control-badge coverage (#3854) |
 | 2026-10-22 | trivial | Progress log: a click in the footer while editing the header moves there |
 | 2026-10-18 | trivial | Explicit New/Open is not interrupted by startup recovery discovery; older copies stay available and Recover follows the interface theme. |
 | 2026-10-17 | trivial | Progress log: Home › Underline drop-down (#2738) |

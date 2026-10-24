@@ -141,24 +141,26 @@ pub fn tab_letter(tab: &str) -> &'static str {
 /// Contextual tabs with no fixed letters, in the order that hands out their letters.
 const LETTERED_TABS: [&str; 6] = ["Picture Format", "Shape Format", "SmartArt Design", "Chart Design", "Equation", "Outlining"];
 
-/// A letter for each of `LETTERED_TABS`: the first letter of its name that nothing else takes,
-/// else the first free letter. Tab letters, J (table tabs), Q (Search) and the first letters of
-/// the legacy menu keys are taken. The result never depends on the selection, so a tab keeps
-/// its letter.
-fn lettered_tab_letters() -> Vec<(&'static str, char)> {
-    let mut taken: Vec<char> = TAB_LETTERS.iter().chain(&TABLE_TAB_LETTERS).filter_map(|(_, l)| l.chars().next()).collect();
-    taken.extend(SEARCH_LETTER.chars());
-    taken.extend(legacy().iter().filter_map(|(k, _)| k.chars().next()));
-    let mut out = Vec::new();
-    for tab in LETTERED_TABS {
-        let own = tab.chars().filter(char::is_ascii_alphabetic).map(|c| c.to_ascii_uppercase());
-        let letter = own.chain('A'..='Z').find(|c| !taken.contains(c));
-        if let Some(c) = letter {
-            taken.push(c);
-            out.push((tab, c));
+/// A letter for each of `LETTERED_TABS`: use the tab's initial when free, else the first free
+/// letter. Tab letters, J (table tabs), Q (Search) and the first letters of legacy menu keys are
+/// taken. These app-assigned letters are fixed and do not claim to match Word's contextual tabs.
+fn lettered_tab_letters() -> &'static [(&'static str, char)] {
+    static LETTERS: std::sync::OnceLock<Vec<(&'static str, char)>> = std::sync::OnceLock::new();
+    LETTERS.get_or_init(|| {
+        let mut taken: Vec<char> = TAB_LETTERS.iter().chain(&TABLE_TAB_LETTERS).filter_map(|(_, l)| l.chars().next()).collect();
+        taken.extend(SEARCH_LETTER.chars());
+        taken.extend(legacy().iter().filter_map(|(k, _)| k.chars().next()));
+        let mut out = Vec::new();
+        for tab in LETTERED_TABS {
+            let initial = tab.chars().find(char::is_ascii_alphabetic).map(|c| c.to_ascii_uppercase());
+            let letter = initial.filter(|c| !taken.contains(c)).or_else(|| ('A'..='Z').find(|c| !taken.contains(c)));
+            if let Some(c) = letter {
+                taken.push(c);
+                out.push((tab, c));
+            }
         }
-    }
-    out
+        out
+    })
 }
 
 /// The tabs of the selection that take a letter from `lettered_tab_letters`, in display order.
@@ -582,10 +584,10 @@ fn letters_for(app: &WordApp, tab: &str) -> Vec<String> {
 /// Pure letter assignment `(tab letters, per-tab control letters)`, for tests without a window.
 #[cfg(test)]
 fn letters(app: &WordApp) -> (Vec<(&'static str, String)>, Vec<(String, Vec<String>)>) {
-    let tabs = badge_tabs(app).into_iter().map(|t| (t, tab_letter(t).to_string())).collect();
+    let tabs = badge_tabs(app).into_iter().map(|t| (t, tab_letter_for(app, t))).collect();
     let cmds = crate::ribbon::TABS
         .iter()
-        .filter(|t| !tab_letter(t).is_empty() || crate::ribbon::in_table_public(app))
+        .filter(|t| !tab_letter_for(app, t).is_empty() || crate::ribbon::in_table_public(app))
         .map(|t| ((*t).to_string(), letters_for(app, t)))
         .collect();
     (tabs, cmds)
@@ -1317,8 +1319,19 @@ mod tests {
     fn contextual_tabs_get_free_letters_that_open_them() {
         let all = lettered_tab_letters();
         assert_eq!(all.len(), LETTERED_TABS.len());
+        assert_eq!(
+            all,
+            &[
+                ("Picture Format", 'B'),
+                ("Shape Format", 'C'),
+                ("SmartArt Design", 'K'),
+                ("Chart Design", 'L'),
+                ("Equation", 'U'),
+                ("Outlining", 'X'),
+            ]
+        );
         let mut seen: Vec<char> = Vec::new();
-        for (tab, c) in &all {
+        for (tab, c) in all {
             assert!(!seen.contains(c), "{tab}: {c} is used twice");
             seen.push(*c);
             assert!(TAB_LETTERS.iter().all(|(_, l)| !l.starts_with(*c)), "{tab}: {c} is a tab letter");
