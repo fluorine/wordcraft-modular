@@ -1323,14 +1323,7 @@ mod tests {
         assert_eq!(all.len(), LETTERED_TABS.len());
         assert_eq!(
             all,
-            &[
-                ("Picture Format", 'B'),
-                ("Shape Format", 'C'),
-                ("SmartArt Design", 'K'),
-                ("Chart Design", 'L'),
-                ("Equation", 'U'),
-                ("Outlining", 'X'),
-            ]
+            &[("Picture Format", 'B'), ("Shape Format", 'C'), ("SmartArt Design", 'K'), ("Chart Design", 'L'), ("Equation", 'U'), ("Outlining", 'X'),]
         );
         let mut seen: Vec<char> = Vec::new();
         for (tab, c) in all {
