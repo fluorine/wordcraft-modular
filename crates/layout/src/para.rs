@@ -1922,11 +1922,8 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
             if !matches!(c.kind, ClKind::Text | ClKind::Space) {
                 return None;
             }
-            if !has_thai {
-                return Some(c.end);
-            }
             let visible = to_visible(c.end)?;
-            (!crate::kinsoku::boundary_touches_thai(&text, visible) || crate::kinsoku::is_safe_line_break(&text, visible)).then_some(c.end)
+            crate::kinsoku::is_safe_line_break(&text, visible).then_some(c.end)
         })
         .collect();
     for c in &mut b.clusters {
@@ -3636,6 +3633,37 @@ mod label_spacing_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hidden_and_deleted_source_cannot_expose_combining_mark_emergency_breaks() {
+        use crate::{LayoutCache, LayoutOptions, Placed};
+        use wordcraft_doc::{Document, Pos, StoryRef};
+
+        let text = "aX\u{0301}ก";
+        assert!(!crate::kinsoku::is_safe_line_break("a\u{0301}ก", 1), "the visible boundary between the base and combining mark is unsafe");
+        for deleted in [false, true] {
+            let mut doc = Document::from_text(text);
+            if deleted {
+                doc.format_range(&Pos::body(0, 1), &Pos::body(0, 2), &|c| c.del = Some(0)).unwrap();
+            } else {
+                doc.format_range(&Pos::body(0, 1), &Pos::body(0, 2), &|c| c.hidden = Some(true)).unwrap();
+            }
+            let mut cache = LayoutCache::new();
+            let options = LayoutOptions { hide_deleted: true, ..Default::default() };
+            let layout = crate::layout(&doc, &mut cache, &options);
+            let para = layout
+                .pages
+                .iter()
+                .flat_map(|page| &page.items)
+                .find_map(|item| match item {
+                    Placed::Lines { story: StoryRef::Body, path, para, .. } if path.0 == vec![0] => Some(para),
+                    _ => None,
+                })
+                .expect("body paragraph is laid out");
+            let base = para.clusters.iter().find(|c| c.end == 1).expect("base character has its own layout cluster");
+            assert!(!base.emergency_break_after, "hidden/deleted source must not make the combining mark a line start (deleted={deleted})");
+        }
+    }
 
     #[test]
     fn symbols_ignore_roman_hint() {
