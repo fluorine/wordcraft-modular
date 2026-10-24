@@ -2043,8 +2043,8 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             const FIND_TABS: [(FindTab, &str); 3] = [(FindTab::Find, "Find"), (FindTab::Replace, "Replace"), (FindTab::GoTo, "Go To")];
             let names = FIND_TABS.map(|(_, l)| tl!(l).to_string());
             let current = FIND_TABS.iter().position(|(t, _)| t == tab).unwrap_or(0);
-            if let Some(k) = crate::widgets::dialog_tabs(ui, &names, current) {
-                *tab = FIND_TABS[k].0;
+            if let Some((t, _)) = crate::widgets::dialog_tabs(ui, &names, current).and_then(|k| FIND_TABS.get(k)) {
+                *tab = *t;
                 message.clear();
             }
             ui.add_space(6.0);
