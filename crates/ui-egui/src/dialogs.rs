@@ -2795,7 +2795,8 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                 .inner;
             if ui.input(|i| i.key_pressed(egui::Key::Escape)) || answer.0 {
                 if let Some(wait) = app.damaged_save_continuation.take() {
-                    let message = "Save cancelled. The document is still open.".to_string();
+                    let name = app.prompt_name();
+                    let message = crate::i18n::fmt(tl!("Saving {name} was cancelled, so it is still open and nothing was lost."), &[("name", &name)]);
                     app.prompt_again(message, wait.then, wait.params, wait.document);
                 }
                 return true;
@@ -2803,6 +2804,7 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             if answer.1 {
                 let tracked_source = app.session.damaged_source.as_ref().is_some_and(|(source, _)| source == std::path::Path::new(path));
                 if app.session.document_id() != *document || (!tracked_source && app.session.path.as_deref() != Some(std::path::Path::new(path))) {
+                    app.damaged_save_continuation = None;
                     app.status(tl!("The document changed while this confirmation was open. Save canceled."));
                     return true;
                 }
