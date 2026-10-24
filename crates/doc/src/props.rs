@@ -1005,6 +1005,7 @@ pub struct ParaProps {
 }
 
 impl ParaProps {
+    /// Apply `patch` over these properties: every field `patch` sets replaces this one's.
     pub fn overlay(&mut self, patch: &ParaProps) {
         overlay_fields!(self, patch; style, align, indent_left, indent_right, indent_first, indent_left_chars, indent_right_chars, indent_first_chars, space_before, space_after, space_before_lines, space_after_lines, space_before_auto, space_after_auto, line_spacing,
             contextual_spacing, mirror_indents, keep_next, keep_lines, page_break_before, widow_control, outline_level, numbering, tabs, shading, borders,

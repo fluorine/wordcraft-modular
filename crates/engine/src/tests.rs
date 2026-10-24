@@ -9058,6 +9058,19 @@ fn spacing_commands_cancel_spacing_in_lines() {
     assert_eq!(rp(&s).space_before, 24.0);
     run(&mut s, "para.addSpaceBefore", json!({}));
     assert_eq!(rp(&s).space_before, 0.0, "Ctrl+0 takes away the inherited space");
+
+    // Each selected paragraph is checked, not just the one at the caret.
+    let mut t = Session::new(wordcraft_doc::Document::new());
+    run(&mut t, "text.insert", json!({"text": "Plain"}));
+    run(&mut t, "text.newParagraph", json!({}));
+    run(&mut t, "text.insert", json!({"text": "From WPS"}));
+    let path = t.sel.focus.path.clone();
+    t.doc.para_mut(StoryRef::Body, &path).unwrap().props.space_before_lines = Some(1.0);
+    run(&mut t, "select.all", json!({}));
+    run(&mut t, "para.spacing", json!({"before": 3}));
+    let props: Vec<_> = t.doc.body.iter().filter_map(|b| b.as_para()).map(|p| p.props.clone()).collect();
+    assert_eq!(props.iter().map(|p| p.space_before_lines).collect::<Vec<_>>(), [None, Some(0.0)], "only the paragraph with lines gets 0");
+    assert!(props.iter().all(|p| t.doc.styles.resolve_para(p).space_before == 3.0));
 }
 
 /// #712, as in Word: Ctrl+F (`edit.find` with no text) opens the Navigation pane and asks the UI

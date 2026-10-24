@@ -154,6 +154,7 @@ fn every_char_prop_round_trips() {
     assert_eq!(p.runs[0].props, CharProps::default());
 }
 
+/// Every paragraph property survives a DOCX save and reopen.
 #[test]
 fn every_para_prop_round_trips() {
     let b = Border { style: BorderStyle::Double, width: 0.75, color: Some(Rgb(9, 8, 7)), space: 4.0 };

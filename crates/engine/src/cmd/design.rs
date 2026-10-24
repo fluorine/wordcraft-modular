@@ -180,6 +180,8 @@ fn style_set(s: &mut Session, v: &Value) -> CmdResult {
     sel_result(s)
 }
 
+/// Design › Paragraph Spacing: a named preset sets the document defaults' space before, space
+/// after and line spacing, replacing any defaults' spacing in lines.
 fn para_spacing(s: &mut Session, v: &Value) -> CmdResult {
     let (before, after, line) = match p::req_str(v, "value")? {
         "none" => (0.0, 0.0, 1.0),

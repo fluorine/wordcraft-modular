@@ -29,6 +29,7 @@ fn props(d: &Document) -> Vec<ParaProps> {
     d.body.iter().filter_map(|b| b.as_para()).map(|p| p.props.clone()).collect()
 }
 
+/// `word/document.xml` of `d` saved as DOCX.
 fn document_xml(d: &Document) -> String {
     let mut z = zip::ZipArchive::new(std::io::Cursor::new(wordcraft_docx::write(d).unwrap())).unwrap();
     let mut xml = String::new();
@@ -36,6 +37,7 @@ fn document_xml(d: &Document) -> String {
     xml
 }
 
+/// Indents in characters: read, zero cancelling, hostile values, written back.
 #[test]
 fn character_indents_read_and_round_trip() {
     let body = r#"<w:p><w:pPr><w:ind w:firstLineChars="200" w:firstLine="420"/></w:pPr><w:r><w:t>一</w:t></w:r></w:p>

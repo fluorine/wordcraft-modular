@@ -255,6 +255,8 @@ pub const LINE_UNIT: f32 = 12.0;
 const MAX_SPACE: f32 = 1584.0;
 
 impl ResolvedPara {
+    /// The resolved form of the cascaded properties `p` of a paragraph in style `style`: defaults
+    /// filled in and values clamped. Character and line units stay as given until converted.
     fn from(p: &ParaProps, style: &str) -> ResolvedPara {
         let clampi = |v: Option<f32>| v.unwrap_or(0.0).clamp(-MAX_INDENT, MAX_INDENT);
         let mut tabs: Vec<TabStop> =

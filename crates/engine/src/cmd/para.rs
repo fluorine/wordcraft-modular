@@ -91,14 +91,14 @@ pub fn specs() -> Vec<CommandSpec> {
                 if let Some(x) = a {
                     p.space_after = Some(x.clamp(0.0, 1584.0));
                 }
-                cancel_line_spacing(p, &rp, b.is_some(), a.is_some());
                 if let Some(on) = b_auto {
                     p.space_before_auto = Some(on);
                 }
                 if let Some(on) = a_auto {
                     p.space_after_auto = Some(on);
                 }
-            })
+            })?;
+            cancel_line_spacing(s, b.is_some(), a.is_some())
         })
         .params(r#"{"before"?: pt, "after"?: pt, "beforeAuto"?: bool, "afterAuto"?: bool (automatic, HTML-style spacing: 14 pt)}"#),
         CommandSpec::new("para.addSpaceBefore", "Add Space Before Paragraph", "Home › Paragraph › Line Spacing", |s, _| {
@@ -106,11 +106,11 @@ pub fn specs() -> Vec<CommandSpec> {
             let has = rp.space_before > 0.0;
             fmt(s, &|p| {
                 p.space_before = Some(if has { 0.0 } else { 12.0 });
-                cancel_line_spacing(p, &rp, true, false);
                 if rp.before_auto {
                     p.space_before_auto = Some(false);
                 }
-            })
+            })?;
+            cancel_line_spacing(s, true, false)
         })
         .key("Mod+0"),
         CommandSpec::new("para.removeSpaceAfter", "Remove Space After Paragraph", "Home › Paragraph › Line Spacing", |s, _| {
@@ -118,11 +118,11 @@ pub fn specs() -> Vec<CommandSpec> {
             let has = rp.space_after > 0.0;
             fmt(s, &|p| {
                 p.space_after = Some(if has { 0.0 } else { 8.0 });
-                cancel_line_spacing(p, &rp, false, true);
                 if rp.after_auto {
                     p.space_after_auto = Some(false);
                 }
-            })
+            })?;
+            cancel_line_spacing(s, false, true)
         }),
         // Back to the paragraph style: direct indents, spacing, alignment… go; the style, list
         // membership and drop cap stay. ⌘Q quits on macOS, so Word for Mac uses ⌃Q.
@@ -251,15 +251,25 @@ pub fn specs() -> Vec<CommandSpec> {
     ]
 }
 
-/// After setting the space before/after in points: keep spacing in lines (the paragraph's own or
-/// an inherited one, `rp`) from winning over it, as Word does (`w:beforeLines="0"`).
-fn cancel_line_spacing(p: &mut ParaProps, rp: &wordcraft_doc::resolve::ResolvedPara, before: bool, after: bool) {
-    let [rb, ra] = rp.space_lines;
-    for (on, inherited, lines) in [(before, rb, &mut p.space_before_lines), (after, ra, &mut p.space_after_lines)] {
-        if on && (lines.is_some() || inherited != 0.0) {
-            *lines = Some(0.0);
+/// After setting the space before/after in points in the selected paragraphs: keep spacing in
+/// lines (each paragraph's own or inherited) from winning over it, as Word does
+/// (`w:beforeLines="0"`). Paragraphs without spacing in lines are left as they are.
+fn cancel_line_spacing(s: &mut Session, before: bool, after: bool) -> CmdResult {
+    let story = s.sel.focus.story;
+    for path in super::selected_paths(s) {
+        let Some(para) = s.doc.para(story, &path) else { continue };
+        let [b, a] = s.doc.styles.resolve_para(&para.props).space_lines;
+        let (b, a) = (before && b != 0.0, after && a != 0.0);
+        if b || a {
+            let props = &mut s.doc.para_mut(story, &path)?.props;
+            for (on, lines) in [(b, &mut props.space_before_lines), (a, &mut props.space_after_lines)] {
+                if on {
+                    *lines = Some(0.0);
+                }
+            }
         }
     }
+    sel_result(s)
 }
 
 /// Resolved paragraph props at the caret.
