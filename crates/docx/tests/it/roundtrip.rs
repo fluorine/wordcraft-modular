@@ -168,6 +168,8 @@ fn every_para_prop_round_trips() {
         indent_first_chars: Some(-1.0),
         space_before: Some(6.0),
         space_after: Some(12.0),
+        space_before_lines: Some(0.5),
+        space_after_lines: Some(0.0),
         space_before_auto: Some(true),
         space_after_auto: Some(false),
         line_spacing: Some(LineSpacing::Multiple(1.5)),

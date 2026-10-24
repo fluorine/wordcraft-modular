@@ -192,6 +192,7 @@ fn para_spacing(s: &mut Session, v: &Value) -> CmdResult {
     };
     s.doc.styles.default_para.space_before = Some(before);
     s.doc.styles.default_para.space_after = Some(after);
+    (s.doc.styles.default_para.space_before_lines, s.doc.styles.default_para.space_after_lines) = (None, None);
     s.doc.styles.default_para.line_spacing = Some(LineSpacing::Multiple(line));
     sel_result(s)
 }

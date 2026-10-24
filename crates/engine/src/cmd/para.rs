@@ -91,6 +91,7 @@ pub fn specs() -> Vec<CommandSpec> {
                 if let Some(x) = a {
                     p.space_after = Some(x.clamp(0.0, 1584.0));
                 }
+                cancel_line_spacing(p, &rp, b.is_some(), a.is_some());
                 if let Some(on) = b_auto {
                     p.space_before_auto = Some(on);
                 }
@@ -105,6 +106,7 @@ pub fn specs() -> Vec<CommandSpec> {
             let has = rp.space_before > 0.0;
             fmt(s, &|p| {
                 p.space_before = Some(if has { 0.0 } else { 12.0 });
+                cancel_line_spacing(p, &rp, true, false);
                 if rp.before_auto {
                     p.space_before_auto = Some(false);
                 }
@@ -116,6 +118,7 @@ pub fn specs() -> Vec<CommandSpec> {
             let has = rp.space_after > 0.0;
             fmt(s, &|p| {
                 p.space_after = Some(if has { 0.0 } else { 8.0 });
+                cancel_line_spacing(p, &rp, false, true);
                 if rp.after_auto {
                     p.space_after_auto = Some(false);
                 }
@@ -246,6 +249,17 @@ pub fn specs() -> Vec<CommandSpec> {
             sel_result(s)
         }),
     ]
+}
+
+/// After setting the space before/after in points: keep spacing in lines (the paragraph's own or
+/// an inherited one, `rp`) from winning over it, as Word does (`w:beforeLines="0"`).
+fn cancel_line_spacing(p: &mut ParaProps, rp: &wordcraft_doc::resolve::ResolvedPara, before: bool, after: bool) {
+    let [rb, ra] = rp.space_lines;
+    for (on, inherited, lines) in [(before, rb, &mut p.space_before_lines), (after, ra, &mut p.space_after_lines)] {
+        if on && (lines.is_some() || inherited != 0.0) {
+            *lines = Some(0.0);
+        }
+    }
 }
 
 /// Resolved paragraph props at the caret.

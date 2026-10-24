@@ -9033,6 +9033,33 @@ fn spacing_commands_handle_automatic_spacing() {
     assert!(s.run("para.spacing", &json!({"beforeAuto": "yes"})).is_ok(), "junk is ignored, never a panic");
 }
 
+/// Spacing in lines (`w:beforeLines`, from WPS Office and East Asian Word files) wins over the
+/// points, so setting the space in points cancels it (`Some(0.0)`, which also beats lines
+/// inherited from the style), as Word does; spacing in lines left alone is kept.
+#[test]
+fn spacing_commands_cancel_spacing_in_lines() {
+    let mut s = s();
+    run(&mut s, "text.insert", json!({"text": "From WPS"}));
+    let rp = |s: &Session| s.doc.styles.resolve_para(&s.doc.para_at(&s.sel.focus).unwrap().props);
+    let path = s.sel.focus.path.clone();
+    let props = &mut s.doc.para_mut(StoryRef::Body, &path).unwrap().props;
+    (props.space_before_lines, props.space_after_lines) = (Some(1.0), Some(0.5));
+    assert_eq!((rp(&s).space_before, rp(&s).space_after), (12.0, 6.0));
+    run(&mut s, "para.spacing", json!({"before": 3}));
+    let props = &s.doc.para_at(&s.sel.focus).unwrap().props;
+    assert_eq!((props.space_before_lines, props.space_after_lines), (Some(0.0), Some(0.5)), "only the space set is cancelled");
+    assert_eq!((rp(&s).space_before, rp(&s).space_after), (3.0, 6.0));
+    run(&mut s, "para.removeSpaceAfter", json!({}));
+    assert_eq!(rp(&s).space_after, 0.0);
+    // Lines from the paragraph's style are cancelled too.
+    s.doc.styles.default_para.space_before_lines = Some(2.0);
+    let path = s.sel.focus.path.clone();
+    s.doc.para_mut(StoryRef::Body, &path).unwrap().props.space_before_lines = None;
+    assert_eq!(rp(&s).space_before, 24.0);
+    run(&mut s, "para.addSpaceBefore", json!({}));
+    assert_eq!(rp(&s).space_before, 0.0, "Ctrl+0 takes away the inherited space");
+}
+
 /// #712, as in Word: Ctrl+F (`edit.find` with no text) opens the Navigation pane and asks the UI
 /// to put the keyboard in its search box, not the dialog; Ctrl+H (`edit.replace` with nothing to
 /// replace) opens Find and Replace on its Replace tab instead of failing; Go To moves by pages from
