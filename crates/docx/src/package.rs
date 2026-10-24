@@ -204,6 +204,9 @@ impl Package {
         if zip.len() > MAX_ENTRIES {
             return Err(DocxError::Limit(format!("{} zip entries", zip.len())));
         }
+        // Keep central-directory names separately: `by_index` can fail while reading a local
+        // header, but the caller still needs to know which package part was skipped.
+        let names = zip.file_names().map(|name| name.trim_start_matches('/').to_string()).collect::<Vec<_>>();
         let mut files = BTreeMap::new();
         let mut skipped = Vec::new();
         let mut total: u64 = 0;
@@ -212,7 +215,7 @@ impl Package {
                 Ok(f) => f,
                 Err(e) => {
                     log::warn!("docx: skipping unreadable zip entry {i}: {e}");
-                    skipped.push(format!("entry {i}"));
+                    skipped.push(names.get(i).cloned().unwrap_or_else(|| format!("entry {i}")));
                     continue;
                 }
             };

@@ -9614,11 +9614,15 @@ fn opening_a_docx_with_a_damaged_part_says_so() {
 
     // Change a byte inside the data of the part `word/settings.xml`, found by its local header.
     let mut bytes = std::fs::read(&path).unwrap();
-    let at = bytes.windows(17).position(|w| w == b"word/settings.xml").unwrap() - 30;
-    let (name_len, extra_len) =
-        (u16::from_le_bytes([bytes[at + 26], bytes[at + 27]]) as usize, u16::from_le_bytes([bytes[at + 28], bytes[at + 29]]) as usize);
-    let data = at + 30 + name_len + extra_len;
-    bytes[data + 4] ^= 0xFF;
+    let name_at = bytes.windows(17).position(|w| w == b"word/settings.xml").expect("settings entry name is in the DOCX");
+    let at = name_at.checked_sub(30).expect("local file header precedes its name");
+    let header = bytes.get(at..name_at).expect("local file header is complete");
+    assert_eq!(header.get(..4), Some(b"PK\x03\x04".as_slice()), "the entry name follows a local header");
+    let read_u16 = |range| bytes.get(at + range..at + range + 2).and_then(|v| <[u8; 2]>::try_from(v).ok()).map(u16::from_le_bytes).map(usize::from);
+    let name_len = read_u16(26).expect("local name length is present");
+    let extra_len = read_u16(28).expect("local extra length is present");
+    let data = name_at.checked_add(name_len).and_then(|at| at.checked_add(extra_len)).expect("settings data offset does not overflow");
+    *bytes.get_mut(data).expect("settings entry has data to corrupt") ^= 0xFF;
     std::fs::write(&path, &bytes).unwrap();
     let mut damaged = Session::new(wordcraft_doc::Document::new());
     run(&mut damaged, "file.open", json!({"path": path.to_string_lossy()}));
