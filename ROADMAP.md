@@ -118,7 +118,7 @@ Also shipped: Traditional Chinese (`zh-hant`), Ukrainian (`uk`), Serbian (`sr`, 
 system-locale selection and a saved language choice (Italian also has 51 strings none of the others had yet); Estonian proofing is not included. Hungarian (`hu`) has a
 complete 2,419-entry catalog, also without proofing. Vietnamese (`vi`, #1434) has a complete
 2,448-entry catalog, also without proofing. Croatian (`hr`, #1271) has a complete catalog.
-Proofing: English, Polish, Portuguese, Italian, Croatian, Turkish and Russian (spelling, grammar; hyphenation except Croatian), plus Czech and Indonesian (system Hunspell spelling, generic checks), chosen per run from its language; Bulgarian and German hyphenation only. Word ships
+Proofing: English, Polish, Portuguese, Italian, Croatian, Turkish and Russian (spelling, grammar; hyphenation except Croatian), plus Czech, Indonesian and Spanish (system Hunspell spelling, generic checks; Spanish per variety: Spain, Mexico, Latin America, Uruguay), chosen per run from its language; Bulgarian and German hyphenation only. Word ships
 30 interface languages and proofing for ~50. Detail: [docs/localization-parity.md](docs/localization-parity.md).
 
 ## Upcoming
@@ -144,6 +144,7 @@ Ranked, to beta (detail and remaining milestones in [docs/roadmap.md](docs/roadm
 - 2026-10-23: Lists: an empty paragraph whose mark is hidden takes no room and draws no list number, in the body and in table cells, as in Word; the number is still counted, so the next item keeps its place (#3982).
 - 2026-10-23: Font dialog: "NaN" or "inf" typed in the Size box previews the text at 12 pt. "NaN" reads as a number, and a font size that is not a number stopped the app while drawing the preview (#3663).
 - 2026-10-23: Tables: a cell span read from a `.json` document (any 32-bit number) no longer overflows when a column is inserted through the cell or the cell is merged: the span is counted from its clamped value and stays within 63 columns. It panicked in debug builds and wrapped to a small span in release (#3637).
+- 2026-10-22: Spanish proofing (#3360, #3553): text in Spanish was never checked (it fell through to the languages without tools). Now Spain (`es-ES`), Mexico (`es-MX`), Latin America (`es-419` and the other countries of the Americas) and Uruguay (`es-UY`) each read their own installed dictionary, with fallbacks; suggestions restore accents first (`prueva` → `prueba`, `tambien` → `también`); Uruguayan Spanish accepts the `vos` forms, imperatives included (`vení`, `decime`, `decímelo`); repeated-word, spacing and missing `¿`/`¡` checks explain in Spanish; Review › Language, the status bar and File › Options › Proofing list the four varieties, and a Spanish interface writes new documents in the region's Spanish. No dictionary data bundled; parity estimates unchanged
 - 2026-10-22: Headers and footers: while editing the header, a single click in the footer edits the footer with the caret where clicked (and the reverse, and another page's own header or footer). The click went to the header being edited and the view scrolled back up to it, so a double-click on the footer rarely landed unless both were on screen.
 - 2026-10-21: Bullets and Numbering toggle off style-inherited lists at their effective level, including basedOn chains and numbered ListParagraph styles; other paragraphs and list definitions stay unchanged (related to #3459).
 
@@ -603,6 +604,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 | 2026-10-23 | trivial | Progress log: a relationship the markup names without the prefix is read as it wrote (#3411 follow-up) |
 | 2026-10-21 | trivial | Progress log: a document with many relationships opens in the time its part takes (#3411) |
 | 2026-10-23 | trivial | Progress log: an empty paragraph with a hidden mark draws no list number (#3982) |
+| 2026-10-22 | minor | Progress log: Spanish proofing (#3360, #3553) |
 | 2026-10-22 | minor | Compare's new and revised untitled results clear the previous document's version snapshots; a rejected protected comparison or mailing result preserves the snapshots and file identity. |
 | 2026-10-22 | minor | The CLI author flag and the Options user name field cannot change the session name after protection starts (#3279 follow-up). |
 | 2026-10-21 | trivial | Progress log: a word with no break opportunity in it no longer makes the layout quadratic (#3412) |
