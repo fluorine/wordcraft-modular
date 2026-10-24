@@ -427,7 +427,8 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
                 }
                 s.run("file.save", &params)
             };
-            r.map_err(|e| e.to_string())?;
+            let result = r.map_err(|e| e.to_string())?;
+            ensure_save_completed(&result, &o)?;
             eprintln!("wrote {o}");
             Ok(())
         }
@@ -549,7 +550,8 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
                 } else {
                     s.run("file.save", &json!({"path": out}))
                 };
-                r.map_err(|e| e.to_string())?;
+                let result = r.map_err(|e| e.to_string())?;
+                ensure_save_completed(&result, &out)?;
                 eprintln!("wrote {out}");
             }
             Ok(())
@@ -658,7 +660,8 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
             }
             eprintln!("{} calls, {}", out.calls, if out.completed { "completed" } else { "ended without completing (cancelled?)" });
             if let Some(o) = arg_value(&rest, "--save") {
-                s.run("file.save", &json!({"path": o})).map_err(|e| e.to_string())?;
+                let result = s.run("file.save", &json!({"path": o})).map_err(|e| e.to_string())?;
+                ensure_save_completed(&result, &o)?;
                 eprintln!("wrote {o}");
             }
             Ok(())
@@ -671,6 +674,16 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
 
 fn same_file_path(a: &Path, b: &Path) -> bool {
     a == b || std::fs::canonicalize(a).ok().zip(std::fs::canonicalize(b).ok()).is_some_and(|(a, b)| a == b)
+}
+
+/// A refused damaged-DOCX overwrite is a successful command response, but not a completed write.
+fn ensure_save_completed(result: &Value, path: &str) -> Result<(), Failure> {
+    if result.get("saved").and_then(Value::as_bool) == Some(false)
+        && result.get("confirmationRequired").and_then(Value::as_str) == Some("damagedDocx")
+    {
+        return Err(format!("refusing to replace damaged source {path}; review skipped parts and confirm the save explicitly").into());
+    }
+    Ok(())
 }
 
 /// At most 400 characters of `s`, for traces.
