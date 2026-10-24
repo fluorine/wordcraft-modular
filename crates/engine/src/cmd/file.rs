@@ -89,9 +89,9 @@ pub fn specs() -> Vec<CommandSpec> {
             .pure(),
         CommandSpec::new("file.save", "Save", "File", save)
             .key("Mod+S / Shift+F12 / Alt+Shift+F2")
-            .params(r#"{"path"?: string, "password"?: string (encrypt this and later saves with it, as file.encrypt does), "markup"?: bool (Print Markup for a PDF, PNG, HTML, Markdown or text copy: comments shown; default file.printMarkup), "format"?: "wordml2003" (an .xml file as a Word 2003 XML Document) | "flatopc" (as a Word XML Document, the default; saving over a Word 2003 XML file keeps that format), "confirmDamaged"?: bool (when true, allow overwriting the source after file.open skipped damaged DOCX parts; otherwise the same-source save returns confirmationRequired: damagedDocx)}"#)
+            .params(r#"{"path"?: string, "password"?: string (encrypt this and later saves with it, as file.encrypt does), "markup"?: bool (Print Markup for a PDF, PNG, HTML, Markdown or text copy: comments shown; default file.printMarkup), "format"?: "wordml2003" (an .xml file as a Word 2003 XML Document) | "flatopc" (as a Word XML Document, the default; saving over a Word 2003 XML file keeps that format), "confirmDamaged"?: bool (when true, allow overwriting the originally damaged DOCX source; otherwise a save to that source returns confirmationRequired: damagedDocx)}"#)
             .pure(),
-        CommandSpec::new("file.saveAs", "Save As", "File", save_as).key(super::mac_or("F12 / Mod+Shift+S", "F12 / Alt+F2")).params(r#"{"path": string, "password"?: string, "markup"?: bool, "format"?: string (as file.save), "confirmDamaged"?: bool (when true, allow overwriting the source after file.open skipped damaged DOCX parts; otherwise the same-source save returns confirmationRequired: damagedDocx)}"#).pure(),
+        CommandSpec::new("file.saveAs", "Save As", "File", save_as).key(super::mac_or("F12 / Mod+Shift+S", "F12 / Alt+F2")).params(r#"{"path": string, "password"?: string, "markup"?: bool, "format"?: string (as file.save), "confirmDamaged"?: bool (when true, allow overwriting the originally damaged DOCX source; otherwise a save to that source returns confirmationRequired: damagedDocx)}"#).pure(),
         // Pure: the password must not land in Repeat or a recorded macro, and it isn't an edit
         // to undo; it marks the document as changed itself.
         CommandSpec::new("file.encrypt", "Encrypt with Password", "File › Info › Protect Document", encrypt)
@@ -254,6 +254,9 @@ fn open(s: &mut Session, v: &Value) -> CmdResult {
     }
     let skipped_parts = doc.skipped_parts.clone();
     s.set_document(doc);
+    if !skipped_parts.is_empty() {
+        s.damaged_source = Some((path.into(), skipped_parts.clone()));
+    }
     s.status.clear();
     if let Some(z) = s.doc.settings.zoom {
         super::view::restore_zoom(s, z);
@@ -323,14 +326,15 @@ fn save(s: &mut Session, v: &Value) -> CmdResult {
         Some(Value::Bool(confirmed)) => *confirmed,
         _ => return Err(CmdError::Params("`confirmDamaged` must be a boolean".into())),
     };
-    if !s.doc.skipped_parts.is_empty() && s.path.as_deref().is_some_and(|source| same_file_path(source, &path)) && !confirm_damaged {
-        let skipped_parts = s.doc.skipped_parts.clone();
+    let confirmation_parts = s.damaged_source.as_ref().and_then(|(source, parts)| same_file_path(source, &path).then(|| parts.clone()));
+    if let Some(skipped_parts) = confirmation_parts.filter(|_| !confirm_damaged) {
         s.push_ui_request(json!({
             "open": "confirmDamagedSave",
             "path": path.to_string_lossy(),
             "skippedParts": skipped_parts.iter().take(3).collect::<Vec<_>>(),
             "skippedPartsMore": skipped_parts.len().saturating_sub(3),
             "document": s.document_id(),
+            "params": v,
         }));
         return Ok(json!({"saved": false, "confirmationRequired": "damagedDocx", "skippedParts": skipped_parts}));
     }
@@ -377,7 +381,12 @@ fn save(s: &mut Session, v: &Value) -> CmdResult {
     if own_file || ["docx", "docm", "dotx", "dotm", "odt", "rtf", "json", "xml"].contains(&ext.as_str()) {
         s.path = Some(path.clone());
         s.dirty = false;
-        s.doc.skipped_parts.clear();
+        if s.damaged_source.as_ref().is_some_and(|(source, _)| same_file_path(source, &path)) {
+            s.damaged_source = None;
+            s.doc.skipped_parts.clear();
+        } else if s.damaged_source.is_none() {
+            s.doc.skipped_parts.clear();
+        }
         s.relayout();
     }
     Ok(json!({"saved": true, "path": path.to_string_lossy(), "encrypted": encrypted}))

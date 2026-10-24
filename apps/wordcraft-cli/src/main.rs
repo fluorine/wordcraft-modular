@@ -87,6 +87,9 @@ fn open(path: &Path, password: Option<&str>) -> Result<Session, String> {
     // paper, as in the app: A4 in Italy, Letter in the US (#1381).
     let region = system_region();
     let (doc, encrypted) = wordcraft_engine::io::open_path_in(path, password, &region)?;
+    if !doc.skipped_parts.is_empty() {
+        eprintln!("{}", wordcraft_engine::cmd::file::skipped_parts_warning(&doc.skipped_parts));
+    }
     let mut s = session(doc);
     s.path = Some(path.into());
     if encrypted {
@@ -405,7 +408,6 @@ fn run<S: AsRef<OsStr>>(args: &[S]) -> Result<(), Failure> {
             let password = password_from(&rest)?;
             let mut s = open(&i, password.as_deref())?;
             if !s.doc.skipped_parts.is_empty() {
-                eprintln!("{}", wordcraft_engine::cmd::file::skipped_parts_warning(&s.doc.skipped_parts));
                 if s.path.as_deref().is_some_and(|source| same_file_path(source, Path::new(&o))) && !confirm_damaged {
                     return Err(
                         "convert: refusing to replace the damaged source; review the omitted parts and pass --confirm-damaged to continue".into()

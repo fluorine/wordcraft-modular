@@ -367,6 +367,8 @@ pub struct Session {
     /// Formatting picked with a collapsed caret, applied to the next typed text.
     pub pending: Option<CharProps>,
     pub path: Option<std::path::PathBuf>,
+    /// Source file for unreadable parts, retained when the user saves a recovery copy.
+    pub damaged_source: Option<(std::path::PathBuf, Vec<String>)>,
     /// Name given to a document not saved yet (File › Info › Rename): what Save suggests. A file
     /// name, not document metadata, so it is not part of the document or its undo history.
     pub file_name: Option<String>,
@@ -685,6 +687,7 @@ impl Session {
             view: ViewState::default(),
             pending: None,
             path: None,
+            damaged_source: None,
             file_name: None,
             user_dict_path: None,
             dirty: false,
@@ -1279,6 +1282,7 @@ impl Session {
         self.document_id = self.document_id.wrapping_add(1);
         self.bib_style = doc_bib_style(&doc);
         self.doc = doc;
+        self.damaged_source = None;
         self.doc.ensure_nonempty();
         self.password = None;
         self.file_name = None;
@@ -1324,6 +1328,7 @@ impl Session {
             view: _,
             pending: _,
             path: _,
+            damaged_source: _,
             file_name: _,
             // The custom dictionary file, like the file path: host wiring, not an edit.
             user_dict_path: _,

@@ -211,6 +211,13 @@ struct AwaitingSave {
     rev: u64,
 }
 
+/// A Save Changes command held until the user confirms a damaged-source overwrite.
+struct DamagedSaveContinuation {
+    then: String,
+    params: Value,
+    document: u64,
+}
+
 /// What [`Services::make_default_app`] did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DefaultApp {
@@ -644,6 +651,7 @@ pub struct WordApp {
     saves_in_flight: Vec<SaveInFlight>,
     /// Web: the command a Save Changes prompt held back until its picker save ends (#1315).
     awaiting_save: Option<AwaitingSave>,
+    damaged_save_continuation: Option<DamagedSaveContinuation>,
     /// The file dialog the host is showing, and what its answer is for ([`file_dialogs`]).
     file_dialog: Option<file_dialogs::PendingDialog>,
     /// The built-in file browser, when it is open, and the folder it showed last (#576).
@@ -752,6 +760,7 @@ impl WordApp {
             autosave_path: None,
             saves_in_flight: Vec::new(),
             awaiting_save: None,
+            damaged_save_continuation: None,
             change_picture_target: None,
             recipient_list_pending: false,
             font_generation: wordcraft_fonts::FontDb::global().generation(),
@@ -1182,7 +1191,7 @@ impl WordApp {
                     file_dialogs::Asked::Busy => Ok(json!({"done": false})),
                 };
             }
-            SaveChoice::Save => match self.save_for_prompt() {
+            SaveChoice::Save => match self.save_for_prompt(&then, &params, document) {
                 Ok(PromptSave::Saved) => true,
                 Ok(PromptSave::NotSaved) => false,
                 // The browser's picker finishes later: the command waits for it (#1315).
@@ -1239,8 +1248,13 @@ impl WordApp {
     /// file locked by another app, a missing folder) is the save's error ([`Self::save_failed`]
     /// tells the user).
     /// In the browser the save picker may write the file later ([`PromptSave::Later`], #1315).
-    fn save_for_prompt(&mut self) -> Result<PromptSave, String> {
-        let v = self.execute("file.save", json!({}))?;
+    fn save_for_prompt(&mut self, then: &str, params: &Value, document: u64) -> Result<PromptSave, String> {
+        let v = self.execute_user("file.save", json!({}))?;
+        if v.get("confirmationRequired").and_then(Value::as_str) == Some("damagedDocx") {
+            self.damaged_save_continuation = Some(DamagedSaveContinuation { then: then.into(), params: params.clone(), document });
+        } else {
+            self.damaged_save_continuation = None;
+        }
         let saved = v.get("saved").and_then(Value::as_bool) == Some(true) || v.get("downloaded").is_some();
         if !self.safely_saved(saved) {
             return Ok(PromptSave::NotSaved);
@@ -1500,7 +1514,9 @@ impl WordApp {
                         .unwrap_or_default();
                     let skipped_parts_more = req.get("skippedPartsMore").and_then(Value::as_u64).unwrap_or(0) as usize;
                     let document = req.get("document").and_then(Value::as_u64).unwrap_or_else(|| self.session.document_id());
-                    self.dialog = Some(dialogs::Dialog::ConfirmDamagedSave { path: path.into(), skipped_parts, skipped_parts_more, document });
+                    let params = req.get("params").cloned().unwrap_or_else(|| json!({"path": path}));
+                    self.dialog =
+                        Some(dialogs::Dialog::ConfirmDamagedSave { path: path.into(), skipped_parts, skipped_parts_more, document, params });
                 }
                 "saveAs" => {
                     self.save_as_dialog();
