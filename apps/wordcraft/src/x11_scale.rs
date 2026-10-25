@@ -112,6 +112,7 @@ fn format_factor(factor: f64) -> String {
 }
 
 /// Combine `xrdb -query` and `xdpyinfo` outputs into a scale factor.
+#[allow(dead_code)]
 pub fn scale_factor_from_outputs(xrdb: &str, xdpyinfo: &str) -> f64 {
     scale_factor_from_outputs_opt(xrdb, xdpyinfo).unwrap_or(1.0)
 }
