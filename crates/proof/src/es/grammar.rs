@@ -187,22 +187,15 @@ const PARTICIPLES_WITH_A: &[(&str, &str)] = &[
     ("comentado", "ha comentado"),
     ("comido", "ha comido"),
     ("corrido", "ha corrido"),
-    ("dicho", "ha dicho"),
     ("guardado", "ha guardado"),
     ("hecho", "ha hecho"),
-    ("ido", "ha ido"),
     ("imprimido", "ha impreso"),
     ("llamado", "ha llamado"),
     ("pensado", "ha pensado"),
-    ("podido", "ha podido"),
-    ("puesto", "ha puesto"),
-    ("querido", "ha querido"),
-    ("sabido", "ha sabido"),
     ("seleccionado", "ha seleccionado"),
     ("sombreado", "ha sombreado"),
     ("subido", "ha subido"),
     ("surgido", "ha surgido"),
-    ("tenido", "ha tenido"),
     ("venido", "ha venido"),
     ("visto", "ha visto"),
     ("vuelto", "ha vuelto"),
@@ -522,14 +515,16 @@ mod tests {
         assert_eq!(haber[1].suggestions, ["ha venido"]);
 
         // Capitalized
-        let text_cap = "A dicho la verdad.";
+        let text_cap = "A llamado hoy.";
         let issues_cap = check(text_cap, ProofLang::Es);
         let haber_cap: Vec<&Issue> = issues_cap.iter().filter(|i| i.message.contains("forma del verbo haber")).collect();
         assert_eq!(haber_cap.len(), 1);
-        assert_eq!(haber_cap[0].suggestions, ["Ha dicho"]);
+        assert_eq!(haber_cap[0].suggestions, ["Ha llamado"]);
 
-        // Correct usage of 'a' should not trigger
-        assert!(check("Voy a comer a la casa.", ProofLang::Es).is_empty());
+        // Correct usage of 'a' and adjectival 'dicho' must NOT trigger
+        for ok_text in ["Voy a comer a la casa.", "Escribí a dicho cliente.", "Conforme a dicho acuerdo."] {
+            assert!(check(ok_text, ProofLang::Es).is_empty(), "{ok_text}: {:?}", check(ok_text, ProofLang::Es));
+        }
     }
 
     #[test]
