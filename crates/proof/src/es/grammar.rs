@@ -18,9 +18,12 @@ fn issue(start: usize, end: usize, message: String, suggestions: Vec<String>, la
 /// every one).
 pub fn check(text: &str, lang: ProofLang) -> Vec<Issue> {
     let mut issues = Vec::new();
-    repeated_words(text, &words(text), lang, &mut issues);
+    let ws = words(text);
+    repeated_words(text, &ws, lang, &mut issues);
     spaces(text, lang, &mut issues);
     opening_marks(text, lang, &mut issues);
+    check_haber_participles(text, &ws, lang, &mut issues);
+    check_interrogative_accents(text, lang, &mut issues);
     issues.sort_by_key(|i| (i.start, i.end));
     issues
 }
@@ -174,6 +177,113 @@ fn opening_marks(text: &str, lang: ProofLang, v: &mut Vec<Issue>) {
             continue;
         }
         v.push(issue(start, i + 1, message.into(), vec![format!("{opener}{sentence}")], lang));
+    }
+}
+
+/// Known participles commonly confused with preposition 'a' (e.g. "a hecho" -> "ha hecho").
+const PARTICIPLES_WITH_A: &[(&str, &str)] = &[
+    ("bajado", "ha bajado"),
+    ("bebido", "ha bebido"),
+    ("comentado", "ha comentado"),
+    ("comido", "ha comido"),
+    ("corrido", "ha corrido"),
+    ("dicho", "ha dicho"),
+    ("guardado", "ha guardado"),
+    ("hecho", "ha hecho"),
+    ("ido", "ha ido"),
+    ("imprimido", "ha impreso"),
+    ("llamado", "ha llamado"),
+    ("pensado", "ha pensado"),
+    ("podido", "ha podido"),
+    ("puesto", "ha puesto"),
+    ("querido", "ha querido"),
+    ("sabido", "ha sabido"),
+    ("seleccionado", "ha seleccionado"),
+    ("sombreado", "ha sombreado"),
+    ("subido", "ha subido"),
+    ("surgido", "ha surgido"),
+    ("tenido", "ha tenido"),
+    ("venido", "ha venido"),
+    ("visto", "ha visto"),
+    ("vuelto", "ha vuelto"),
+];
+
+fn check_haber_participles(text: &str, ws: &[(usize, usize)], lang: ProofLang, v: &mut Vec<Issue>) {
+    let folded = |w: &str| w.nfc().collect::<String>().to_lowercase();
+    for pair in ws.windows(2) {
+        let [(a0, b0), (a1, b1)] = pair else { continue };
+        let (Some(w0), Some(w1), Some(gap)) = (text.get(*a0..*b0), text.get(*a1..*b1), text.get(*b0..*a1)) else { continue };
+        if !gap.is_empty() && gap.chars().all(char::is_whitespace) && folded(w0) == "a" {
+            let w1_lower = folded(w1);
+            if let Some(&(_, fix)) = PARTICIPLES_WITH_A.iter().find(|(p, _)| *p == w1_lower) {
+                let Some(actual) = text.get(*a0..*b1) else { continue };
+                let suggestion = if w0.starts_with('A') {
+                    let mut s = fix.to_string();
+                    if let Some(c) = s.get_mut(0..1) {
+                        c.make_ascii_uppercase();
+                    }
+                    s
+                } else {
+                    fix.to_string()
+                };
+                v.push(issue(
+                    *a0,
+                    *b1,
+                    format!("Probable confusión: «{actual}» debería ser «{suggestion}» (forma del verbo haber)"),
+                    vec![suggestion],
+                    lang,
+                ));
+            }
+        }
+    }
+}
+
+/// Interrogative / exclamative pronouns that must carry a diacritic accent inside questions or exclamations.
+const INTERROGATIVES: &[(&str, &str)] = &[
+    ("como", "cómo"),
+    ("cuando", "cuándo"),
+    ("donde", "dónde"),
+    ("adonde", "adónde"),
+    ("que", "qué"),
+    ("quien", "quién"),
+    ("quienes", "quiénes"),
+    ("cual", "cuál"),
+    ("cuales", "cuáles"),
+    ("cuanto", "cuánto"),
+    ("cuanta", "cuánta"),
+    ("cuantos", "cuántos"),
+    ("cuantas", "cuántas"),
+];
+
+fn check_interrogative_accents(text: &str, lang: ProofLang, v: &mut Vec<Issue>) {
+    for (q_idx, c) in text.char_indices() {
+        if c != '¿' && c != '¡' {
+            continue;
+        }
+        let close_mark = if c == '¿' { '?' } else { '!' };
+        let Some(rest) = text.get(q_idx + c.len_utf8()..) else { continue };
+        let Some(end_rel) = rest.find(close_mark) else { continue };
+        let Some(question_body) = rest.get(..end_rel) else { continue };
+        let base_offset = q_idx + c.len_utf8();
+
+        for (w_start, w_end) in words(question_body) {
+            let Some(word_str) = question_body.get(w_start..w_end) else { continue };
+            let folded_word = word_str.nfc().collect::<String>().to_lowercase();
+            if let Some(&(_, accented)) = INTERROGATIVES.iter().find(|(u, _)| *u == folded_word) {
+                let abs_start = base_offset + w_start;
+                let abs_end = base_offset + w_end;
+                let sug = if word_str.chars().next().is_some_and(char::is_uppercase) {
+                    let mut s = accented.to_string();
+                    if let Some(c) = s.get_mut(0..1) {
+                        c.make_ascii_uppercase();
+                    }
+                    s
+                } else {
+                    accented.to_string()
+                };
+                v.push(issue(abs_start, abs_end, format!("El pronombre interrogativo o exclamativo debe llevar tilde: «{sug}»"), vec![sug], lang));
+            }
+        }
     }
 }
 
@@ -377,6 +487,43 @@ mod tests {
         assert_eq!(spaced, ["¿ ", "¡ "], "{issues:?}");
         assert!(issues.iter().all(|i| !i.message.starts_with("Falta")), "{issues:?}");
         assert!(check("¿ ", ProofLang::Es).is_empty());
+    }
+
+    #[test]
+    fn haber_participles_flag_confusion_with_preposition_a() {
+        let text = "El usuario a hecho una copia y a venido hoy.";
+        let issues = check(text, ProofLang::EsMx);
+        let haber: Vec<&Issue> = issues.iter().filter(|i| i.message.contains("forma del verbo haber")).collect();
+        assert_eq!(haber.len(), 2, "{issues:?}");
+        assert_eq!(&text[haber[0].start..haber[0].end], "a hecho");
+        assert_eq!(haber[0].suggestions, ["ha hecho"]);
+        assert_eq!(&text[haber[1].start..haber[1].end], "a venido");
+        assert_eq!(haber[1].suggestions, ["ha venido"]);
+
+        // Capitalized
+        let text_cap = "A dicho la verdad.";
+        let issues_cap = check(text_cap, ProofLang::Es);
+        let haber_cap: Vec<&Issue> = issues_cap.iter().filter(|i| i.message.contains("forma del verbo haber")).collect();
+        assert_eq!(haber_cap.len(), 1);
+        assert_eq!(haber_cap[0].suggestions, ["Ha dicho"]);
+
+        // Correct usage of 'a' should not trigger
+        assert!(check("Voy a comer a la casa.", ProofLang::Es).is_empty());
+    }
+
+    #[test]
+    fn interrogative_pronouns_require_accents_inside_questions() {
+        let text = "¿Como estas? ¡Que sorpresa!";
+        let issues = check(text, ProofLang::Es);
+        let tildes: Vec<&Issue> = issues.iter().filter(|i| i.message.contains("debe llevar tilde")).collect();
+        assert_eq!(tildes.len(), 2, "{issues:?}");
+        assert_eq!(&text[tildes[0].start..tildes[0].end], "Como");
+        assert_eq!(tildes[0].suggestions, ["Cómo"]);
+        assert_eq!(&text[tildes[1].start..tildes[1].end], "Que");
+        assert_eq!(tildes[1].suggestions, ["Qué"]);
+
+        // Accented words inside questions should not trigger
+        assert!(check("¿Cómo estás? ¡Qué sorpresa!", ProofLang::Es).is_empty());
     }
 
     proptest::proptest! {
