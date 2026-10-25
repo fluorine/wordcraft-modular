@@ -4863,18 +4863,22 @@ fn leading_spaces_keep_their_width_in_justified_lines() {
             l.pages[0].items.iter().find_map(|it| if let Placed::Lines { para, x, .. } = it { Some((para.clone(), *x)) } else { None }).unwrap();
         assert!(para.lines.len() > 1, "the paragraph wraps");
         let line = &para.lines[0];
-        let end = text[line.start..line.stop].trim_end().len();
-        (para.x_of(0, lead).unwrap(), para.x_of(0, line.start + end).unwrap() + x0)
+        // The first line's last character (ASCII here): its index and left and right positions.
+        let end = line.start + text[line.start..line.stop].trim_end().len();
+        (para.x_of(0, lead).unwrap(), end, para.x_of(0, end - 1).unwrap() + x0, para.x_of(0, end).unwrap() + x0)
     };
     for (hidden, float) in [("", false), ("hidden", false), ("", true)] {
-        let (left, left_end) = first_x(Align::Left, hidden, float);
+        let (left, left_end, left_from, left_to) = first_x(Align::Left, hidden, float);
         for align in [Align::Justify, Align::Distribute] {
-            let (x, end) = first_x(align, hidden, float);
+            let (x, end, from, _) = first_x(align, hidden, float);
             let case = format!("{align:?} hidden {hidden:?} float {float}");
             assert!((x - left).abs() < 0.01, "{case}: the first character is at {x}, left-aligned at {left}");
-            assert!(end > left_end + 1.0, "{case}: the line is still stretched ({end} vs {left_end})");
-            // The line ends with the space it wrapped at; the last character still reaches the margin.
-            assert!((end - 540.0).abs() < 0.05, "{case}: the line's text ends at {end}, not the margin");
+            assert_eq!(end, left_end, "{case}: the line breaks where it does left-aligned");
+            assert!(from > left_from + 1.0, "{case}: the line is still stretched ({from} vs {left_from})");
+            // The line ends with the space it wrapped at; its last character, keeping its own
+            // advance, still ends at the margin: no gap is left after it.
+            let ink_end = from + (left_to - left_from);
+            assert!((ink_end - 540.0).abs() < 0.05, "{case}: the line's last character ends at {ink_end}, not the margin");
         }
     }
 }
@@ -4966,6 +4970,30 @@ fn justified_line_ending_in_line_break_is_stretched() {
     let kept = ends(true);
     assert_eq!(kept.len(), 2, "{kept:?}");
     assert!(kept[0] < 400.0, "doNotExpandShiftReturn keeps the line before the break short: {}", kept[0]);
+}
+
+/// A distributed line that ends in a manual line break stretches its characters to the margin, as
+/// in Word (measured with a synthetic `distribute` paragraph): the break itself takes no gap.
+#[test]
+fn distributed_line_ending_in_line_break_reaches_the_margin() {
+    let first = "We tie the spend";
+    let text = format!("{first}\nto a pipe");
+    // The left edge of the first line's last character and the position after it, on the page.
+    let last = |align: Align| {
+        let mut d = Document::from_text("");
+        let mut p = wordcraft_doc::Paragraph::with_text(&text, Default::default());
+        p.props = ParaProps { align: Some(align), ..Default::default() };
+        d.body = vec![wordcraft_doc::para_block(p)];
+        let l = lay(&d);
+        let (para, x) =
+            l.pages[0].items.iter().find_map(|it| if let Placed::Lines { para, x, .. } = it { Some((para.clone(), *x)) } else { None }).unwrap();
+        (para.x_of(0, first.len() - 1).unwrap() + x, para.x_of(0, first.len()).unwrap() + x)
+    };
+    let (left_from, left_to) = last(Align::Left);
+    let (from, _) = last(Align::Distribute);
+    // The last character keeps its own advance and ends at the margin: no gap is left after it.
+    let ink_end = from + (left_to - left_from);
+    assert!((ink_end - 540.0).abs() < 0.05, "the line's last character ends at {ink_end}, not the margin");
 }
 
 #[test]
