@@ -252,51 +252,62 @@ const INTERROGATIVES: &[(&str, &str)] = &[
 const INTERROGATIVE_PREPOSITIONS: &[&str] = &["a", "de", "en", "por", "para", "con", "hacia", "hasta", "desde", "sobre"];
 
 fn check_interrogative_accents(text: &str, lang: ProofLang, v: &mut Vec<Issue>) {
-    for (q_idx, c) in text.char_indices() {
-        if c != '¿' && c != '¡' {
-            continue;
-        }
-        let close_mark = if c == '¿' { '?' } else { '!' };
-        let Some(rest) = text.get(q_idx + c.len_utf8()..) else { continue };
-        let Some(end_rel) = rest.find(close_mark) else { continue };
-        let Some(question_body) = rest.get(..end_rel) else { continue };
-        let base_offset = q_idx + c.len_utf8();
-        let body_words = words(question_body);
+    // Single linear pass over text to find matched question/exclamation spans without overlapping rescans
+    let mut current_opener_start: Option<usize> = None;
 
-        for (idx, &(w_start, w_end)) in body_words.iter().enumerate() {
-            let Some(word_str) = question_body.get(w_start..w_end) else { continue };
-            let folded_word = word_str.nfc().collect::<String>().to_lowercase();
-            let Some(&(_, accented)) = INTERROGATIVES.iter().find(|(u, _)| *u == folded_word) else { continue };
-
-            // Restrict suggestions to actual interrogative/exclamative positions (at the start of
-            // the clause, or right after an introductory preposition like "¿A dónde?", "¿Por qué?").
-            // Relative and conjunctive uses inside the clause (e.g. "¿Crees que vendrá?",
-            // "¿Qué pasa cuando llueve?") correctly take no accent per RAE rules.
-            let is_interrogative_position = if idx == 0 {
-                true
-            } else if idx == 1 {
-                let Some((p_start, p_end)) = body_words.first().copied() else { continue };
-                let Some(prev_word) = question_body.get(p_start..p_end) else { continue };
-                let prev_folded = prev_word.nfc().collect::<String>().to_lowercase();
-                INTERROGATIVE_PREPOSITIONS.contains(&prev_folded.as_str())
-            } else {
-                false
-            };
-
-            if is_interrogative_position {
-                let abs_start = base_offset + w_start;
-                let abs_end = base_offset + w_end;
-                let sug = if word_str.chars().next().is_some_and(char::is_uppercase) {
-                    let mut s = accented.to_string();
-                    if let Some(c) = s.get_mut(0..1) {
-                        c.make_ascii_uppercase();
-                    }
-                    s
-                } else {
-                    accented.to_string()
-                };
-                v.push(issue(abs_start, abs_end, format!("El pronombre interrogativo o exclamativo debe llevar tilde: «{sug}»"), vec![sug], lang));
+    for (i, c) in text.char_indices() {
+        match c {
+            '¿' | '¡' => {
+                current_opener_start = Some(i + c.len_utf8());
             }
+            '?' | '!' => {
+                if let Some(start) = current_opener_start.take()
+                    && start < i
+                    && let Some(question_body) = text.get(start..i)
+                {
+                    check_clause_interrogatives(question_body, start, lang, v);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn check_clause_interrogatives(question_body: &str, base_offset: usize, lang: ProofLang, v: &mut Vec<Issue>) {
+    let body_words = words(question_body);
+    for (idx, &(w_start, w_end)) in body_words.iter().enumerate() {
+        let Some(word_str) = question_body.get(w_start..w_end) else { continue };
+        let folded_word = word_str.nfc().collect::<String>().to_lowercase();
+        let Some(&(_, accented)) = INTERROGATIVES.iter().find(|(u, _)| *u == folded_word) else { continue };
+
+        // Restrict suggestions to actual interrogative/exclamative positions (at the start of
+        // the clause, or right after an introductory preposition like "¿A dónde?", "¿Por qué?").
+        // Relative and conjunctive uses inside the clause (e.g. "¿Crees que vendrá?",
+        // "¿Qué pasa cuando llueve?") correctly take no accent per RAE rules.
+        let is_interrogative_position = if idx == 0 {
+            true
+        } else if idx == 1 {
+            let Some((p_start, p_end)) = body_words.first().copied() else { continue };
+            let Some(prev_word) = question_body.get(p_start..p_end) else { continue };
+            let prev_folded = prev_word.nfc().collect::<String>().to_lowercase();
+            INTERROGATIVE_PREPOSITIONS.contains(&prev_folded.as_str())
+        } else {
+            false
+        };
+
+        if is_interrogative_position {
+            let abs_start = base_offset + w_start;
+            let abs_end = base_offset + w_end;
+            let sug = if word_str.chars().next().is_some_and(char::is_uppercase) {
+                let mut s = accented.to_string();
+                if let Some(c) = s.get_mut(0..1) {
+                    c.make_ascii_uppercase();
+                }
+                s
+            } else {
+                accented.to_string()
+            };
+            v.push(issue(abs_start, abs_end, format!("El pronombre interrogativo o exclamativo debe llevar tilde: «{sug}»"), vec![sug], lang));
         }
     }
 }
@@ -546,6 +557,16 @@ mod tests {
         for text in ["¿Crees que vendrá?", "¿Qué pasa cuando llueve?", "¿Sabes si viene?", "¿Cómo estás? ¡Qué sorpresa!"] {
             assert!(check(text, ProofLang::Es).is_empty(), "{text}: {:?}", check(text, ProofLang::Es));
         }
+    }
+
+    #[test]
+    fn repeated_openers_scan_linearly_without_quadratic_blowup() {
+        let repeated = "¿que ".repeat(2_000) + "?";
+        let started = std::time::Instant::now();
+        let issues = check(&repeated, ProofLang::Es);
+        let took = started.elapsed();
+        assert!(took < std::time::Duration::from_millis(50), "took {took:?}");
+        assert_eq!(issues.iter().filter(|i| i.message.contains("debe llevar tilde")).count(), 1);
     }
 
     proptest::proptest! {
