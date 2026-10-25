@@ -636,11 +636,8 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 
 | Date | Change | Summary |
 |---|---|---|
-<<<<<<< HEAD
 | 2026-10-25 | trivial | Progress log: justified and distributed lines keep the width of the spaces before their first character |
-=======
 | 2026-10-17 | trivial | Progress log: Standard-encrypted (AES) Word files open (gap 9) |
->>>>>>> origin/main
 | 2026-10-25 | trivial | Progress log: Text Highlight Color buttons show the remembered colour, or no colour bar after No Color (#4087) |
 | 2026-10-23 | minor | A command that changes nothing is not an edit: no undo step, no unsaved changes, no relayout, and the redo stack survives it. |
 | 2026-10-23 | trivial | cu20we: preserve and render outline caps across DOCX/VML, screen and PDF; synthetic regressions; readiness estimates unchanged |
