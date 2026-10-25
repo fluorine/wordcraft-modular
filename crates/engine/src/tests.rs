@@ -56,6 +56,30 @@ fn encrypted_doc_asks_for_a_password_and_rejects_a_wrong_one() {
     assert!(crate::io::needs_password(&e), "{e}");
 }
 
+/// Gap 9: AES-encrypted Word files — Standard encryption (Word 2007) and agile packages — open
+/// with the right password whatever Word extension they carry, and ask for one or refuse a wrong
+/// one the same way.
+#[test]
+fn aes_encrypted_packages_open_under_any_word_extension() {
+    let mut doc = wordcraft_doc::Document::from_text("Old secret minutes");
+    doc.core.title = "Minutes".into();
+    let pkg = wordcraft_docx::write(&doc).unwrap();
+    let standard = wordcraft_docx::encrypt_standard_for_tests(&pkg, "letmein", 128).unwrap();
+    let agile = wordcraft_docx::encrypt_with_spin_count(&pkg, "letmein", 8).unwrap();
+    for (kind, bytes) in [("standard", &standard), ("agile", &agile)] {
+        for name in ["old.doc", "old.docx", "old.dot", "noext"] {
+            let (d, encrypted) = crate::io::open_bytes_with(name, bytes, Some("letmein")).unwrap_or_else(|e| panic!("{kind} {name}: {e}"));
+            assert!(encrypted, "{kind} {name}");
+            assert!(d.plain_text(StoryRef::Body).contains("Old secret minutes"), "{kind} {name}");
+            assert_eq!(d.core.title, "Minutes");
+            let e = crate::io::open_bytes_with(name, bytes, None).unwrap_err();
+            assert!(crate::io::needs_password(&e), "{kind} {name}: {e}");
+            let e = crate::io::open_bytes_with(name, bytes, Some("letmeout")).unwrap_err();
+            assert!(crate::io::wrong_password(&e), "{kind} {name}: {e}");
+        }
+    }
+}
+
 #[test]
 fn txt_open_decodes_windows_1252_and_unmarked_utf16() {
     // #433: the TXT open path sniffs encodings like the formats importer.
@@ -4487,6 +4511,21 @@ fn word_count_with_an_object_selected_counts_the_document() {
     assert_eq!(run(&mut s, "review.wordCount", json!({}))["words"].as_u64(), Some(1));
 }
 
+/// #2982: a property imported from a file made by an older Word may have a name longer than
+/// today's limit. Such a name is still deletable (the dialog sends `null`), while setting or
+/// renaming a property to it stays refused.
+#[test]
+fn custom_properties_delete_legacy_names_but_new_names_keep_the_limit() {
+    let mut s = s();
+    let long = "x".repeat(crate::cmd::file::MAX_CUSTOM_NAME + 1);
+    s.doc.custom_props.push(wordcraft_doc::CustomProp { name: long.clone(), kind: "raw".into(), value: "<data/>".into() });
+    let mut custom = serde_json::Map::new();
+    custom.insert(long.clone(), serde_json::Value::Null);
+    run(&mut s, "file.properties", json!({"custom": custom}));
+    assert!(s.doc.custom_props.is_empty(), "the legacy name could be deleted");
+    assert!(s.run("file.properties", &json!({"custom": { (long): "x" }})).is_err(), "a new or updated name keeps the limit");
+}
+
 #[test]
 fn custom_properties_set_read_remove_and_undo() {
     let mut s = s();
@@ -4502,6 +4541,37 @@ fn custom_properties_set_read_remove_and_undo() {
     assert!(s.run("file.properties", &json!({"custom": {"n": 3}})).is_err());
     run(&mut s, "edit.undo", json!({}));
     assert_eq!(s.doc.custom_prop("Status"), Some("draft"));
+}
+
+/// #2982: a case-only rename arrives as the old spelling with null and the new one with its
+/// value. The removal must run first: object keys are sorted, so `Status` sorts before
+/// `status`, and setting before removing would let the removal take the new spelling too.
+#[test]
+fn custom_properties_case_only_rename_keeps_the_new_spelling() {
+    let mut s = s();
+    run(&mut s, "file.properties", json!({"custom": {"status": "draft"}}));
+    run(&mut s, "file.properties", json!({"custom": {"Status": "draft", "status": null}}));
+    let props: Vec<(&str, &str)> = s.doc.custom_props.iter().map(|p| (p.name.as_str(), p.value.as_str())).collect();
+    assert_eq!(props, [("Status", "draft")], "the property keeps the new spelling and its value");
+}
+
+/// #2982: what the Custom Properties dialog saves (through `file.properties`) survives a .docx
+/// save and reopen.
+#[test]
+fn custom_properties_round_trip_through_docx() {
+    let mut s = s();
+    run(&mut s, "file.properties", json!({"custom": {"Status": "draft", "Reviewer": "Ada L."}}));
+    let back = wordcraft_docx::read(&wordcraft_docx::write(&s.doc).unwrap()).unwrap();
+    assert_eq!(back.custom_prop("Status"), Some("draft"));
+    assert_eq!(back.custom_prop("Reviewer"), Some("Ada L."));
+    assert_eq!(back.custom_props.len(), 2);
+    // One call removes one and adds another; the saved file follows the document.
+    run(&mut s, "file.properties", json!({"custom": {"Status": null, "Owner": "Ada L."}}));
+    let back = wordcraft_docx::read(&wordcraft_docx::write(&s.doc).unwrap()).unwrap();
+    assert_eq!(back.custom_prop("Status"), None);
+    assert_eq!(back.custom_prop("Reviewer"), Some("Ada L."));
+    assert_eq!(back.custom_prop("Owner"), Some("Ada L."));
+    assert_eq!(back.custom_props.len(), 2);
 }
 
 /// `document_id` tells an edit from a replacement (the UI drops a "Save changes?" prompt
@@ -10576,4 +10646,115 @@ fn export_png_refuses_a_path_that_is_not_png() {
         assert!(std::fs::read(&target).unwrap().starts_with(b"\x89PNG"), "{name} is not a PNG");
     }
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn style_set_keeps_imported_styles_latent_styles_and_defaults() {
+    use wordcraft_doc::props::{Rgb, TextColor};
+    use wordcraft_doc::styles::{Style, StyleKind};
+    for name in ["basic", "lines", "shaded", "casual", "centered", "minimalist", "title"] {
+        let mut s = s();
+        let mut body = s.doc.styles.get("Normal").unwrap().clone();
+        body.id = "BodyText".into();
+        body.name = "Body Text".into();
+        body.builtin = true;
+        body.based_on = Some("Normal".into());
+        body.chr.size = Some(20.0);
+        body.chr.color = Some(TextColor::Rgb(Rgb(0xFF, 0, 0)));
+        let grid = Style { id: "GridTable4".into(), name: "Grid Table 4".into(), kind: StyleKind::Table, builtin: true, ..Default::default() };
+        s.doc.styles.styles.push(body.clone());
+        s.doc.styles.styles.push(grid.clone());
+        s.doc.styles.latent_styles = Some("<w:latentStyles/>".into());
+        s.doc.styles.default_chr.lang = Some("de-DE".into());
+        s.doc.styles.default_chr.size = Some(11.0);
+        run(&mut s, "design.styleSet", json!({ "name": name }));
+        assert_eq!(s.doc.styles.get("BodyText"), Some(&body), "{name}: BodyText");
+        assert_eq!(s.doc.styles.get("GridTable4"), Some(&grid), "{name}: GridTable4");
+        assert_eq!(s.doc.styles.latent_styles.as_deref(), Some("<w:latentStyles/>"), "{name}");
+        assert_eq!(s.doc.styles.default_chr.lang.as_deref(), Some("de-DE"), "{name}");
+        assert_eq!(s.doc.styles.default_chr.size, Some(11.0), "{name}");
+        assert_eq!(s.doc.styles.styles.iter().filter(|x| x.id == "Heading1").count(), 1, "{name}");
+        let saved = crate::io::save_bytes("x.docx", &s.doc).unwrap();
+        let back = crate::io::open_bytes("x.docx", &saved).unwrap();
+        assert!(back.styles.get("BodyText").is_some(), "{name}: BodyText after round trip");
+    }
+    let mut s = s();
+    run(&mut s, "design.styleSet", json!({ "name": "title" }));
+    assert_eq!(s.doc.styles.get("Title").unwrap().chr.size, Some(36.0));
+}
+
+fn style_size(s: &Session, id: &str) -> f32 {
+    s.doc.styles.resolve_char(Some(id), &Default::default()).size
+}
+
+#[test]
+fn scale_font_sizes_adds_points_to_every_style() {
+    let mut s = Session::new(crate::sample::sample_document());
+    let ids: Vec<String> = s.doc.styles.styles.iter().map(|x| x.id.clone()).collect();
+    let before: Vec<f32> = ids.iter().map(|i| style_size(&s, i)).collect();
+    let base = s.doc.styles.resolve_char(None, &Default::default()).size;
+    let runs = serde_json::to_string(&s.doc.body).unwrap();
+    run(&mut s, "design.scaleFontSizes", json!({"delta": 2}));
+    // Every style (explicit or inherited) grows by exactly 2, once.
+    for (i, b) in ids.iter().zip(&before) {
+        assert_eq!(style_size(&s, i), b + 2.0, "{i}");
+    }
+    assert_eq!(s.doc.styles.resolve_char(None, &Default::default()).size, base + 2.0);
+    assert_eq!(serde_json::to_string(&s.doc.body).unwrap(), runs, "runs untouched");
+    run(&mut s, "edit.undo", json!({}));
+    for (i, b) in ids.iter().zip(&before) {
+        assert_eq!(style_size(&s, i), *b, "undo {i}");
+    }
+}
+
+#[test]
+fn scale_font_sizes_percent_and_clamp_and_errors() {
+    let mut s = Session::new(crate::sample::sample_document());
+    let n = style_size(&s, "Normal");
+    run(&mut s, "design.scaleFontSizes", json!({"percent": 10}));
+    assert_eq!(style_size(&s, "Normal"), (n * 1.1 * 2.0).round() / 2.0);
+    run(&mut s, "design.scaleFontSizes", json!({"delta": -500}));
+    assert_eq!(style_size(&s, "Normal"), 1.0);
+    for bad in [
+        json!({}),
+        json!({"delta": 1e9}),
+        json!({"percent": -100}),
+        json!({"percent": 1e9}),
+        json!({"delta": "x"}),
+        json!({"delta": 0}),
+        json!({"percent": 0}),
+        json!({"delta": 1, "percent": 10}),
+        json!({"delta": 2, "percent": "x"}),
+        json!({"percent": 10, "delta": null}),
+    ] {
+        assert!(s.run("design.scaleFontSizes", &bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
+fn scale_font_sizes_reaches_char_table_and_cs_sizes_and_unset_default() {
+    use wordcraft_doc::props::CharProps;
+    use wordcraft_doc::{Style, StyleKind, styles::TablePart};
+    let mut s = s();
+    s.doc.styles.default_chr.size = None;
+    s.doc.styles.default_chr.size_cs = Some(10.0);
+    let mut ch = Style { id: "Big".into(), name: "Big".into(), kind: StyleKind::Character, ..Default::default() };
+    ch.chr.size = Some(20.0);
+    ch.chr.size_cs = Some(22.0);
+    let mut tb = Style { id: "Grid".into(), name: "Grid".into(), kind: StyleKind::Table, ..Default::default() };
+    let mut parts = wordcraft_doc::styles::TableStyleParts::default();
+    parts.header_chr.size = Some(14.0);
+    parts.regions.entry(TablePart::Band2Horz).or_default().chr.size = Some(8.0);
+    tb.table = Some(parts);
+    s.doc.styles.styles.extend([ch, tb]);
+    run(&mut s, "design.scaleFontSizes", json!({"delta": 2}));
+    let st = &s.doc.styles;
+    assert_eq!(st.default_chr.size, Some(13.0), "unset default is 11 pt, made explicit");
+    assert_eq!(st.default_chr.size_cs, Some(12.0));
+    let big = CharProps { style: Some("Big".into()), ..Default::default() };
+    assert_eq!(st.resolve_char(None, &big).size, 22.0);
+    assert_eq!(st.resolve_char(None, &big).size_cs, 24.0);
+    let grid = st.styles.iter().find(|x| x.id == "Grid").and_then(|x| x.table.as_ref()).unwrap();
+    assert_eq!(grid.header_chr.size, Some(16.0));
+    assert_eq!(grid.regions.get(&TablePart::Band2Horz).unwrap().chr.size, Some(10.0));
 }
