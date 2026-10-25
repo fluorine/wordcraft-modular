@@ -4844,16 +4844,20 @@ fn justified_lines_shrink_spaces_in_word_2013_mode() {
 fn leading_spaces_keep_their_width_in_justified_lines() {
     let spaces = " ".repeat(20);
     let body = "We tie the spend to a pipe and to the books, so it is in an ad hoc view of all of it. ".repeat(4);
-    // `hidden` (zero-width hidden text before the spaces, as Word ignores a bookmark or hidden
-    // text there too): the first character is still the one after the spaces.
-    let first_x = |align: Align, hidden: &str| {
-        let text = format!("{hidden}{spaces}{body}");
-        let lead = hidden.len() + spaces.len();
-        let mut d = Document::from_text(&text);
+    // `hidden` (zero-width hidden text before the spaces) and `float` (a floating shape anchored
+    // before them): Word ignores those, and a bookmark, there too; the first character is still
+    // the one after the spaces.
+    let first_x = |align: Align, hidden: &str, float: bool| {
+        let mut d = Document::from_text(&format!("{hidden}{spaces}{body}"));
         d.format_paragraphs(&Pos::body(0, 0), &Pos::body(0, 0), &|p| p.align = Some(align)).unwrap();
         if !hidden.is_empty() {
             d.format_range(&Pos::body(0, 0), &Pos::body(0, hidden.len()), &|c| c.hidden = Some(true)).unwrap();
         }
+        if float {
+            d.insert_object(&Pos::body(0, 0), rect_shape(20.0, 20.0, page_float(400.0, 600.0)), &Default::default()).unwrap();
+        }
+        let text = d.body[0].as_para().unwrap().text.clone();
+        let lead = text.len() - body.len();
         let l = lay(&d);
         let (para, x0) =
             l.pages[0].items.iter().find_map(|it| if let Placed::Lines { para, x, .. } = it { Some((para.clone(), *x)) } else { None }).unwrap();
@@ -4862,14 +4866,15 @@ fn leading_spaces_keep_their_width_in_justified_lines() {
         let end = text[line.start..line.stop].trim_end().len();
         (para.x_of(0, lead).unwrap(), para.x_of(0, line.start + end).unwrap() + x0)
     };
-    for hidden in ["", "hidden"] {
-        let (left, left_end) = first_x(Align::Left, hidden);
+    for (hidden, float) in [("", false), ("hidden", false), ("", true)] {
+        let (left, left_end) = first_x(Align::Left, hidden, float);
         for align in [Align::Justify, Align::Distribute] {
-            let (x, end) = first_x(align, hidden);
-            assert!((x - left).abs() < 0.01, "{align:?} {hidden:?}: the first character is at {x}, left-aligned at {left}");
-            assert!(end > left_end + 1.0, "{align:?} {hidden:?}: the line is still stretched ({end} vs {left_end})");
+            let (x, end) = first_x(align, hidden, float);
+            let case = format!("{align:?} hidden {hidden:?} float {float}");
+            assert!((x - left).abs() < 0.01, "{case}: the first character is at {x}, left-aligned at {left}");
+            assert!(end > left_end + 1.0, "{case}: the line is still stretched ({end} vs {left_end})");
             // The line ends with the space it wrapped at; the last character still reaches the margin.
-            assert!((end - 540.0).abs() < 0.05, "{align:?} {hidden:?}: the line's text ends at {end}, not the margin");
+            assert!((end - 540.0).abs() < 0.05, "{case}: the line's text ends at {end}, not the margin");
         }
     }
 }

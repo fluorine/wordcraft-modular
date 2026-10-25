@@ -2595,8 +2595,13 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u32, level: Optio
         } else if justify && slack > 0.0 {
             // Spaces before the line's first character (after the last tab) keep their width, as
             // in Word: text indented with spaces stays where the spaces put it. Zero-width markers
-            // (a bookmark, hidden text) before or among them don't count as a character.
-            let blank = |k: usize| pl.clusters.get(k).is_some_and(|c| matches!(c.kind, ClKind::Space | ClKind::Marker));
+            // (a bookmark, hidden text) and floating objects' anchors before or among them don't
+            // count as a character.
+            let blank = |k: usize| {
+                pl.clusters.get(k).is_some_and(|c| {
+                    matches!(c.kind, ClKind::Space | ClKind::Marker) || (matches!(c.kind, ClKind::Object(_)) && c.adv == 0.0 && c.obj_h == 0.0)
+                })
+            };
             let text_from = (align_from..c1).find(|k| !blank(*k)).unwrap_or(c1);
             // Spaces inside the content.
             let spaces: Vec<usize> = (text_from..c1)
