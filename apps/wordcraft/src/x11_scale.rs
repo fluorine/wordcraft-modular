@@ -11,8 +11,6 @@
 
 /// Re-exec with `WINIT_X11_SCALE_FACTOR` set from the desktop when on X11 and unset.
 pub fn apply() {
-    #[cfg(not(all(unix, not(target_os = "macos"))))]
-    return;
     #[cfg(all(unix, not(target_os = "macos")))]
     apply_impl();
 }
@@ -28,20 +26,16 @@ fn apply_impl() {
     {
         return;
     }
-    let xrdb = std::process::Command::new("xrdb")
-        .arg("-query")
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default();
-    let xdpy = std::process::Command::new("xdpyinfo")
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default();
-    let factor = scale_factor_from_outputs(&xrdb, &xdpy);
+    let xrdb = run_query("xrdb", &["-query"]);
+    let xdpy = run_query("xdpyinfo", &[]);
+    // XSETTINGS takes precedence in winit. If a settings manager is present and Xft.dpi is not,
+    // leave the environment alone so winit can use its value.
+    if parse_xft_dpi(&xrdb).is_none() && !run_query("xprop", &["-root", "_XSETTINGS_SETTINGS"]).is_empty() {
+        return;
+    }
+    let Some(factor) = scale_factor_from_outputs_opt(&xrdb, &xdpy) else {
+        return;
+    };
     if !valid_scale_factor(factor) {
         return;
     }
@@ -55,6 +49,50 @@ fn apply_impl() {
     let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     let err = std::process::Command::new(exe).args(args).env("WINIT_X11_SCALE_FACTOR", format_factor(factor)).exec();
     log::warn!("x11 scale: re-exec failed ({err}); continuing with winit defaults");
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn run_query(program: &str, args: &[&str]) -> String {
+    use std::io::Read as _;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    let Ok(mut child) = Command::new(program).args(args).stdout(Stdio::piped()).stderr(Stdio::null()).spawn() else {
+        return String::new();
+    };
+    let Some(mut stdout) = child.stdout.take() else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return String::new();
+    };
+    let reader = std::thread::spawn(move || {
+        let mut out = Vec::new();
+        let mut buf = [0_u8; 4096];
+        loop {
+            match stdout.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) if out.len() < 64 * 1024 => out.extend_from_slice(&buf[..n.min(64 * 1024 - out.len())]),
+                Ok(_) => {}
+            }
+        }
+        out
+    });
+    let deadline = Instant::now() + Duration::from_millis(750);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let bytes = reader.join().unwrap_or_default();
+                return if status.success() { String::from_utf8_lossy(&bytes).into_owned() } else { String::new() };
+            }
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = reader.join();
+                return String::new();
+            }
+        }
+    }
 }
 
 fn valid_scale_factor(factor: f64) -> bool {
@@ -75,16 +113,22 @@ fn format_factor(factor: f64) -> String {
 
 /// Combine `xrdb -query` and `xdpyinfo` outputs into a scale factor.
 pub fn scale_factor_from_outputs(xrdb: &str, xdpyinfo: &str) -> f64 {
+    scale_factor_from_outputs_opt(xrdb, xdpyinfo).unwrap_or(1.0)
+}
+
+fn scale_factor_from_outputs_opt(xrdb: &str, xdpyinfo: &str) -> Option<f64> {
     if let Some(dpi) = parse_xft_dpi(xrdb) {
-        return dpi / 96.0;
+        let factor = dpi / 96.0;
+        if valid_scale_factor(factor) { return Some(factor); }
     }
     if let Some(dpi) = parse_xdpyinfo_resolution(xdpyinfo) {
-        return dpi / 96.0;
+        let factor = dpi / 96.0;
+        if valid_scale_factor(factor) { return Some(factor); }
     }
     if let Some((pixels, mm)) = parse_xdpyinfo_dimensions(xdpyinfo) {
-        return calc_dpi_factor(pixels, mm);
+        return Some(calc_dpi_factor(pixels, mm));
     }
-    1.0
+    None
 }
 
 /// Same quantization as winit's `calc_dpi_factor`: 1/12 steps, at least 1.0.
