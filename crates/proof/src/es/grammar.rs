@@ -251,6 +251,13 @@ const INTERROGATIVES: &[(&str, &str)] = &[
 /// Prepositions that can precede an interrogative/exclamative pronoun at the start of a clause.
 const INTERROGATIVE_PREPOSITIONS: &[&str] = &["a", "de", "en", "por", "para", "con", "hacia", "hasta", "desde", "sobre"];
 
+/// Subject pronouns that can introduce a subject before an interrogative in a question (e.g. "¿Tú qué harás?", "¿Y tú qué harás?").
+const SUBJECT_PRONOUNS: &[&str] =
+    &["yo", "tú", "tu", "él", "el", "ella", "ello", "usted", "nosotros", "nosotras", "vosotros", "vosotras", "ellos", "ellas", "ustedes"];
+
+/// Introductory coordinating conjunctions before an interrogative or subject (e.g. "¿Y tú qué harás?", "¿Y por qué no?").
+const INTRODUCTORY_CONJUNCTIONS: &[&str] = &["y", "e", "o", "u", "pero"];
+
 fn check_interrogative_accents(text: &str, lang: ProofLang, v: &mut Vec<Issue>) {
     // Single linear pass over text to find matched question/exclamation spans without overlapping rescans
     let mut current_opener_start: Option<usize> = None;
@@ -280,17 +287,33 @@ fn check_clause_interrogatives(question_body: &str, base_offset: usize, lang: Pr
         let folded_word = word_str.nfc().collect::<String>().to_lowercase();
         let Some(&(_, accented)) = INTERROGATIVES.iter().find(|(u, _)| *u == folded_word) else { continue };
 
-        // Restrict suggestions to actual interrogative/exclamative positions (at the start of
-        // the clause, or right after an introductory preposition like "¿A dónde?", "¿Por qué?").
+        // Restrict suggestions to actual interrogative/exclamative positions:
+        // - At the start of the clause (e.g. "¿Qué haces?")
+        // - After a comma inside the question (vocative/topic, e.g. "¿Juan, qué haces?", "¿Y tú, qué harás?")
+        // - Right after an introductory preposition or subject pronoun (e.g. "¿A dónde?", "¿Por qué?", "¿Tú qué harás?")
+        // - After an introductory conjunction + subject/preposition (e.g. "¿Y tú qué harás?", "¿Y por qué no?")
         // Relative and conjunctive uses inside the clause (e.g. "¿Crees que vendrá?",
         // "¿Qué pasa cuando llueve?") correctly take no accent per RAE rules.
         let is_interrogative_position = if idx == 0 {
+            true
+        } else if let Some(&(_, prev_end)) = body_words.get(idx.saturating_sub(1))
+            && idx > 0
+            && let Some(gap) = question_body.get(prev_end..w_start)
+            && gap.contains(',')
+        {
             true
         } else if idx == 1 {
             let Some((p_start, p_end)) = body_words.first().copied() else { continue };
             let Some(prev_word) = question_body.get(p_start..p_end) else { continue };
             let prev_folded = prev_word.nfc().collect::<String>().to_lowercase();
-            INTERROGATIVE_PREPOSITIONS.contains(&prev_folded.as_str())
+            INTERROGATIVE_PREPOSITIONS.contains(&prev_folded.as_str()) || SUBJECT_PRONOUNS.contains(&prev_folded.as_str())
+        } else if idx == 2 {
+            let (Some(&(w0_s, w0_e)), Some(&(w1_s, w1_e))) = (body_words.first(), body_words.get(1)) else { continue };
+            let (Some(w0), Some(w1)) = (question_body.get(w0_s..w0_e), question_body.get(w1_s..w1_e)) else { continue };
+            let w0_folded = w0.nfc().collect::<String>().to_lowercase();
+            let w1_folded = w1.nfc().collect::<String>().to_lowercase();
+            INTRODUCTORY_CONJUNCTIONS.contains(&w0_folded.as_str())
+                && (SUBJECT_PRONOUNS.contains(&w1_folded.as_str()) || INTERROGATIVE_PREPOSITIONS.contains(&w1_folded.as_str()))
         } else {
             false
         };
@@ -552,6 +575,13 @@ mod tests {
         assert_eq!(tildes[2].suggestions, ["dónde"]);
         assert_eq!(&text[tildes[3].start..tildes[3].end], "que");
         assert_eq!(tildes[3].suggestions, ["qué"]);
+
+        // Introductory subject and vocative clauses (Fundéu / CodeRabbit review)
+        for intro in ["¿Y tú que harás?", "¿Y tú, que harás?", "¿Tú que harás?", "¿Juan, que dices?"] {
+            let res = check(intro, ProofLang::Es);
+            let flagged: Vec<&str> = res.iter().filter(|i| i.message.contains("debe llevar tilde")).map(|i| &intro[i.start..i.end]).collect();
+            assert_eq!(flagged, ["que"], "{intro}: {res:?}");
+        }
 
         // Relative pronouns and conjunctions inside questions must NOT be flagged (RAE rule)
         for text in ["¿Crees que vendrá?", "¿Qué pasa cuando llueve?", "¿Sabes si viene?", "¿Cómo estás? ¡Qué sorpresa!"] {
