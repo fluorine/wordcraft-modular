@@ -119,11 +119,15 @@ pub fn scale_factor_from_outputs(xrdb: &str, xdpyinfo: &str) -> f64 {
 fn scale_factor_from_outputs_opt(xrdb: &str, xdpyinfo: &str) -> Option<f64> {
     if let Some(dpi) = parse_xft_dpi(xrdb) {
         let factor = dpi / 96.0;
-        if valid_scale_factor(factor) { return Some(factor); }
+        if valid_scale_factor(factor) {
+            return Some(factor);
+        }
     }
     if let Some(dpi) = parse_xdpyinfo_resolution(xdpyinfo) {
         let factor = dpi / 96.0;
-        if valid_scale_factor(factor) { return Some(factor); }
+        if valid_scale_factor(factor) {
+            return Some(factor);
+        }
     }
     if let Some((pixels, mm)) = parse_xdpyinfo_dimensions(xdpyinfo) {
         return Some(calc_dpi_factor(pixels, mm));
