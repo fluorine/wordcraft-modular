@@ -2594,8 +2594,10 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u32, level: Optio
             shrink_line_spaces(pl, &mut xs, c0, c1, content_end, slack);
         } else if justify && slack > 0.0 {
             // Spaces before the line's first character (after the last tab) keep their width, as
-            // in Word: text indented with spaces stays where the spaces put it.
-            let text_from = (align_from..c1).find(|k| pl.clusters.get(*k).is_none_or(|c| c.kind != ClKind::Space)).unwrap_or(c1);
+            // in Word: text indented with spaces stays where the spaces put it. Zero-width markers
+            // (a bookmark, hidden text) before or among them don't count as a character.
+            let blank = |k: usize| pl.clusters.get(k).is_some_and(|c| matches!(c.kind, ClKind::Space | ClKind::Marker));
+            let text_from = (align_from..c1).find(|k| !blank(*k)).unwrap_or(c1);
             // Spaces inside the content.
             let spaces: Vec<usize> = (text_from..c1)
                 .filter(|k| {
@@ -2605,8 +2607,7 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u32, level: Optio
             if rp.align == Align::Distribute || spaces.is_empty() {
                 // Distributed across the gaps between the first and last characters: spaces
                 // hanging at the line's end take none, so the last character reaches the margin.
-                let text_to =
-                    (text_from..c1).rev().find(|k| pl.clusters.get(*k).is_some_and(|c| c.kind != ClKind::Space)).map_or(text_from, |k| k + 1);
+                let text_to = (text_from..c1).rev().find(|k| !blank(*k)).map_or(text_from, |k| k + 1);
                 let cnt = (text_to - text_from).saturating_sub(1).max(1) as f32;
                 if rp.align == Align::Distribute {
                     let per = slack / cnt;

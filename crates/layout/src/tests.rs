@@ -4842,11 +4842,18 @@ fn justified_lines_shrink_spaces_in_word_2013_mode() {
 /// distributed line also counted the space it wrapped at, so its text stopped short of the margin.
 #[test]
 fn leading_spaces_keep_their_width_in_justified_lines() {
-    let lead = 20;
-    let text = format!("{}{}", " ".repeat(lead), "We tie the spend to a pipe and to the books, so it is in an ad hoc view of all of it. ".repeat(4));
-    let first_x = |align: Align| {
+    let spaces = " ".repeat(20);
+    let body = "We tie the spend to a pipe and to the books, so it is in an ad hoc view of all of it. ".repeat(4);
+    // `hidden` (zero-width hidden text before the spaces, as Word ignores a bookmark or hidden
+    // text there too): the first character is still the one after the spaces.
+    let first_x = |align: Align, hidden: &str| {
+        let text = format!("{hidden}{spaces}{body}");
+        let lead = hidden.len() + spaces.len();
         let mut d = Document::from_text(&text);
         d.format_paragraphs(&Pos::body(0, 0), &Pos::body(0, 0), &|p| p.align = Some(align)).unwrap();
+        if !hidden.is_empty() {
+            d.format_range(&Pos::body(0, 0), &Pos::body(0, hidden.len()), &|c| c.hidden = Some(true)).unwrap();
+        }
         let l = lay(&d);
         let (para, x0) =
             l.pages[0].items.iter().find_map(|it| if let Placed::Lines { para, x, .. } = it { Some((para.clone(), *x)) } else { None }).unwrap();
@@ -4855,13 +4862,15 @@ fn leading_spaces_keep_their_width_in_justified_lines() {
         let end = text[line.start..line.stop].trim_end().len();
         (para.x_of(0, lead).unwrap(), para.x_of(0, line.start + end).unwrap() + x0)
     };
-    let (left, left_end) = first_x(Align::Left);
-    for align in [Align::Justify, Align::Distribute] {
-        let (x, end) = first_x(align);
-        assert!((x - left).abs() < 0.01, "{align:?}: the first character is at {x}, left-aligned at {left}");
-        assert!(end > left_end + 1.0, "{align:?}: the line is still stretched ({end} vs {left_end})");
-        // The line ends with the space it wrapped at; the last character still reaches the margin.
-        assert!((end - 540.0).abs() < 0.05, "{align:?}: the line's text ends at {end}, not the margin");
+    for hidden in ["", "hidden"] {
+        let (left, left_end) = first_x(Align::Left, hidden);
+        for align in [Align::Justify, Align::Distribute] {
+            let (x, end) = first_x(align, hidden);
+            assert!((x - left).abs() < 0.01, "{align:?} {hidden:?}: the first character is at {x}, left-aligned at {left}");
+            assert!(end > left_end + 1.0, "{align:?} {hidden:?}: the line is still stretched ({end} vs {left_end})");
+            // The line ends with the space it wrapped at; the last character still reaches the margin.
+            assert!((end - 540.0).abs() < 0.05, "{align:?} {hidden:?}: the line's text ends at {end}, not the margin");
+        }
     }
 }
 
