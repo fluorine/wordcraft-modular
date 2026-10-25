@@ -255,6 +255,9 @@ const INTERROGATIVES: &[(&str, &str)] = &[
     ("cuantas", "cuántas"),
 ];
 
+/// Prepositions that can precede an interrogative/exclamative pronoun at the start of a clause.
+const INTERROGATIVE_PREPOSITIONS: &[&str] = &["a", "de", "en", "por", "para", "con", "hacia", "hasta", "desde", "sobre"];
+
 fn check_interrogative_accents(text: &str, lang: ProofLang, v: &mut Vec<Issue>) {
     for (q_idx, c) in text.char_indices() {
         if c != '¿' && c != '¡' {
@@ -265,11 +268,29 @@ fn check_interrogative_accents(text: &str, lang: ProofLang, v: &mut Vec<Issue>) 
         let Some(end_rel) = rest.find(close_mark) else { continue };
         let Some(question_body) = rest.get(..end_rel) else { continue };
         let base_offset = q_idx + c.len_utf8();
+        let body_words = words(question_body);
 
-        for (w_start, w_end) in words(question_body) {
+        for (idx, &(w_start, w_end)) in body_words.iter().enumerate() {
             let Some(word_str) = question_body.get(w_start..w_end) else { continue };
             let folded_word = word_str.nfc().collect::<String>().to_lowercase();
-            if let Some(&(_, accented)) = INTERROGATIVES.iter().find(|(u, _)| *u == folded_word) {
+            let Some(&(_, accented)) = INTERROGATIVES.iter().find(|(u, _)| *u == folded_word) else { continue };
+
+            // Restrict suggestions to actual interrogative/exclamative positions (at the start of
+            // the clause, or right after an introductory preposition like "¿A dónde?", "¿Por qué?").
+            // Relative and conjunctive uses inside the clause (e.g. "¿Crees que vendrá?",
+            // "¿Qué pasa cuando llueve?") correctly take no accent per RAE rules.
+            let is_interrogative_position = if idx == 0 {
+                true
+            } else if idx == 1 {
+                let Some((p_start, p_end)) = body_words.first().copied() else { continue };
+                let Some(prev_word) = question_body.get(p_start..p_end) else { continue };
+                let prev_folded = prev_word.nfc().collect::<String>().to_lowercase();
+                INTERROGATIVE_PREPOSITIONS.contains(&prev_folded.as_str())
+            } else {
+                false
+            };
+
+            if is_interrogative_position {
                 let abs_start = base_offset + w_start;
                 let abs_end = base_offset + w_end;
                 let sug = if word_str.chars().next().is_some_and(char::is_uppercase) {
@@ -513,17 +534,23 @@ mod tests {
 
     #[test]
     fn interrogative_pronouns_require_accents_inside_questions() {
-        let text = "¿Como estas? ¡Que sorpresa!";
+        let text = "¿Como estas? ¡Que sorpresa! ¿A donde vas? ¿Por que no viniste?";
         let issues = check(text, ProofLang::Es);
         let tildes: Vec<&Issue> = issues.iter().filter(|i| i.message.contains("debe llevar tilde")).collect();
-        assert_eq!(tildes.len(), 2, "{issues:?}");
+        assert_eq!(tildes.len(), 4, "{issues:?}");
         assert_eq!(&text[tildes[0].start..tildes[0].end], "Como");
         assert_eq!(tildes[0].suggestions, ["Cómo"]);
         assert_eq!(&text[tildes[1].start..tildes[1].end], "Que");
         assert_eq!(tildes[1].suggestions, ["Qué"]);
+        assert_eq!(&text[tildes[2].start..tildes[2].end], "donde");
+        assert_eq!(tildes[2].suggestions, ["dónde"]);
+        assert_eq!(&text[tildes[3].start..tildes[3].end], "que");
+        assert_eq!(tildes[3].suggestions, ["qué"]);
 
-        // Accented words inside questions should not trigger
-        assert!(check("¿Cómo estás? ¡Qué sorpresa!", ProofLang::Es).is_empty());
+        // Relative pronouns and conjunctions inside questions must NOT be flagged (RAE rule)
+        for text in ["¿Crees que vendrá?", "¿Qué pasa cuando llueve?", "¿Sabes si viene?", "¿Cómo estás? ¡Qué sorpresa!"] {
+            assert!(check(text, ProofLang::Es).is_empty(), "{text}: {:?}", check(text, ProofLang::Es));
+        }
     }
 
     proptest::proptest! {
