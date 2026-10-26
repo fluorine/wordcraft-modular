@@ -272,7 +272,18 @@ impl Reader<'_> {
                         // A letter in a font of its own: the drop cap's font, the letter itself
                         // in the text's (so taking the drop cap away gives the letter its font back).
                         let cap_font = first.runs.first().and_then(|r| r.props.font.clone());
-                        let text_font = p.runs.first().and_then(|r| r.props.font.clone());
+                        let text_font = {
+                            let mut at = 0;
+                            p.runs
+                                .iter()
+                                .find_map(|r| {
+                                    let end = at.saturating_add(r.len).min(p.text.len());
+                                    let text = p.text.get(at..end).unwrap_or("");
+                                    at = end;
+                                    text.chars().any(|c| c != wordcraft_doc::para::OBJ).then(|| r.props.font.clone())
+                                })
+                                .flatten()
+                        };
                         if cap_font.is_some() && cap_font != text_font {
                             for r in first.runs.iter_mut().filter(|r| r.props.font == cap_font) {
                                 r.props.font = text_font.clone();

@@ -4183,3 +4183,17 @@ fn drop_cap_frame_keeps_other_fonts() {
     assert_eq!(p[0].props_of_char(0).font.as_deref(), Some("Liberation Serif"), "the cap letter gets the text's font");
     assert_eq!(p[0].props_of_char(1).font.as_deref(), Some("Liberation Sans"), "the other letter keeps its own");
 }
+
+/// A leading bookmark marker has default run properties; the following text keeps its font.
+#[test]
+fn drop_cap_merge_takes_text_font_after_leading_marker() {
+    let body = r#"<w:p><w:pPr><w:framePr w:dropCap="drop" w:lines="3" w:wrap="around" w:vAnchor="text" w:hAnchor="text"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Liberation Mono" w:hAnsi="Liberation Mono"/></w:rPr><w:t>A</w:t></w:r></w:p>
+        <w:p><w:bookmarkStart w:id="0" w:name="before-text"/><w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:hAnsi="Liberation Serif"/></w:rPr><w:t>c tale</w:t></w:r></w:p>"#;
+    let d = read_body(body);
+    let p = paras(&d);
+    assert_eq!(p.len(), 1, "the frame merges into its paragraph");
+    assert_eq!(p[0].props.drop_cap_font.as_deref(), Some("Liberation Mono"));
+    let text_at = p[0].text.find("c tale").unwrap();
+    assert_eq!(p[0].props_of_char(0).font.as_deref(), Some("Liberation Serif"), "the cap letter gets the following text's font");
+    assert_eq!(p[0].props_of_char(text_at).font.as_deref(), Some("Liberation Serif"));
+}
