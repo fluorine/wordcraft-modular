@@ -1940,7 +1940,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
     // through the visible-text map as well, so hidden text and tracked deletions cannot split a
     // grapheme or Thai preposed-vowel sequence across formatting runs.
     let to_visible = |i: usize| -> Option<usize> {
-        if left.is_empty() { Some(i) } else { ends.binary_search_by_key(&i, |e| e.1).ok().and_then(|k| ends.get(k)).map(|e| e.0) }
+        if skip.is_empty() { Some(i) } else { ends.binary_search_by_key(&i, |e| e.1).ok().and_then(|k| ends.get(k)).map(|e| e.0) }
     };
     let safe_breaks: std::collections::HashSet<usize> = b
         .clusters
@@ -3772,6 +3772,44 @@ mod label_spacing_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bare_bookmark_offsets_map_to_visible_thai_boundaries() {
+        use crate::{LayoutCache, LayoutOptions, Placed};
+        use wordcraft_doc::{Document, Pos, StoryRef};
+
+        let text = "ภาษาไทย".repeat(20);
+        let marker_at = "ภาษา".len();
+        let mut doc = Document::from_text(&text);
+        doc.insert_object(&Pos::body(0, marker_at), InlineObject::BookmarkStart { name: "top".into() }, &Default::default()).unwrap();
+        let mut cache = LayoutCache::new();
+        let layout = crate::layout(&doc, &mut cache, &LayoutOptions::default());
+        let para = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.items)
+            .find_map(|item| match item {
+                Placed::Lines { story: StoryRef::Body, path, para, .. } if path.0 == vec![0] => Some(para),
+                _ => None,
+            })
+            .expect("body paragraph is laid out");
+        let marker_end = marker_at + OBJ.len_utf8();
+        let mut checked = 0;
+        for cluster in &para.clusters {
+            if !matches!(cluster.kind, ClKind::Text | ClKind::Space) {
+                continue;
+            }
+            let visible_end = if cluster.start >= marker_end { cluster.end - OBJ.len_utf8() } else { cluster.end };
+            let safe = crate::kinsoku::is_safe_line_break(&text, visible_end);
+            assert_eq!(
+                cluster.emergency_break_after, safe,
+                "emergency boundary after paragraph byte {} maps to visible byte {visible_end}",
+                cluster.end
+            );
+            checked += 1;
+        }
+        assert!(checked > 0, "the bookmark is followed by laid out Thai text");
+    }
 
     #[test]
     fn hidden_and_deleted_source_cannot_expose_combining_mark_emergency_breaks() {

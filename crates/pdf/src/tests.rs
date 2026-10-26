@@ -518,30 +518,32 @@ fn thai_pdf_uses_the_same_glyph_positions_and_line_breaks_as_layout() {
         .unwrap();
     let first_line = para.lines.get(line0).unwrap();
     assert_eq!(first_line.end, LineEnd::Wrap, "the first line has an actual wrap boundary");
-    let display = page_display(&d, &lay.pages[0], &DisplayOptions::default());
-    let expected = display
-        .iter()
-        .find_map(|draw| match draw {
-            Draw::Glyphs { glyphs, text, .. } if text.contains('\u{0E20}') => {
-                Some(glyphs.iter().map(|(_, x, y)| (*x as f64, *y as f64)).collect::<Vec<_>>())
-            }
-            _ => None,
-        })
-        .unwrap();
-    assert!(!expected.is_empty());
     let bytes = export_layout(&d, &lay, &PdfOptions::default()).unwrap();
     let pdf = hayro_syntax::Pdf::new(bytes.clone()).expect("the exported PDF opens");
-    assert_eq!(pdf.pages().len(), lay.pages.len());
+    let pdf_pages = pdf.pages();
+    assert_eq!(pdf_pages.len(), lay.pages.len());
     let extracted = extract_text(&bytes).concat();
     assert_eq!(extracted.chars().filter(|c| !c.is_whitespace()).collect::<String>(), text);
     let cache = InterpreterCache::new();
-    let mut ctx = Context::new(Affine::IDENTITY, kurbo::Rect::new(0.0, 0.0, 1.0, 1.0), &cache, pdf.xref(), InterpreterSettings::default());
-    let mut positions = Positions(Vec::new());
-    hayro_interpret::interpret_page(&pdf.pages()[0], &mut ctx, &mut positions);
-    assert!(positions.0.len() >= expected.len(), "PDF has each displayed glyph position");
-    for (pdf, screen) in positions.0.iter().zip(&expected) {
-        assert!((pdf.0 - screen.0).abs() < 0.05, "PDF glyph x={} vs shared display-list x={}", pdf.0, screen.0);
-        assert!((pdf.1 + screen.1 - lay.pages[0].h as f64).abs() < 0.05, "PDF glyph y={} vs shared display-list y={}", pdf.1, screen.1);
+    for (page_no, (pdf_page, layout_page)) in pdf_pages.iter().zip(&lay.pages).enumerate() {
+        let expected: Vec<_> = page_display(&d, layout_page, &DisplayOptions::default())
+            .iter()
+            .flat_map(|draw| match draw {
+                Draw::Glyphs { glyphs, text, .. } if text.chars().any(|c| matches!(u32::from(c), 0x0E00..=0x0E7F)) => {
+                    glyphs.iter().map(|(_, x, y)| (*x as f64, *y as f64)).collect::<Vec<_>>()
+                }
+                _ => Vec::new(),
+            })
+            .collect();
+        assert!(!expected.is_empty(), "page {page_no} has displayed Thai glyphs");
+        let mut ctx = Context::new(Affine::IDENTITY, kurbo::Rect::new(0.0, 0.0, 1.0, 1.0), &cache, pdf.xref(), InterpreterSettings::default());
+        let mut positions = Positions(Vec::new());
+        hayro_interpret::interpret_page(pdf_page, &mut ctx, &mut positions);
+        assert_eq!(positions.0.len(), expected.len(), "PDF page {page_no} has one position per displayed Thai glyph");
+        for (pdf, screen) in positions.0.iter().zip(&expected) {
+            assert!((pdf.0 - screen.0).abs() < 0.05, "PDF glyph x={} vs shared display-list x={}", pdf.0, screen.0);
+            assert!((pdf.1 + screen.1 - layout_page.h as f64).abs() < 0.05, "PDF glyph y={} vs shared display-list y={}", pdf.1, screen.1);
+        }
     }
 }
 
