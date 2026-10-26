@@ -273,7 +273,7 @@ impl Reader<'_> {
                         // in the text's (so taking the drop cap away gives the letter its font back).
                         let cap_font = first.runs.first().and_then(|r| r.props.font.clone());
                         let text_font = {
-                            let mut at = 0;
+                            let mut at: usize = 0;
                             p.runs
                                 .iter()
                                 .find_map(|r| {
