@@ -2901,7 +2901,11 @@ fn break_lines(
         if shrink {
             shrink_line_spaces(pl, &mut xs, c0, c1, content_end, slack);
         } else if justify && slack > 0.0 {
-            if has_thai && matches!(rp.align, Align::Justify | Align::ThaiDistribute) {
+            let line_has_thai = has_thai
+                && pl.clusters.get(c0..c1).is_some_and(|clusters| {
+                    clusters.iter().any(|c| text_cluster_source(p, c).is_some_and(|text| text.chars().any(crate::kinsoku::is_thai_text_char)))
+                });
+            if line_has_thai && matches!(rp.align, Align::Justify | Align::ThaiDistribute) {
                 apply_thai_justification(pl, p, &mut xs, c0, c1, align_from, content_end, slack, thai_justify_after);
             } else {
                 // The original non-Thai Justify / Distributed spacing rules stay unchanged.

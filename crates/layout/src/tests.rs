@@ -5264,6 +5264,37 @@ fn thai_justify_uses_spaces_before_group_gaps_and_respects_size_caps() {
 }
 
 #[test]
+fn thai_containing_paragraph_uses_regular_justification_on_latin_only_lines() {
+    let thai = "ภาษาไทย".repeat(28);
+    let latin =
+        "Alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega. ".repeat(12);
+    let text = format!("{thai} {latin}");
+
+    for align in [Align::Justify, Align::ThaiDistribute] {
+        let (_, layout) = thai_justification_layout_with_wrap(&text, align, 180.0, 12.0, true);
+        let (para, x) = body_para_and_x(&layout).unwrap();
+        let (li, line) = para
+            .lines
+            .iter()
+            .enumerate()
+            .find(|(_, line)| {
+                if line.end != LineEnd::Wrap {
+                    return false;
+                }
+                let Some(source) = text.get(line.start..line.stop) else { return false };
+                let content = source.trim_end();
+                content.split_whitespace().count() >= 2 && !content.chars().any(crate::kinsoku::is_thai_text_char)
+            })
+            .expect("mixed paragraph has a wrapped Latin-only line");
+        let source = text.get(line.start..line.stop).unwrap_or_default();
+        let content_end = line.start + source.trim_end().len();
+        let actual_end = x + para.x_of(li, content_end).unwrap_or(line.left);
+        let expected_end = x + line.right;
+        assert!((actual_end - expected_end).abs() < 0.05, "{align:?} should justify a Latin-only line to the margin: {actual_end} vs {expected_end}");
+    }
+}
+
+#[test]
 fn thai_justification_never_adds_spacing_inside_thai_clusters_or_format_boundaries() {
     let motif = "\u{0E40}\u{0E01}\u{0E48}\u{0E01}\u{0E33}";
     let text = motif.repeat(24);
