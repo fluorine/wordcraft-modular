@@ -11,7 +11,8 @@ use super::{
     Placed, SectionProps, SectionStart, StoryRef, display, layout, para, work,
 };
 use wordcraft_doc::para::Run;
-use wordcraft_doc::{Pos, Rgb, Table};
+use wordcraft_doc::props::Rgb;
+use wordcraft_doc::{Pos, Table};
 
 fn lay(d: &Document, opts: &LayoutOptions) -> DocLayout {
     layout(d, &mut LayoutCache::new(), opts)
