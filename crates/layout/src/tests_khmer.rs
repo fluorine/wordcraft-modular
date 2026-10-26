@@ -122,8 +122,13 @@ fn thai_distributed_spreads_evenly_between_khmer_clusters() {
 #[test]
 fn thai_distributed_does_not_stretch_trailing_spaces_before_line_break() {
     let first = "កម្ពុជា  ";
-    let text = format!("{first}\nកម្ពុជា");
-    let l = lay(&doc(&text, Align::ThaiDistribute));
+    let text = format!("{first}{}កម្ពុជា", wordcraft_doc::para::LINE_BREAK);
+    let mut d = doc(first, Align::ThaiDistribute);
+    let p = d.para_mut(StoryRef::Body, &Path::top(0)).unwrap();
+    let props = wordcraft_doc::props::CharProps { size: Some(14.0), ..Default::default() };
+    *p = wordcraft_doc::Paragraph::with_text(&text, props);
+    p.props.align = Some(Align::ThaiDistribute);
+    let l = lay(&d);
     let pl = para_layout(&l, 0);
     let line = pl.lines.iter().find(|line| line.end == crate::para::LineEnd::LineBreak).unwrap();
     let trailing_spaces: Vec<usize> = pl
