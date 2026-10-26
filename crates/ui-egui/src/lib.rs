@@ -27,6 +27,7 @@ pub mod autoscroll;
 pub mod backstage;
 pub mod canvas;
 pub mod caret_glide;
+pub mod caption_buttons;
 pub mod chrome;
 pub mod colors;
 pub mod content_controls;
@@ -88,6 +89,7 @@ pub mod updates_ui;
 pub mod widgets;
 pub mod window_close;
 pub mod window_geometry;
+pub(crate) mod window_chrome;
 mod window_ui;
 mod windows;
 pub mod wordart_menus;
@@ -606,6 +608,8 @@ pub struct WordApp {
     pub integrated_titlebar: bool,
     /// macOS: the title bar's height and where its content starts, around the traffic lights.
     pub mac_titlebar: chrome::MacTitleBar,
+    /// Linux: the native title bar is replaced by the app's own caption controls.
+    pub frameless: bool,
     /// Focus (#1678): the ribbon is dropped down from the Focus bar, over the page.
     pub(crate) focus_ribbon: bool,
     pub(crate) updates_rt: updates_ui::Runtime,
@@ -839,6 +843,7 @@ impl WordApp {
             print_feedback_seen: None,
             integrated_titlebar: false,
             mac_titlebar: chrome::MacTitleBar::default(),
+            frameless: false,
             updates_rt: updates_ui::Runtime::default(),
             control_rx: None,
             shots: control::Shots::default(),
@@ -2868,6 +2873,7 @@ impl WordApp {
         if !moved(self) {
             self.sync_title_and_frame(&ctx, t0);
         }
+        caption_buttons::resize_edges(self, &ctx);
         // The synthetic step this frame took is done even when drawing ended early.
         self.flush_shot_and_synthetic(&ctx);
     }
