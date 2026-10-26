@@ -120,10 +120,10 @@ pub fn customize_ribbon(app: &mut WordApp, ui: &mut Ui, f: &mut RibbonForm) -> b
             });
         });
         ui.add_space(4.0);
-        crate::widgets::dialog_page(ui, "ribbon", |ui| match f.page {
+        match f.page {
             Page::Ribbon => ribbon_page(app, ui, f, h),
             Page::QuickAccess => qat_page(app, ui, f, h),
-        });
+        }
     });
     if let Some(spec) = app.session.registry.get(&f.command) {
         ui.label(egui::RichText::new(format!("{} · {}", crate::i18n::location(spec.location), spec.id)).small().weak());

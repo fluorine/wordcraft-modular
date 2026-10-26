@@ -558,7 +558,7 @@ pub fn borders(app: &mut WordApp, ui: &mut Ui, f: &mut BordersForm) -> bool {
     }
     ui.add_space(6.0);
     let theme = app.session.doc.settings.theme_colors.clone();
-    crate::widgets::dialog_page(ui, "borders", |ui| match f.tab {
+    match f.tab {
         0 => {
             let to_text = f.to_text;
             lines(ui, "para", &mut f.para, &theme, Rgb::parse(&f.fill), Target::from(to_text));
@@ -588,7 +588,7 @@ pub fn borders(app: &mut WordApp, ui: &mut Ui, f: &mut BordersForm) -> bool {
                 ui.radio_value(&mut f.fill_to_text, true, tl!("Text"));
             });
         }
-    });
+    }
     let (ok, cancel) = buttons(ui, tl!("OK"));
     if ok {
         f.apply(app);

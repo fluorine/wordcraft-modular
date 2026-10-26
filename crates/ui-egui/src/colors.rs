@@ -496,10 +496,10 @@ fn body(ui: &mut Ui, d: &mut ColorsDialog) -> Option<bool> {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.set_width(330.0);
-            crate::widgets::dialog_page(ui, "colors", |ui| match d.tab {
+            match d.tab {
                 ColorsTab::Standard => standard(ui, d),
                 ColorsTab::Custom => custom(ui, d),
-            });
+            }
         });
         ui.vertical(|ui| {
             ui.add_space(110.0);

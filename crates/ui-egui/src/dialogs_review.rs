@@ -388,7 +388,7 @@ fn autocorrect_ui(app: &mut WordApp, ui: &mut Ui, f: &mut AutoCorrectForm) -> bo
         f.tab = k as u8;
     }
     ui.add_space(6.0);
-    crate::widgets::dialog_page(ui, "autocorrect", |ui| match f.tab {
+    match f.tab {
         0 => autocorrect_tab(app, ui, f),
         1 => {
             let o = &mut f.options;
@@ -409,7 +409,7 @@ fn autocorrect_ui(app: &mut WordApp, ui: &mut Ui, f: &mut AutoCorrectForm) -> bo
             ui.checkbox(&mut o.tab_indent, tl!("Set left- and first-indent with tabs and backspaces"));
         }
         _ => math_tab(ui, f),
-    });
+    }
     error(ui, &f.message);
     let (ok, cancel) = buttons(ui, true);
     if ok {
