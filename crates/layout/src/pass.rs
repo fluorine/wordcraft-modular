@@ -413,6 +413,7 @@ struct Snap<'a> {
     eq_count: u32,
     page_field: u32,
     boxes: usize,
+    header_repeats: usize,
 }
 
 impl<'a> Snap<'a> {
@@ -430,6 +431,7 @@ impl<'a> Snap<'a> {
             eq_count: ctx.eq_count,
             page_field: ctx.fields.page,
             boxes: ctx.boxes.total(),
+            header_repeats: ctx.header_repeats,
         }
     }
 
@@ -452,6 +454,7 @@ impl<'a> Snap<'a> {
         ctx.counters = self.counters.clone();
         ctx.eq_count = self.eq_count;
         ctx.fields.page = self.page_field;
+        ctx.header_repeats = self.header_repeats;
     }
 }
 
