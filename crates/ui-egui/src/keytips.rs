@@ -61,7 +61,15 @@ impl Target {
             Target::Tab(tab) => {
                 let _ = app.run("ui.tab", serde_json::json!({ "tab": tab }));
             }
-            Target::Cmd { id, params } => {
+            Target::Cmd { id, mut params } => {
+                // Match the SmartArt ribbon button: when the Text Pane has a valid focused row,
+                // Add Shape inserts after that row (and its descendants), not at the end.
+                if id == "smartArt.addShape"
+                    && let Some(graphic) = wordcraft_engine::cmd::smart_art::selected_smart_art(&app.session)
+                    && let Some(index) = app.smart_art_item.filter(|i| *i < graphic.items.len())
+                {
+                    params["after"] = serde_json::json!(index);
+                }
                 let _ = app.run(id, params);
             }
             Target::Dialog { name } => {
@@ -1365,6 +1373,22 @@ mod tests {
             assert_eq!(seen.len(), letters.len(), "{tab}: letters are unique");
             assert!(letters.iter().all(|l| !l.is_empty() && !l.starts_with('?')), "{tab}: every control has a letter");
         }
+    }
+
+    #[test]
+    fn smart_art_add_shape_keytip_preserves_the_selected_insertion_point() {
+        let mut a = app();
+        a.run("insert.smartArt", serde_json::json!({"items": ["A", "B"]})).unwrap();
+        a.smart_art_item = Some(0);
+        let add_shape = controls("SmartArt Design")
+            .into_iter()
+            .find(|c| matches!(&c.target, Target::Cmd { id: "smartArt.addShape", .. }))
+            .expect("Add Shape keytip");
+
+        add_shape.target.run(&mut a);
+
+        let items = wordcraft_engine::cmd::smart_art::selected_smart_art(&a.session).expect("selected SmartArt");
+        assert_eq!(items.items.iter().map(|item| item.text.as_str()).collect::<Vec<_>>(), ["A", "", "B"]);
     }
 
     #[test]
