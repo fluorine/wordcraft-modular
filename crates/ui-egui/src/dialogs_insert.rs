@@ -822,20 +822,16 @@ fn symbol_cell(app: &mut WordApp, ui: &mut Ui, font: &str, c: char, selected: bo
 fn symbol_ui(app: &mut WordApp, ui: &mut Ui, f: &mut SymbolForm) -> bool {
     let t = Tokens::get(ui.ctx());
     ui.set_width(GRID_COLS as f32 * CELL + 24.0);
-    ui.horizontal(|ui| {
-        for (i, l) in ["Symbols", "Special Characters"].into_iter().enumerate() {
-            if ui.selectable_label(f.tab == i as u8, tl!(l)).clicked() {
-                f.tab = i as u8;
-            }
-        }
-    });
-    ui.separator();
+    let names = ["Symbols", "Special Characters"].map(|n| tl!(n).to_string());
+    if let Some(k) = crate::widgets::dialog_tabs(ui, &names, f.tab as usize) {
+        f.tab = k as u8;
+    }
+    ui.add_space(6.0);
     let mut insert: Option<(Value, String, String)> = None;
-    if f.tab == 1 {
-        if special_ui(app, ui, f, &mut insert, &t) {
-            return true;
+    let double = crate::widgets::dialog_page(ui, "symbol", |ui| {
+        if f.tab == 1 {
+            return special_ui(app, ui, f, &t);
         }
-    } else {
         f.load();
         ui.horizontal(|ui| {
             ui.label(tl!("Font:"));
@@ -951,17 +947,15 @@ fn symbol_ui(app: &mut WordApp, ui: &mut Ui, f: &mut SymbolForm) -> bool {
                 ui.label(tl!("Character code:"));
             });
         });
-        if double && let Some(p) = f.params() {
-            insert = Some((p, f.selected.map(String::from).unwrap_or_default(), f.font.clone()));
-        }
-        // The Insert button.
-        let (ok, close) = buttons(ui, "Insert", "Close", f.selected.is_some());
-        if ok && let Some(p) = f.params() {
-            insert = Some((p, f.selected.map(String::from).unwrap_or_default(), f.font.clone()));
-        }
-        if close {
-            return true;
-        }
+        double
+    });
+    let (ok, close) = buttons(ui, "Insert", "Close", f.tab == 1 || f.selected.is_some());
+    if close {
+        return true;
+    }
+    if ok || double {
+        insert =
+            if f.tab == 1 { special_insert(f) } else { f.params().map(|p| (p, f.selected.map(String::from).unwrap_or_default(), f.font.clone())) };
     }
     if let Some((params, ch, font)) = insert {
         // Special characters with their own command insert through it (non-breaking hyphen…).
@@ -976,8 +970,8 @@ fn symbol_ui(app: &mut WordApp, ui: &mut Ui, f: &mut SymbolForm) -> bool {
     false
 }
 
-/// The Special Characters tab; returns true to close.
-fn special_ui(app: &mut WordApp, ui: &mut Ui, f: &mut SymbolForm, insert: &mut Option<(Value, String, String)>, t: &Tokens) -> bool {
+/// The Special Characters tab; returns true after a double click.
+fn special_ui(app: &mut WordApp, ui: &mut Ui, f: &mut SymbolForm, t: &Tokens) -> bool {
     let mut double = false;
     egui::ScrollArea::vertical().id_salt("special_chars").max_height(CELL * GRID_ROWS as f32 + 60.0).auto_shrink([false, false]).show(ui, |ui| {
         egui::Grid::new("special_grid").num_columns(3).striped(true).spacing(vec2(14.0, 4.0)).show(ui, |ui| {
@@ -1001,17 +995,17 @@ fn special_ui(app: &mut WordApp, ui: &mut Ui, f: &mut SymbolForm, insert: &mut O
             }
         });
     });
-    let (ok, close) = buttons(ui, "Insert", "Close", true);
-    if (ok || double)
-        && let Some((_, c, cmd)) = SPECIAL.get(f.special)
-    {
-        let params = match cmd {
-            Some(id) => json!({"command": id}),
-            None => json!({"char": c.to_string()}),
-        };
-        *insert = Some((params, c.to_string(), String::new()));
-    }
-    close
+    double
+}
+
+/// What the Insert button inserts on the Special Characters tab.
+fn special_insert(f: &SymbolForm) -> Option<(Value, String, String)> {
+    let (_, c, cmd) = SPECIAL.get(f.special)?;
+    let params = match cmd {
+        Some(id) => json!({"command": id}),
+        None => json!({"char": c.to_string()}),
+    };
+    Some((params, c.to_string(), String::new()))
 }
 
 // ---------------------------------------------------------------------------------------------

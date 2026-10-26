@@ -383,15 +383,12 @@ fn list_change(app: &mut WordApp, f: &mut AutoCorrectForm, params: Value) -> boo
 }
 
 fn autocorrect_ui(app: &mut WordApp, ui: &mut Ui, f: &mut AutoCorrectForm) -> bool {
-    ui.horizontal(|ui| {
-        for (i, l) in ["AutoCorrect", "AutoFormat As You Type", "Math AutoCorrect"].into_iter().enumerate() {
-            if ui.selectable_label(f.tab == i as u8, tl!(l)).clicked() {
-                f.tab = i as u8;
-            }
-        }
-    });
-    ui.separator();
-    match f.tab {
+    let names = ["AutoCorrect", "AutoFormat As You Type", "Math AutoCorrect"].map(|n| tl!(n).to_string());
+    if let Some(k) = crate::widgets::dialog_tabs(ui, &names, f.tab as usize) {
+        f.tab = k as u8;
+    }
+    ui.add_space(6.0);
+    crate::widgets::dialog_page(ui, "autocorrect", |ui| match f.tab {
         0 => autocorrect_tab(app, ui, f),
         1 => {
             let o = &mut f.options;
@@ -412,7 +409,7 @@ fn autocorrect_ui(app: &mut WordApp, ui: &mut Ui, f: &mut AutoCorrectForm) -> bo
             ui.checkbox(&mut o.tab_indent, tl!("Set left- and first-indent with tabs and backspaces"));
         }
         _ => math_tab(ui, f),
-    }
+    });
     error(ui, &f.message);
     let (ok, cancel) = buttons(ui, true);
     if ok {

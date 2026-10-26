@@ -1348,6 +1348,20 @@ pub fn dialog_tabs(ui: &mut Ui, labels: &[String], selected: usize) -> Option<us
     clicked
 }
 
+/// A dialog page under [`dialog_tabs`]. Every page of one dialog gets the
+/// size of the largest page shown so far, so the dialog keeps its size when
+/// the tab changes. `key` tells dialogs apart.
+pub fn dialog_page<R>(ui: &mut Ui, key: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
+    let id = ui.scope_id().with(("dialog_page", key));
+    let seen: egui::Vec2 = ui.ctx().data(|d| d.get_temp(id)).unwrap_or_default();
+    let out = ui.scope(|ui| {
+        ui.set_min_size(seen);
+        add(ui)
+    });
+    ui.ctx().data_mut(|d| d.insert_temp(id, seen.max(out.response.rect.size())));
+    out.inner
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
