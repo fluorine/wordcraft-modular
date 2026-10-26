@@ -9734,6 +9734,26 @@ fn spacing_commands_cancel_spacing_in_lines() {
     assert!(props.iter().all(|p| t.doc.styles.resolve_para(p).space_before == 3.0));
 }
 
+/// The Paragraph dialog's OK (`para.set`) cancels spacing in lines on the side whose space it
+/// sets in points, inherited from the style too; a side it doesn't set, or sets in lines along
+/// with the points, keeps its lines.
+#[test]
+fn paragraph_dialog_spacing_cancels_spacing_in_lines() {
+    let mut s = s();
+    run(&mut s, "text.insert", json!({"text": "From WPS"}));
+    let rp = |s: &Session| s.doc.styles.resolve_para(&s.doc.para_at(&s.sel.focus).unwrap().props);
+    s.doc.styles.default_para.space_before_lines = Some(2.0);
+    let path = s.sel.focus.path.clone();
+    s.doc.para_mut(StoryRef::Body, &path).unwrap().props.space_after_lines = Some(0.5);
+    assert_eq!((rp(&s).space_before, rp(&s).space_after), (24.0, 6.0));
+    run(&mut s, "para.set", json!({"props": {"keepNext": true}}));
+    assert_eq!((rp(&s).space_before, rp(&s).space_after), (24.0, 6.0), "other fields leave the lines alone");
+    run(&mut s, "para.set", json!({"props": {"spaceBefore": 9}}));
+    assert_eq!((rp(&s).space_before, rp(&s).space_after), (9.0, 6.0), "Before in points wins over the style's lines; After keeps its own");
+    run(&mut s, "para.set", json!({"props": {"spaceAfter": 4, "spaceAfterLines": 1.5}}));
+    assert_eq!(rp(&s).space_after, 18.0, "lines given with the points stay");
+}
+
 /// #712, as in Word: Ctrl+F (`edit.find` with no text) opens the Navigation pane and asks the UI
 /// to put the keyboard in its search box, not the dialog; Ctrl+H (`edit.replace` with nothing to
 /// replace) opens Find and Replace on its Replace tab instead of failing; Go To moves by pages from
