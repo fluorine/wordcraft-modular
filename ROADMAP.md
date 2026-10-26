@@ -649,6 +649,7 @@ Imported Word 97–2003 `.doc`/`.dot` files now ask for a supported DOCX target 
 | 2026-10-20 | Saving to a NAS share mounted by GVFS (`smb://` in the Linux file manager, #3003) works: the share refuses every Unix mode change with "Operation not supported", which used to fail the whole save, so the close prompt's Save never closed. The save now goes on without copying a mode the folder doesn't keep; any other failure still keeps the original. Unit tests; not yet confirmed on a real share |
 
 Footer page-table height and body wrapping are corrected. Other pagination gaps remain open.
+- 2026-10-26: Thai Distributed (`w:jc="thaiDistribute"`) is its own alignment and survives DOCX and RTF (`\qt`) round trips (it was read as Distribute): a wrapped line's room is shared evenly between Thai and Khmer clusters, with a gap after the leading vowels as in Word, and the spaces before a line's first character keep their width. Khmer Justify is new for Khmer, which has no spaces: room goes to phrase spaces, then word boundaries (zero-width space, ។, script changes), then syllables, never inside a syllable or coeng stack; saved as `thaiDistribute` plus an ignorable `wc:khmer` mark. A zero-width space, word joiner or U+FEFF is invisible whatever the font draws (Khmer OS Battambang has no U+200B glyph). `para.thaiDistribute`, `para.khmerJustify`, the Paragraph dialog; see `docs/khmer-justify.md`
 
 ## Revision history
 
