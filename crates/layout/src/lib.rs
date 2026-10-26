@@ -13,6 +13,7 @@ mod contour;
 pub mod display;
 pub mod fields;
 pub mod hit;
+pub mod khmer_just;
 pub mod kinsoku;
 pub mod math;
 pub mod outline;
@@ -4996,6 +4997,8 @@ mod tests_budget;
 mod tests_complex;
 #[cfg(test)]
 mod tests_grid;
+#[cfg(test)]
+mod tests_khmer;
 #[cfg(test)]
 mod tests_ligature;
 #[cfg(test)]
