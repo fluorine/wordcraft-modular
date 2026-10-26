@@ -36,11 +36,12 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     if !has_document && !works_without_document(&app.ui.backstage_page) {
         app.ui.backstage_page = "home".into();
     }
-    let mac = app.integrated_titlebar;
+    let chrome = crate::window_chrome::config(app);
+    let mac = chrome.mode == crate::window_chrome::Mode::Integrated;
     // Frameless (Linux) shares the macOS treatment: the Backstage covers the title bar, so its
     // top band drags the window and carries the chevron, and the caption buttons float at the
     // content band's right end (below).
-    let covers_title_bar = mac || app.frameless;
+    let covers_title_bar = chrome.mode != crate::window_chrome::Mode::Native;
     egui::Panel::left("backstage_nav")
         .exact_size(200.0)
         // Fixed width, as in Word: without this egui shows a resize handle that does nothing (#502).
@@ -51,15 +52,32 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 // The Backstage covers the title bar, so its top band is the title bar: the back
                 // button sits beside the traffic lights (macOS) or the window's left edge
                 // (frameless), centred in the band, and the rest of the band drags the window.
-                let band_h = if mac { app.mac_titlebar.height } else { crate::caption_buttons::BAND_HEIGHT };
-                let (band, drag) = ui.allocate_exact_size(vec2(200.0, band_h), Sense::click_and_drag());
+                let (band, drag) = ui.allocate_exact_size(vec2(200.0, chrome.height), Sense::click_and_drag());
                 if drag.drag_started() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+                }
+                if drag.double_clicked() {
+                    let max = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!max));
                 }
                 // The chevron's stroke starts at the content edge.
                 let c =
                     back_chevron_c(band.min.x, band.center().y, app.session.view.full_screen, if mac { app.mac_titlebar.content_left } else { 23.0 });
-                let resp = ui.interact(Rect::from_center_size(c, vec2(22.0, band.height())), ui.id().with("backstage_back"), Sense::click());
+                let resp = ui.interact(
+                    Rect::from_center_size(c, vec2(28.0, 28.0)),
+                    ui.id().with("backstage_back"),
+                    Sense::click(),
+                );
+                let hot = resp.hovered() || resp.is_pointer_button_down_on();
+                if hot {
+                    let fill = if resp.is_pointer_button_down_on() {
+                        egui::Color32::from_white_alpha(46)
+                    } else {
+                        egui::Color32::from_white_alpha(26)
+                    };
+                    ui.painter().circle_filled(c, 14.0, fill);
+                }
+                let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
                 icons::paint(ui.painter(), Rect::from_center_size(c, vec2(18.0, 18.0)), "chevronLeft", egui::Color32::WHITE, egui::Color32::WHITE);
                 resp
             } else {
@@ -68,7 +86,17 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                 // not also close the File page, same as the macOS chevron fix (#2972) below.
                 let (r, _) = ui.allocate_exact_size(vec2(200.0, 40.0), Sense::hover());
                 let c = pos2(r.min.x + 26.0, r.center().y);
-                let resp = ui.interact(Rect::from_center_size(c, vec2(22.0, r.height())), ui.id().with("backstage_back"), Sense::click());
+                let resp = ui.interact(Rect::from_center_size(c, vec2(28.0, 28.0)), ui.id().with("backstage_back"), Sense::click());
+                let hot = resp.hovered() || resp.is_pointer_button_down_on();
+                if hot {
+                    let fill = if resp.is_pointer_button_down_on() {
+                        egui::Color32::from_white_alpha(46)
+                    } else {
+                        egui::Color32::from_white_alpha(26)
+                    };
+                    ui.painter().circle_filled(c, 14.0, fill);
+                }
+                let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
                 icons::paint(ui.painter(), Rect::from_center_size(c, vec2(18.0, 18.0)), "chevronLeft", egui::Color32::WHITE, egui::Color32::WHITE);
                 resp
             };
@@ -149,7 +177,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin {
             left: 40,
             right: 40,
-            top: 30 + if app.frameless { crate::caption_buttons::BAND_HEIGHT as i8 } else { 0 },
+            top: 30 + if chrome.mode == crate::window_chrome::Mode::Frameless { chrome.height as i8 } else { 0 },
             bottom: 30,
         }))
         .show(ui, |ui| {
@@ -172,9 +200,9 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         });
     // Frameless (Linux): the content area's top band drags the window and carries the caption
     // buttons at its right end; the content starts below it (the margin above).
-    if app.frameless {
+    if chrome.custom_controls {
         let full = ui.ctx().input(|i| i.viewport_rect());
-        let band = Rect::from_min_max(pos2(200.0, 0.0), pos2(full.max.x, crate::caption_buttons::BAND_HEIGHT));
+        let band = Rect::from_min_max(pos2(full.min.x + 200.0, full.min.y), pos2(full.max.x, full.min.y + chrome.height));
         crate::caption_buttons::band(app, ui.ctx(), band);
     }
 }

@@ -84,6 +84,7 @@ pub mod table_resize;
 pub mod table_ruler;
 pub mod theme;
 pub mod widgets;
+pub(crate) mod window_chrome;
 pub mod window_close;
 pub mod window_geometry;
 pub mod wordart_menus;
@@ -2466,7 +2467,9 @@ impl WordApp {
         }
         // Frameless (Linux): thin strips along the window's edges resize it. Above the panels,
         // below the popups.
-        caption_buttons::resize_edges(self, &ctx);
+        if crate::window_chrome::config(self).custom_controls {
+            caption_buttons::resize_edges(self, &ctx);
+        }
         content_controls::popup(self, &ctx);
         dialogs::show(self, &ctx);
         #[cfg(not(target_arch = "wasm32"))]

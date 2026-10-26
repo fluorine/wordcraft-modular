@@ -279,12 +279,13 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     // macOS: shorter, so the system's traffic lights are centred in it; the tallest controls
     // shrink to keep a margin above and below them.
-    let mac = app.integrated_titlebar;
+    let chrome = crate::window_chrome::config(app);
+    let mac = chrome.mode == crate::window_chrome::Mode::Integrated;
     let bar = app.mac_titlebar;
     let left = if mac { bar.content_left as i8 } else { 8 };
     let control_h = if mac { 22.0 } else { 26.0 };
     // Frameless (Linux): the caption buttons sit flush at the bar's right end, so no right margin.
-    let right = if app.frameless { 0 } else { 10 };
+    let right = if chrome.mode == crate::window_chrome::Mode::Frameless { 0 } else { 10 };
     egui::Panel::top("title_bar")
         .exact_size(if mac { bar.height } else { 38.0 })
         .frame(egui::Frame::NONE.fill(t.title_bar).inner_margin(egui::Margin { left, right, top: 0, bottom: 0 }))
@@ -347,7 +348,7 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
                 qat_end = ui.min_rect().max.x;
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     // Frameless (Linux): the window's caption buttons, flush at the right end.
-                    if app.frameless {
+                    if chrome.custom_controls {
                         crate::caption_buttons::draw(ui, crate::caption_buttons::BAND_HEIGHT);
                         ui.add_space(8.0);
                     }
@@ -523,7 +524,7 @@ pub fn screen_bar(app: &mut WordApp, ui: &mut Ui, screen: Screen) {
             });
         }
         // Frameless (Linux): the window's buttons stay reachable in Focus and Full Screen.
-        if app.frameless {
+        if crate::window_chrome::config(app).custom_controls {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 crate::caption_buttons::draw(ui, SCREEN_BAR_HEIGHT);
             });

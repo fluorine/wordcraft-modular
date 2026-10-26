@@ -20,6 +20,7 @@ const ICON_STROKE: f32 = 1.35;
 const EDGE: f32 = 6.0;
 /// The height of the title bar and of the band the Backstage reserves for it.
 pub(crate) const BAND_HEIGHT: f32 = 38.0;
+pub(crate) const BUTTONS_WIDTH: f32 = WIDTH * 2.0 + CLOSE_WIDTH;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Kind {
@@ -112,14 +113,14 @@ pub(crate) fn band(app: &WordApp, ctx: &Context, band: Rect) {
     if !app.frameless {
         return;
     }
+    let controls_rect = Rect::from_min_max(pos2(band.max.x - BUTTONS_WIDTH, band.min.y), band.max);
+    let drag_rect = Rect::from_min_max(band.min, pos2(controls_rect.min.x, band.max.y));
     let drag_id = egui::Id::new("window_band_drag");
     let drag = egui::Area::new(drag_id)
-        .order(Order::Middle)
-        .fixed_pos(band.min)
+        .order(Order::Foreground)
+        .fixed_pos(drag_rect.min)
         .show(ctx, |ui| {
-            ui.set_min_size(band.size());
-            let local_band = Rect::from_min_size(egui::Pos2::ZERO, band.size());
-            ui.interact(local_band, drag_id, Sense::click_and_drag())
+            ui.allocate_rect(drag_rect, Sense::click_and_drag())
         })
         .inner;
     if drag.drag_started() {
@@ -129,11 +130,17 @@ pub(crate) fn band(app: &WordApp, ctx: &Context, band: Rect) {
         let max = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
         ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
     }
-    egui::Area::new(egui::Id::new("window_band_buttons")).order(Order::Middle).fixed_pos(band.min).show(ctx, |ui| {
-        ui.scope_builder(egui::UiBuilder::new().max_rect(band).layout(egui::Layout::right_to_left(egui::Align::Center)), |ui| {
-            draw(ui, band.height());
+    egui::Area::new(egui::Id::new("window_band_buttons"))
+        .order(Order::Foreground)
+        .fixed_pos(controls_rect.min)
+        .show(ctx, |ui| {
+            ui.scope_builder(
+                egui::UiBuilder::new().max_rect(controls_rect).layout(egui::Layout::right_to_left(egui::Align::Center)),
+                |ui| {
+                    draw(ui, controls_rect.height());
+                },
+            );
         });
-    });
 }
 
 /// Invisible strips along the window's edges that resize a frameless window (`BeginResize`).
@@ -165,8 +172,7 @@ pub(crate) fn resize_edges(app: &WordApp, ctx: &Context) {
             .fixed_pos(rect.min)
             .show(ctx, |ui| {
                 ui.set_min_size(rect.size());
-                let local_rect = Rect::from_min_size(egui::Pos2::ZERO, rect.size());
-                ui.interact(local_rect, id, Sense::click_and_drag())
+                ui.interact(rect, id, Sense::click_and_drag())
             })
             .inner;
         let resp = resp.on_hover_cursor(cursor);
@@ -246,6 +252,31 @@ mod tests {
             .expect("the caption Close sits in the band");
         assert!(close.rect().top() < crate::caption_buttons::BAND_HEIGHT, "the buttons sit in the Backstage's top band");
         assert!(h.ctx.read_response(egui::Id::new("window_band_drag")).is_some(), "the band drags the window");
+        // Click back button closes backstage:
+        h.event(egui::Event::PointerMoved(pos2(23.0, 19.0)));
+        h.event(egui::Event::PointerButton { pos: pos2(23.0, 19.0), button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+        h.event(egui::Event::PointerButton { pos: pos2(23.0, 19.0), button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
+        h.step();
+        assert!(!h.state().ui.backstage, "clicking backstage back should close backstage");
+        // Drag in the window band:
+        let mut app2 = frameless_app();
+        app2.run("ui.backstage", json!({"value": true})).unwrap();
+        let mut h2 = harness(app2);
+        for _ in 0..4 {
+            h2.step();
+        }
+        h2.event(egui::Event::PointerMoved(pos2(300.0, 19.0)));
+        h2.event(egui::Event::PointerButton { pos: pos2(300.0, 19.0), button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+        h2.event(egui::Event::PointerMoved(pos2(350.0, 19.0)));
+        h2.step();
+        let layer = h2.ctx.layer_id_at(pos2(300.0, 19.0));
+        assert_eq!(layer, Some(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("window_band_drag"))));
+        // The sidebar's top band also drags the window:
+        h2.event(egui::Event::PointerMoved(pos2(100.0, 19.0)));
+        h2.event(egui::Event::PointerButton { pos: pos2(100.0, 19.0), button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+        h2.event(egui::Event::PointerMoved(pos2(120.0, 19.0)));
+        h2.step();
+        assert!(h2.state().ui.backstage, "dragging sidebar top band leaves backstage open");
         let mut h = harness(WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), crate::Services::default()));
         let _ = h.state_mut().run("ui.backstage", json!({"value": true}));
         for _ in 0..4 {
@@ -255,6 +286,30 @@ mod tests {
         // the caption button in the window's top band.
         let in_band = h.get_all_by_label_contains("Close").into_iter().any(|n| n.rect().top() < crate::caption_buttons::BAND_HEIGHT);
         assert!(!in_band, "a native title bar already has the buttons");
+    }
+
+    #[test]
+    fn frameless_start_screen_back_button_and_drag() {
+        let mut app = frameless_app();
+        app.start_screen();
+        assert!(app.ui.backstage);
+        assert!(!app.has_document());
+        let mut h = harness(app);
+        h.run_steps(4);
+        // Drag in central panel top band
+        h.event(egui::Event::PointerMoved(pos2(300.0, 19.0)));
+        h.event(egui::Event::PointerButton { pos: pos2(300.0, 19.0), button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+        h.event(egui::Event::PointerMoved(pos2(350.0, 19.0)));
+        h.step();
+        assert_eq!(h.ctx.layer_id_at(pos2(300.0, 19.0)), Some(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("window_band_drag"))));
+
+        // Click Back button leaves start screen to empty window
+        h.event(egui::Event::PointerMoved(pos2(23.0, 19.0)));
+        h.event(egui::Event::PointerButton { pos: pos2(23.0, 19.0), button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+        h.event(egui::Event::PointerButton { pos: pos2(23.0, 19.0), button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
+        h.run_steps(4);
+        assert!(!h.state().ui.backstage, "clicking back leaves the Start screen");
+        assert!(!h.state().has_document(), "for the empty window");
     }
 
     /// Close asks the viewport to close; egui-winit turns that into the close request, and the
