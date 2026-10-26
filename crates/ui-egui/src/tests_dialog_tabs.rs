@@ -9,6 +9,7 @@ use crate::dialogs::Dialog;
 
 fn harness(name: &str) -> egui_kittest::Harness<'static, WordApp> {
     let mut app = WordApp::new(Session::new(wordcraft_doc::Document::new()), crate::Services::default());
+    let _ = app.run("ui.language", json!({"value": "en"}));
     let _ = app.run("document.setText", json!({"text": "Some text"}));
     let _ = app.run("select.all", json!({}));
     let _ = app.run("ui.dialog", json!({"name": name}));
