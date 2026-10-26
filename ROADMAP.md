@@ -681,6 +681,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 | 2026-10-25 | trivial | Progress log: egui 0.37 migration records the `craft-i18n.rev` catalog pin (9205108…; 27 languages) and the input-method handling; managed CI passed; native acceptance and native-speaker review remain open |
 | 2026-10-25 | trivial | Progress log: justified and distributed lines keep the width of the spaces before their first character |
 | 2026-10-17 | trivial | Progress log: Standard-encrypted (AES) Word files open (gap 9) |
+| 2026-10-14 | trivial | Progress log: Insert Date and Time and DATE/TIME fields use local time (#1707) |
 | 2026-10-19 | trivial | Progress log: Latin text in right-to-left lines keeps its order (#2150) |
 | 2026-10-25 | trivial | Progress log: Text Highlight Color buttons show the remembered colour, or no colour bar after No Color (#4087) |
 | 2026-10-23 | minor | A command that changes nothing is not an edit: no undo step, no unsaved changes, no relayout, and the redo stack survives it. |
