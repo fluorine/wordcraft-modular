@@ -1911,18 +1911,33 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
     if !thai_runs.is_empty() {
         let segmenter = LineSegmenter::new_dictionary(Default::default());
         let dictionary: Vec<usize> = segmenter.segment_str(&text).collect();
-        for run in thai_runs {
-            let thai: Vec<usize> = dictionary
-                .iter()
-                .copied()
-                .filter(|&i| run.start < i && i < run.end)
-                .filter(|&i| crate::kinsoku::is_safe_line_break(&text, i))
-                .collect();
-            if !thai.is_empty() {
-                found.retain(|&i| !(run.start < i && i < run.end));
-                found.extend(thai);
+        // Walk the sorted ICU boundaries and Thai runs together. Rescanning the paragraph-wide
+        // boundary list for each run makes paragraphs with many short Thai runs quadratic.
+        let mut boundaries = dictionary.into_iter().peekable();
+        let mut thai_breaks = Vec::new();
+        let mut replaced_runs = Vec::new();
+        for run in &thai_runs {
+            while boundaries.peek().is_some_and(|&i| i <= run.start) {
+                boundaries.next();
+            }
+            let breaks_before_run = thai_breaks.len();
+            while boundaries.peek().is_some_and(|&i| i < run.end) {
+                if let Some(i) = boundaries.next().filter(|&i| crate::kinsoku::is_safe_line_break(&text, i)) {
+                    thai_breaks.push(i);
+                }
+            }
+            if thai_breaks.len() > breaks_before_run {
+                replaced_runs.push(run.clone());
             }
         }
+        let mut run_index = 0;
+        found.retain(|&i| {
+            while replaced_runs.get(run_index).is_some_and(|run| i >= run.end) {
+                run_index += 1;
+            }
+            replaced_runs.get(run_index).is_none_or(|run| i <= run.start || i >= run.end)
+        });
+        found.extend(thai_breaks);
     }
     // Myanmar has no spaces between words: it wraps between syllables.
     if text.chars().any(|c| matches!(u32::from(c), 0x1000..=0x109F | 0xA9E0..=0xA9FF | 0xAA60..=0xAA7F)) {
