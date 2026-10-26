@@ -882,7 +882,6 @@ impl WordApp {
             read_aloud_error: None,
             autosave_path: None,
             saves_in_flight: Vec::new(),
-            awaiting_save: None,
             damaged_save_continuation: None,
             font_generation: wordcraft_fonts::FontDb::global().generation(),
             recovery_seen: false,
