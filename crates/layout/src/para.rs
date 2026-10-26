@@ -154,7 +154,7 @@ pub struct Cluster {
     /// The cluster is a decimal separator (decimal tabs align on it).
     pub dot: bool,
     /// A visible inline drawing eligible for picture-only leading.
-    picture: bool,
+    pub(crate) picture: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
