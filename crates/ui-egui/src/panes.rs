@@ -480,16 +480,9 @@ fn nav(app: &mut WordApp, ui: &mut Ui) {
     let keys = ["headings", "pages", "results"];
     let names = ["Headings", "Pages", "Results"].map(|n| tl!(n).to_string());
     let current = keys.iter().position(|k| *k == app.ui.nav_tab).unwrap_or(0);
-    // Localized tab labels can be wider than this fixed pane even at the helper's minimum
-    // padding. Keep the pane width unchanged and let users scroll across the complete tab strip.
-    egui::ScrollArea::horizontal().id_salt("navigation_tabs").scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible).show(
-        ui,
-        |ui| {
-            if let Some(i) = crate::widgets::dialog_tabs_within(ui, &names, current, ui.available_width()) {
-                app.ui.nav_tab = keys[i].into();
-            }
-        },
-    );
+    if let Some(i) = crate::widgets::dialog_tabs_within(ui, &names, current, ui.available_width()) {
+        app.ui.nav_tab = keys[i].into();
+    }
     ui.add_space(4.0);
     egui::ScrollArea::vertical().show(ui, |ui| match app.ui.nav_tab.as_str() {
         "pages" => {
