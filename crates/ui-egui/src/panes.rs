@@ -477,14 +477,13 @@ fn nav(app: &mut WordApp, ui: &mut Ui) {
         }
     }
     ui.add_space(4.0);
-    ui.horizontal_wrapped(|ui| {
-        for (k, l) in [("headings", "Headings"), ("pages", "Pages"), ("results", "Results")] {
-            if ui.selectable_label(app.ui.nav_tab == k, tl!(l)).clicked() {
-                app.ui.nav_tab = k.into();
-            }
-        }
-    });
-    ui.separator();
+    let keys = ["headings", "pages", "results"];
+    let names = ["Headings", "Pages", "Results"].map(|n| tl!(n).to_string());
+    let current = keys.iter().position(|k| *k == app.ui.nav_tab).unwrap_or(0);
+    if let Some(i) = crate::widgets::dialog_tabs_within(ui, &names, current, ui.available_width()) {
+        app.ui.nav_tab = keys[i].into();
+    }
+    ui.add_space(4.0);
     egui::ScrollArea::vertical().show(ui, |ui| match app.ui.nav_tab.as_str() {
         "pages" => {
             let l = app.session.layout();
@@ -1291,6 +1290,21 @@ mod tests {
         h.input_mut().events.push(egui::Event::Text("typed".into()));
         h.run_steps(2);
         assert_eq!(h.state().session.doc.plain_text(wordcraft_doc::StoryRef::Body).trim(), "typed");
+    }
+
+    /// The Navigation pane's views are the shared dialog tabs: a click shows that view.
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn navigation_tabs_switch_the_view() {
+        use egui_kittest::kittest::Queryable;
+        let mut app = crate::WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::from_text("Open it")), crate::Services::default());
+        app.run("view.navigationPane", serde_json::json!({"value": true})).unwrap();
+        let mut h = pane_harness(app);
+        for (label, key) in [("Pages", "pages"), ("Results", "results"), ("Headings", "headings")] {
+            h.get_by_label(label).click();
+            h.run_steps(3);
+            assert_eq!(h.state().ui.nav_tab, key, "{label} tab");
+        }
     }
 
     fn pane_harness(app: crate::WordApp) -> egui_kittest::Harness<'static, crate::WordApp> {
