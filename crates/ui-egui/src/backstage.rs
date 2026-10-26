@@ -71,7 +71,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     app.session.view.full_screen,
                     if mac { app.mac_titlebar.content_left } else { 23.0 },
                 );
-                let resp = ui.interact(Rect::from_center_size(c, vec2(28.0, 28.0)), ui.id().with("backstage_back"), Sense::click());
+                let resp = ui.interact(Rect::from_center_size(c, vec2(28.0, 28.0)), ui.scope_id().with("backstage_back"), Sense::click());
                 icons::paint(ui.painter(), Rect::from_center_size(c, vec2(18.0, 18.0)), "chevronLeft", egui::Color32::WHITE, egui::Color32::WHITE);
                 resp
             } else {

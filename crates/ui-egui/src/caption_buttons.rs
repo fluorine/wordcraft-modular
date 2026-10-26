@@ -87,7 +87,7 @@ pub(crate) fn draw(ui: &mut Ui, bar_h: f32) {
             Kind::Maximize => tl!("Maximize"),
             Kind::Close => tl!("Close"),
         };
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
         let resp = resp.on_hover_text(label);
         if resp.clicked() {
             match kind {
@@ -115,7 +115,7 @@ pub(crate) fn band(app: &WordApp, ctx: &Context, band: Rect) {
     }
     let controls_rect = Rect::from_min_max(pos2(band.max.x - BUTTONS_WIDTH, band.min.y), band.max);
     let drag_rect = Rect::from_min_max(band.min, pos2(controls_rect.min.x, band.max.y));
-    let drag_id = egui::Id::new("window_band_drag");
+    let drag_id = egui::Id::unique("window_band_drag");
     let drag = egui::Area::new(drag_id)
         .order(Order::Foreground)
         .fixed_pos(drag_rect.min)
@@ -130,7 +130,7 @@ pub(crate) fn band(app: &WordApp, ctx: &Context, band: Rect) {
         let max = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
         ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
     }
-    egui::Area::new(egui::Id::new("window_band_buttons"))
+    egui::Area::new(egui::Id::unique("window_band_buttons"))
         .order(Order::Foreground)
         .fixed_pos(controls_rect.min)
         .show(ctx, |ui| {
@@ -166,7 +166,7 @@ pub(crate) fn resize_edges(app: &WordApp, ctx: &Context) {
         (ResizeDirection::SouthEast, Rect::from_min_max(pos2(r - EDGE, b - EDGE), pos2(r, b)), CursorIcon::ResizeSouthEast, 7),
     ];
     for (dir, rect, cursor, n) in dirs {
-        let id = egui::Id::new(("window_resize", n));
+        let id = egui::Id::unique(("window_resize", n));
         let resp = egui::Area::new(id)
             .order(Order::Middle)
             .fixed_pos(rect.min)
@@ -251,7 +251,7 @@ mod tests {
             .find(|n| n.rect().top() < crate::caption_buttons::BAND_HEIGHT)
             .expect("the caption Close sits in the band");
         assert!(close.rect().top() < crate::caption_buttons::BAND_HEIGHT, "the buttons sit in the Backstage's top band");
-        assert!(h.ctx.read_response(egui::Id::new("window_band_drag")).is_some(), "the band drags the window");
+        assert!(h.ctx.read_response(egui::Id::unique("window_band_drag")).is_some(), "the band drags the window");
         // Click back button closes backstage:
         h.event(egui::Event::PointerMoved(pos2(23.0, 19.0)));
         h.event(egui::Event::PointerButton { pos: pos2(23.0, 19.0), button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
@@ -270,7 +270,7 @@ mod tests {
         h2.event(egui::Event::PointerMoved(pos2(350.0, 19.0)));
         h2.step();
         let layer = h2.ctx.layer_id_at(pos2(300.0, 19.0));
-        assert_eq!(layer, Some(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("window_band_drag"))));
+        assert_eq!(layer, Some(egui::LayerId::new(egui::Order::Foreground, egui::Id::unique("window_band_drag"))));
         // The sidebar's top band also drags the window:
         h2.event(egui::Event::PointerMoved(pos2(100.0, 19.0)));
         h2.event(egui::Event::PointerButton { pos: pos2(100.0, 19.0), button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
@@ -301,7 +301,7 @@ mod tests {
         h.event(egui::Event::PointerButton { pos: pos2(300.0, 19.0), button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
         h.event(egui::Event::PointerMoved(pos2(350.0, 19.0)));
         h.step();
-        assert_eq!(h.ctx.layer_id_at(pos2(300.0, 19.0)), Some(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("window_band_drag"))));
+        assert_eq!(h.ctx.layer_id_at(pos2(300.0, 19.0)), Some(egui::LayerId::new(egui::Order::Foreground, egui::Id::unique("window_band_drag"))));
 
         // Click Back button leaves start screen to empty window
         h.event(egui::Event::PointerMoved(pos2(23.0, 19.0)));
@@ -332,11 +332,11 @@ mod tests {
     fn resize_edges_follow_the_frameless_flag() {
         let h = harness(frameless_app());
         for n in [0u8, 1, 3, 7] {
-            let id = egui::Id::new(("window_resize", n));
+            let id = egui::Id::unique(("window_resize", n));
             assert!(h.ctx.read_response(id).is_some(), "edge {n} is a widget");
         }
         let h = harness(WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), crate::Services::default()));
-        let id = egui::Id::new(("window_resize", 0u8));
+        let id = egui::Id::unique(("window_resize", 0u8));
         assert!(h.ctx.read_response(id).is_none(), "no edges on a decorated window");
     }
 }
