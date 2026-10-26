@@ -13,10 +13,13 @@ use crate::theme::Tokens;
 /// A caption button's width; the close box is a little wider, as on Windows.
 const WIDTH: f32 = 40.0;
 const CLOSE_WIDTH: f32 = 44.0;
-/// How far a glyph reaches from its centre (the ✕, the line, the box).
-const GLYPH: f32 = 4.5;
+/// The compact geometry shared by the caption glyphs.
+const GLYPH: f32 = 5.0;
+const ICON_STROKE: f32 = 1.35;
 /// The thickness of the invisible resize strips along the window's edges.
 const EDGE: f32 = 6.0;
+/// The height of the title bar and of the band the Backstage reserves for it.
+pub(crate) const BAND_HEIGHT: f32 = 38.0;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Kind {
@@ -30,7 +33,9 @@ enum Kind {
 pub(crate) fn draw(ui: &mut Ui, bar_h: f32) {
     let t = Tokens::get(ui.ctx());
     let maximized = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
-    for kind in [Kind::Minimize, Kind::Maximize, Kind::Close] {
+    // Right-to-left layout puts the first button at the right edge. This produces the standard
+    // left-to-right order: Minimize, Maximize/Restore, Close.
+    for kind in [Kind::Close, Kind::Maximize, Kind::Minimize] {
         let w = if kind == Kind::Close { CLOSE_WIDTH } else { WIDTH };
         let (r, resp) = ui.allocate_exact_size(vec2(w, bar_h), Sense::click());
         let down = resp.is_pointer_button_down_on();
@@ -46,7 +51,7 @@ pub(crate) fn draw(ui: &mut Ui, bar_h: f32) {
         }
         let c = r.center();
         let stroke = egui::Stroke::new(
-            1.0,
+            ICON_STROKE,
             if kind == Kind::Close && hot {
                 t.on_close
             } else if hot {
@@ -57,17 +62,18 @@ pub(crate) fn draw(ui: &mut Ui, bar_h: f32) {
         );
         match kind {
             Kind::Minimize => {
-                ui.painter().line_segment([pos2(c.x - GLYPH, c.y + GLYPH), pos2(c.x + GLYPH, c.y + GLYPH)], stroke);
+                ui.painter().line_segment([pos2(c.x - GLYPH, c.y + 2.5), pos2(c.x + GLYPH, c.y + 2.5)], stroke);
             }
             Kind::Maximize if !maximized => {
-                ui.painter().rect_stroke(centre_box(c, 0.0), 1.5, stroke, StrokeKind::Inside);
+                ui.painter().rect_stroke(centre_box(c, 0.0), 1.0, stroke, StrokeKind::Inside);
             }
             Kind::Maximize => {
-                // Restore: the front box, then the back one behind its top-right corner.
-                ui.painter().rect_stroke(centre_box(c, 0.0), 1.5, stroke, StrokeKind::Inside);
+                // Restore: two offset windows with only the visible edges of the rear one.
+                let front = centre_box(c, 0.0).translate(vec2(-1.0, 1.0));
                 let back = centre_box(c, 0.0).translate(vec2(2.0, -2.0));
-                ui.painter().line_segment([pos2(back.min.x, back.min.y), pos2(back.max.x, back.min.y)], stroke);
-                ui.painter().line_segment([pos2(back.max.x, back.min.y), pos2(back.max.x, back.max.y - 3.0)], stroke);
+                ui.painter().line_segment([back.left_top(), back.right_top()], stroke);
+                ui.painter().line_segment([back.right_top(), back.right_bottom()], stroke);
+                ui.painter().rect_stroke(front, 1.0, stroke, StrokeKind::Inside);
             }
             Kind::Close => {
                 ui.painter().line_segment([pos2(c.x - GLYPH, c.y - GLYPH), pos2(c.x + GLYPH, c.y + GLYPH)], stroke);
@@ -95,8 +101,39 @@ pub(crate) fn draw(ui: &mut Ui, bar_h: f32) {
 
 /// A `size`-square box centred on `c`.
 fn centre_box(c: egui::Pos2, grow: f32) -> Rect {
-    let s = GLYPH * 2.0 + grow;
+    let s = GLYPH * 2.0 + grow - 1.0;
     Rect::from_center_size(c, vec2(s, s))
+}
+
+/// The top band of a full-window surface that covers the title bar (Backstage): it drags the
+/// window (double-click maximizes, as the title bar does) and carries the caption buttons at its
+/// right end. The caller leaves `band` clear of content; the buttons are drawn over it here.
+pub(crate) fn band(app: &WordApp, ctx: &Context, band: Rect) {
+    if !app.frameless {
+        return;
+    }
+    let drag_id = egui::Id::new("window_band_drag");
+    let drag = egui::Area::new(drag_id)
+        .order(Order::Middle)
+        .fixed_pos(band.min)
+        .show(ctx, |ui| {
+            ui.set_min_size(band.size());
+            let local_band = Rect::from_min_size(egui::Pos2::ZERO, band.size());
+            ui.interact(local_band, drag_id, Sense::click_and_drag())
+        })
+        .inner;
+    if drag.drag_started() {
+        ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+    }
+    if drag.double_clicked() {
+        let max = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
+        ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
+    }
+    egui::Area::new(egui::Id::new("window_band_buttons")).order(Order::Middle).fixed_pos(band.min).show(ctx, |ui| {
+        ui.scope_builder(egui::UiBuilder::new().max_rect(band).layout(egui::Layout::right_to_left(egui::Align::Center)), |ui| {
+            draw(ui, band.height());
+        });
+    });
 }
 
 /// Invisible strips along the window's edges that resize a frameless window (`BeginResize`).
@@ -128,7 +165,8 @@ pub(crate) fn resize_edges(app: &WordApp, ctx: &Context) {
             .fixed_pos(rect.min)
             .show(ctx, |ui| {
                 ui.set_min_size(rect.size());
-                ui.interact(rect, id, Sense::click_and_drag())
+                let local_rect = Rect::from_min_size(egui::Pos2::ZERO, rect.size());
+                ui.interact(local_rect, id, Sense::click_and_drag())
             })
             .inner;
         let resp = resp.on_hover_cursor(cursor);
@@ -163,7 +201,8 @@ mod tests {
     }
 
     /// A frameless window's title bar carries Minimize, Maximize and Close; a native-decorated
-    /// one doesn't (the system buttons do that work).
+    /// one doesn't (the system buttons do that work). Close sits at the right end, as a Windows
+    /// caption bar has it.
     #[test]
     fn caption_buttons_only_on_a_frameless_window() {
         use egui_kittest::kittest::Queryable;
@@ -171,13 +210,51 @@ mod tests {
         for _ in 0..4 {
             h.step();
         }
-        for name in ["Minimize", "Maximize", "Close"] {
-            assert!(h.query_by_label_contains(name).is_some(), "{name} is drawn");
-        }
+        let close = h.get_by_label_contains("Close");
+        let max = h.get_by_label_contains("Maximize");
+        let min = h.get_by_label_contains("Minimize");
+        assert!(
+            min.rect().left() < max.rect().left() && max.rect().left() < close.rect().left(),
+            "Minimize, Maximize, Close left to right, Close at the edge: min={}, max={}, close={}",
+            min.rect().left(),
+            max.rect().left(),
+            close.rect().left()
+        );
         let h = harness(WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), crate::Services::default()));
         for name in ["Minimize", "Maximize", "Close"] {
             assert!(h.query_by_label_contains(name).is_none(), "{name} belongs to the system's title bar");
         }
+    }
+
+    /// The Backstage covers the title bar: its top band carries the caption buttons and a drag
+    /// region, so the frameless window can still be moved (and closed) from the File pages.
+    #[test]
+    fn the_backstage_band_carries_the_caption_buttons() {
+        use egui_kittest::kittest::Queryable;
+        let mut app = frameless_app();
+        app.run("ui.backstage", json!({"value": true})).unwrap();
+        let mut h = harness(app);
+        for _ in 0..4 {
+            h.step();
+        }
+        // The Backstage's own Close page shares the label; the caption button is the one in the
+        // window's top band.
+        let close = h
+            .get_all_by_label_contains("Close")
+            .into_iter()
+            .find(|n| n.rect().top() < crate::caption_buttons::BAND_HEIGHT)
+            .expect("the caption Close sits in the band");
+        assert!(close.rect().top() < crate::caption_buttons::BAND_HEIGHT, "the buttons sit in the Backstage's top band");
+        assert!(h.ctx.read_response(egui::Id::new("window_band_drag")).is_some(), "the band drags the window");
+        let mut h = harness(WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), crate::Services::default()));
+        let _ = h.state_mut().run("ui.backstage", json!({"value": true}));
+        for _ in 0..4 {
+            h.step();
+        }
+        // The Backstage's own Close page keeps its label on every window; what must differ is
+        // the caption button in the window's top band.
+        let in_band = h.get_all_by_label_contains("Close").into_iter().any(|n| n.rect().top() < crate::caption_buttons::BAND_HEIGHT);
+        assert!(!in_band, "a native title bar already has the buttons");
     }
 
     /// Close asks the viewport to close; egui-winit turns that into the close request, and the

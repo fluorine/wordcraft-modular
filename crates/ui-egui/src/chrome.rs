@@ -348,7 +348,7 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     // Frameless (Linux): the window's caption buttons, flush at the right end.
                     if app.frameless {
-                        crate::caption_buttons::draw(ui, 38.0);
+                        crate::caption_buttons::draw(ui, crate::caption_buttons::BAND_HEIGHT);
                         ui.add_space(8.0);
                     }
                     // Account / community.
