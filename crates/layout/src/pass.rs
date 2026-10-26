@@ -73,6 +73,7 @@ pub(crate) fn layout_pass(
         floats_above: HashMap::new(),
         hf: Arc::new(HfLinks::new(doc.sections())),
         alphas: Default::default(),
+        header_repeats: 0,
     };
     let hf = Arc::clone(&ctx.hf);
     let sections = &hf.sections;
