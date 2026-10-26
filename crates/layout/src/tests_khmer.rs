@@ -120,6 +120,29 @@ fn thai_distributed_spreads_evenly_between_khmer_clusters() {
 }
 
 #[test]
+fn thai_distributed_does_not_stretch_trailing_spaces_before_line_break() {
+    let first = "កម្ពុជា  ";
+    let text = format!("{first}\nកម្ពុជា");
+    let l = lay(&doc(&text, Align::ThaiDistribute));
+    let pl = para_layout(&l, 0);
+    let line = pl.lines.iter().find(|line| line.end == crate::para::LineEnd::LineBreak).unwrap();
+    let trailing_spaces: Vec<usize> = pl
+        .clusters
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.kind == ClKind::Space && text[c.start..c.end] == *" ")
+        .filter(|(i, _)| *i >= line.c0 && *i < line.c1)
+        .map(|(i, _)| i)
+        .collect();
+    assert_eq!(trailing_spaces.len(), 2, "{trailing_spaces:?}");
+    for i in trailing_spaces {
+        let x = line.xs[i - line.c0];
+        let next_x = line.xs[i + 1 - line.c0];
+        assert!((next_x - x - pl.clusters[i].adv).abs() < 1e-3, "trailing space {i} was stretched");
+    }
+}
+
+#[test]
 fn zero_width_space_is_an_invisible_word_boundary() {
     let text = khmer_text("\u{200B}");
     let l = lay(&doc(&text, Align::KhmerJustify));

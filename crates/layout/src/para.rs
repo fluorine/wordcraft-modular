@@ -2834,7 +2834,8 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u32, level: Optio
             // of them) keep their width, as in Word; so do anchors and empty objects around them.
             let blank = |k: usize| {
                 pl.clusters.get(k).is_some_and(|c| {
-                    matches!(c.kind, ClKind::Space | ClKind::Marker) || (matches!(c.kind, ClKind::Object(_)) && c.adv == 0.0 && c.obj_h == 0.0)
+                    matches!(c.kind, ClKind::Space | ClKind::Marker | ClKind::LineBreak)
+                        || (matches!(c.kind, ClKind::Object(_)) && c.adv == 0.0 && c.obj_h == 0.0)
                 })
             };
             let first = (align_from..c1).find(|k| !blank(*k)).unwrap_or(c1);
