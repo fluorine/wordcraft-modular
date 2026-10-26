@@ -201,6 +201,8 @@ Imported Word 97–2003 `.doc`/`.dot` files now ask for a supported DOCX target 
 - 2026-10-15: Find opens Navigation on Results; editing the query restores Results after manual Headings/Pages navigation. Typed and selected-text searches retain document contents (#2096).
 
 | Date | What landed |
+| 2026-10-15 | Visible bottom paragraph borders reserve their gap and stroke in body and boxed flow and keep-with-next calculations. |
+
 | 2026-10-17 | Password-protected Word files from Word 2007 (Standard encryption: AES-128/192/256, SHA-1) open with their password, also when named `.doc` or `.dot`; a wrong or missing password is reported as for newer files. Word 97-2003 files with an AES header, which the public spec doesn't define, are refused with a clear message (gap 9) |
 | 2026-10-14 | Insert › Date & Time and DATE, TIME and other date fields show the computer's local date, time and weekday, daylight saving included, as Word does (#1707); they showed UTC, so a user in New Zealand at noon on 31 October got 30 October 23:00. Timestamps saved in files (revisions, comments, document properties) stay UTC. Backstage's greeting follows the local hour too |
 | 2026-10-19 | Mixed-direction lines: Latin text with digits, hyphens, spaces, full stops and commas after a Persian or Arabic word reads as typed ("2-naphthol", "Windows 11"), as in Word, in right-to-left and left-to-right paragraphs; a combining mark at the end of the Persian or Arabic word stays with its letter (#2150). |
@@ -751,6 +753,8 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 | 2026-10-18 | trivial | Progress log: header-cell picture watermarks drawn behind the text (#1775); readiness estimates unchanged |
 | 2026-10-14 | trivial | Progress log: comment drafts kept and written before saving or closing (#1348) |
 | 2026-10-17 | trivial | Language dialog keeps inherited proofing language and no-proof choices (#2717); readiness estimates unchanged |
+| 2026-10-15 | trivial | Visible bottom paragraph borders reserve their gap and stroke in body and boxed flow and keep-with-next calculations. |
+
 | 2026-10-14 | trivial | Progress log: ASK and SET fields show nothing (#1765) |
 | 2026-10-15 | trivial | Progress log: at-least table rows start the next page whole (#1742) |
 | 2026-10-14 | trivial | Progress log: ODT sections on export (gap 19) |
