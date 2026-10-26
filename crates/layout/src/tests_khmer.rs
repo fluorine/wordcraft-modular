@@ -161,7 +161,7 @@ fn plain_justify_and_left_leave_khmer_alone() {
 
 /// A cluster for the byte range `a..b` of the paragraph text, of the given kind.
 fn cl(a: usize, b: usize, kind: ClKind) -> crate::para::Cluster {
-    crate::para::Cluster { start: a, end: b, adv: 8.0, kind, style: 0, g0: 0, g1: 0, break_after: false, obj_h: 0.0, obj_d: 0.0, dot: false }
+    crate::para::Cluster { start: a, end: b, adv: 8.0, kind, style: 0, g0: 0, g1: 0, break_after: false, obj_h: 0.0, obj_d: 0.0, dot: false, picture: false }
 }
 
 #[test]
