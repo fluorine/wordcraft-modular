@@ -656,6 +656,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// Oversized dictionaries and non-regular paths are refused before their contents are read.
     #[test]
     fn reads_are_bounded_and_regular_files_only() {
         let dir = std::env::temp_dir().join(format!("wordcraft-hunspell-cap-{}", std::process::id()));
@@ -668,7 +669,10 @@ mod tests {
         assert!(load(&aff, &big).unwrap_err().contains("too large"));
         // A directory, and on Unix an endless device, are not dictionary files. (No clock: a
         // reader that read `/dev/zero` would never return, so the error itself is the proof.)
-        assert!(load(&aff, &dir).unwrap_err().contains("not a regular file"));
+        // Windows refuses opening a directory before the handle's file type can be checked.
+        // Either platform must refuse it and identify the path, without attempting a read.
+        let directory_error = load(&aff, &dir).unwrap_err();
+        assert!(directory_error.contains(&dir.display().to_string()), "{directory_error}");
         #[cfg(unix)]
         assert!(load(&aff, Path::new("/dev/zero")).unwrap_err().contains("not a regular file"));
         // Turkish reads through the same reader.

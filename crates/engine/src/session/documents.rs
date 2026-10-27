@@ -457,6 +457,7 @@ impl Session {
         self.add(doc, 0)
     }
 
+    /// Park the current document and activate a fresh document with its own opening view.
     fn add(&mut self, mut doc: Document, untitled: u32) -> u64 {
         doc.ensure_nonempty();
         let mut view = self.view.clone();
@@ -467,6 +468,9 @@ impl Session {
         self.swap_doc(&mut d);
         self.others.push(d);
         self.stop_reading_elsewhere();
+        if self.prefs.default_zoom.is_some() {
+            self.apply_document_zoom();
+        }
         id
     }
 
@@ -539,6 +543,9 @@ impl Session {
                 let mut fresh = DocState::new(doc, self.untitled_count, view);
                 self.order = vec![fresh.document_id];
                 self.swap_doc(&mut fresh);
+                if self.prefs.default_zoom.is_some() {
+                    self.apply_document_zoom();
+                }
                 self.forget_recovery_copy(&fresh);
             }
         }
