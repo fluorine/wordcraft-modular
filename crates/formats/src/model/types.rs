@@ -139,6 +139,29 @@ pub struct Img {
     pub w: f32,
     pub h: f32,
     pub alt: String,
+    /// Where it floats, when it isn't in line with the text (ODT anchored frames).
+    pub float: Option<Float>,
+}
+
+/// A drawing shape: a rectangle, ellipse or text box, with its text as blocks (ODT drawing
+/// shapes and text-box frames).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Shape {
+    pub kind: ShapeKind,
+    /// Size, points.
+    pub w: f32,
+    pub h: f32,
+    pub fill: Option<Rgb>,
+    pub stroke: Option<Rgb>,
+    /// Outline width, points.
+    pub stroke_width: f32,
+    pub float: Float,
+    /// Internal margins (left, top, right, bottom), EMU; `None` = Word's defaults.
+    pub inset: Option<[u32; 4]>,
+    /// Where the text sits between the shape's top and bottom.
+    pub valign: VAlign,
+    /// The shape's text; empty = no text box.
+    pub blocks: Vec<FBlock>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -156,6 +179,8 @@ pub enum Inline {
         linear: String,
         display: bool,
     },
+    /// A drawing shape anchored here.
+    Shape(Box<Shape>),
     /// A field (`PAGE`, `NUMPAGES`…) with its last result.
     Field {
         instr: String,
@@ -280,7 +305,7 @@ impl Para {
                 Inline::Text(t, _) | Inline::Equation { linear: t, .. } | Inline::Field { result: t, .. } | Inline::Ruby { base: t, .. } => {
                     s.push_str(t)
                 }
-                Inline::Image(_) | Inline::Anchor(_) | Inline::Figure(_) => {}
+                Inline::Image(_) | Inline::Anchor(_) | Inline::Figure(_) | Inline::Shape(_) => {}
             }
         }
         s
@@ -296,7 +321,7 @@ impl Para {
                     _ => s.push_str(t),
                 },
                 Inline::Equation { linear: t, .. } | Inline::Field { result: t, .. } | Inline::Ruby { base: t, .. } => s.push_str(t),
-                Inline::Image(_) | Inline::Anchor(_) | Inline::Figure(_) => {}
+                Inline::Image(_) | Inline::Anchor(_) | Inline::Figure(_) | Inline::Shape(_) => {}
             }
         }
         s

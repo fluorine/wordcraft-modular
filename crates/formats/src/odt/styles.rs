@@ -44,7 +44,7 @@ impl FmtDelta {
 }
 
 #[derive(Clone, Debug, Default)]
-struct StyleInfo {
+pub(super) struct StyleInfo {
     parent: Option<String>,
     display: Option<String>,
     auto: bool,
@@ -69,6 +69,8 @@ struct StyleInfo {
     page_number: Option<Option<u32>>,
     /// `style:columns` of a section style.
     columns: Option<Columns>,
+    /// `style:graphic-properties` of a graphic style (see [`drawing::graphic_props`]).
+    pub(super) graphic: Attrs,
     /// `style:tab-stops` of a paragraph style: they replace the parent style's.
     tabs: Option<Vec<TabStop>>,
 }
@@ -120,7 +122,7 @@ pub(super) fn column_sep(a: &Attrs) -> bool {
 
 #[derive(Default)]
 pub(super) struct Styles {
-    map: HashMap<String, StyleInfo>,
+    pub(super) map: HashMap<String, StyleInfo>,
     pub(super) lists: HashMap<String, Vec<bool>>,
     /// Default tab interval of the paragraph default style (`style:tab-stop-distance`), points.
     pub(super) default_tab: Option<f32>,
@@ -156,7 +158,12 @@ impl Styles {
                         cur = Some((name.to_string(), info));
                     }
                 }
-                "default-style" if q.starts_with("style:") => in_default = get(&a, "style:family") == Some("paragraph"),
+                "default-style" if q.starts_with("style:") => {
+                    in_default = get(&a, "style:family") == Some("paragraph");
+                    if get(&a, "style:family") == Some("graphic") {
+                        cur = Some((drawing::DEFAULT_GRAPHIC.to_string(), StyleInfo::default()));
+                    }
+                }
                 "text-properties" if in_default && cur.is_none() => {
                     if let Some(fam) = get(&a, "fo:font-family").or_else(|| get(&a, "style:font-name")) {
                         let fam = fam.split(',').next().unwrap_or("").trim().trim_matches(['\'', '"']);
@@ -236,6 +243,11 @@ impl Styles {
                         && let Some(t) = tab_stop(&a)
                     {
                         tabs.push(t);
+                    }
+                }
+                "graphic-properties" if q.starts_with("style:") => {
+                    if let Some((_, s)) = &mut cur {
+                        s.graphic = drawing::graphic_props(&a);
                     }
                 }
                 "table-properties" => {
@@ -318,7 +330,12 @@ impl Styles {
             },
             Ev::End(q) => match local(&q) {
                 "automatic-styles" => in_auto = false,
-                "default-style" if q.starts_with("style:") => in_default = false,
+                "default-style" if q.starts_with("style:") => {
+                    in_default = false;
+                    if let Some((n, s)) = cur.take_if(|(n, _)| n == drawing::DEFAULT_GRAPHIC) {
+                        self.map.insert(n, s);
+                    }
+                }
                 "style" if q.starts_with("style:") => {
                     if let Some((n, s)) = cur.take()
                         && self.map.len() < 100_000
@@ -342,7 +359,7 @@ impl Styles {
         self.map.get("Standard").filter(|s| !s.auto).and_then(|s| s.fmt.font.as_deref().map(str::to_string)).or_else(|| self.default_font.clone())
     }
 
-    fn chain<'a>(&'a self, name: &'a str) -> Vec<(&'a str, &'a StyleInfo)> {
+    pub(super) fn chain<'a>(&'a self, name: &'a str) -> Vec<(&'a str, &'a StyleInfo)> {
         let mut out = Vec::new();
         let mut cur = Some(name);
         while let Some(n) = cur {

@@ -200,7 +200,7 @@ fn flow_paras_in(doc: &Document, p: &Paragraph, tracked: bool) -> Vec<Para> {
                 continue;
             }
             match obj {
-                Some(o @ InlineObject::Image { media, w, h, alt, .. }) => {
+                Some(o @ InlineObject::Image { media, w, h, alt, float, .. }) => {
                     if !buf.is_empty() {
                         out.push_text(&std::mem::take(&mut buf), &f);
                     }
@@ -214,6 +214,7 @@ fn flow_paras_in(doc: &Document, p: &Paragraph, tracked: bool) -> Vec<Para> {
                             w: *w,
                             h: *h,
                             alt: alt.to_string(),
+                            float: (float.wrap != wordcraft_doc::para::Wrap::Inline).then(|| float.clone()),
                         })),
                         None if !alt.is_empty() => buf.push_str(alt),
                         None => {}

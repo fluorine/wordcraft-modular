@@ -9,8 +9,9 @@
 //!
 //! Import reads the same subset back from `content.xml` / `styles.xml` (style inheritance
 //! resolved, both automatic and common styles), plus the master pages' headers and footers
-//! (`page_parts`) and page number / page count fields; notes, annotations, text boxes and drawing
-//! shapes are skipped.
+//! (`page_parts`), rectangles, ellipses, custom shapes and text frames as text boxes and anchored
+//! frames as floating (`drawing`), and page number / page count fields; notes, annotations and
+//! other drawing shapes (lines, paths, polygons, connectors) are skipped.
 //!
 //! Tracked changes (ODF 1.3 Part 3 §5.5) go both ways: `text:tracked-changes` holds one
 //! `text:changed-region` per change; an insertion is the body text between
@@ -32,6 +33,7 @@ use wordcraft_doc::{Align, Document, RevisionKind, Rgb, SectionProps};
 use crate::model::{self, Cell, FBlock, FTable, Flow, Fmt, Inline, Kind, ListInfo, Meta, Para, RevMark, make_img, mime_of};
 
 mod body;
+mod drawing;
 mod import;
 mod limits;
 mod package;

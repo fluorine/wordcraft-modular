@@ -18,3 +18,9 @@ pub(super) const MAX_INFO_CHARS: usize = 256;
 
 /// Most tab stops kept per paragraph style.
 pub(super) const MAX_TAB_STOPS: usize = 64;
+
+/// Most drawing shapes read; later ones are left out.
+pub(super) const MAX_SHAPES: usize = 10_000;
+
+/// Longest picture description kept, in bytes.
+pub(super) const MAX_ALT_BYTES: usize = 4096;

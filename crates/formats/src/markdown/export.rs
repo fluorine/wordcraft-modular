@@ -134,7 +134,7 @@ fn inlines_md_impl(inlines: &[Inline], in_table: bool) -> String {
             }
             Inline::Figure(alt) => pieces.push((String::new(), Fmt::default(), Some(format!("![{}]()", escape(alt))))),
             // Equations and fields are text by now (`equations_as_text`).
-            Inline::Equation { .. } | Inline::Field { .. } => {}
+            Inline::Equation { .. } | Inline::Field { .. } | Inline::Shape(_) => {}
             // Read as its base text by `ruby_as_text` above.
             Inline::Ruby { .. } => {}
         }

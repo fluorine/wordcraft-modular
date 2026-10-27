@@ -1041,3 +1041,20 @@ fn flow_keeps_tab_stops_from_a_document() {
     let Some(FBlock::Para(q)) = back.blocks.first() else { panic!("{:?}", back.blocks) };
     assert_eq!(q.tabs.as_ref(), Some(&tabs));
 }
+
+#[test]
+fn flow_keeps_floats_from_a_document() {
+    use wordcraft_doc::para::{Float, Wrap};
+    let float = Float { wrap: Wrap::Square, x: 36.0, ..Default::default() };
+    let mut floating = model::make_img(png(), Some(40.0), Some(20.0), "").unwrap();
+    floating.float = Some(float.clone());
+    let inline = model::make_img(png(), Some(40.0), Some(20.0), "").unwrap();
+    let mut p = model::Para::default();
+    p.inlines.push(model::Inline::Image(floating));
+    p.inlines.push(model::Inline::Image(inline));
+    let doc = model::to_doc(&model::Flow { blocks: vec![FBlock::Para(p)], ..Default::default() });
+    let back = model::from_doc(&doc);
+    let Some(FBlock::Para(q)) = back.blocks.first() else { panic!("{:?}", back.blocks) };
+    let floats: Vec<_> = q.inlines.iter().filter_map(|i| if let model::Inline::Image(img) = i { Some(img.float.clone()) } else { None }).collect();
+    assert_eq!(floats, vec![Some(float), None]);
+}
