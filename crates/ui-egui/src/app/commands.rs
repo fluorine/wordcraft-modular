@@ -777,6 +777,7 @@ impl WordApp {
                         .into(),
                 ));
             }
+            "help.reportIssue" => crate::report_issue::run(self),
             "ui.discord" => {
                 self.canvas.open_url = Some("https://discord.gg/artcraft".into());
                 json!({})
