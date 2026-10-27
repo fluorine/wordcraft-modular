@@ -382,12 +382,12 @@ fn named_instances_and_collection_members_are_capped() {
 /// System, Khmer Busra, which dotted-circles a typed ុ + ិ) are left alone. Skipped without the fonts.
 #[test]
 fn khmer_triisap_takes_the_u_form_like_khmer_os_system() {
-    let face = |path: &str| {
+    let face = |path: &std::path::Path| {
         let data = std::fs::read(path).ok()?;
         super::make_face(super::FontBytes::Owned(data.into()), 0, "Khmer".into(), "Regular".into(), "Khmer".into(), Vec::new())
     };
     let gids = |f: &FontFace, t: &str| crate::shape(f, t, &[], |c| c).into_iter().map(|g| g.gid).collect::<Vec<_>>();
-    if let Some(f) = face("/System/Library/Fonts/Supplemental/Khmer Sangam MN.ttf") {
+    if let Some(f) = face(std::path::Path::new("/System/Library/Fonts/Supplemental/Khmer Sangam MN.ttf")) {
         for (tri, u) in [("អ៊ិ", "អុិ"), ("ស៊ី", "សុី"), ("ហ៊ឹ", "ហុឹ"), ("ក្អ៊ិ", "ក្អុិ")] {
             assert_eq!(gids(&f, tri), gids(&f, u), "{tri}");
         }
@@ -395,8 +395,10 @@ fn khmer_triisap_takes_the_u_form_like_khmer_os_system() {
         assert_ne!(gids(&f, "ប៊ិ"), gids(&f, "បុិ"));
         assert!(crate::shape(&f, "អ៊ិ", &[], |c| c).iter().all(|g| g.cluster == 0));
     }
+    // The user's font folder, read at run time: no home directory (some Windows runners) skips these.
+    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(std::path::PathBuf::from);
     for font in ["!KhmerOSSystem.ttf", "Busra-R.ttf"] {
-        if let Some(f) = face(&format!("{}/Library/Fonts/{font}", env!("HOME"))) {
+        if let Some(f) = home.as_ref().and_then(|h| face(&h.join("Library/Fonts").join(font))) {
             let _ = gids(&f, "អ៊ិ");
             assert_eq!(f.triisap_u.get().copied(), Some([false; 3]), "{font} already does the U-form");
         }
