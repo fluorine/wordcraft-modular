@@ -118,7 +118,7 @@ pub(super) fn shape_draws(
             stroke_width,
             effects,
             corner: extra.corner,
-            dash: extra.dash.pattern(stroke_width),
+            dash: extra.dash.pattern_with_cap(stroke_width, extra.cap),
             cap: extra.cap,
         });
         return;
@@ -157,7 +157,7 @@ pub(super) fn shape_draws(
             fill: if closed { fill.clone() } else { None },
             stroke,
             stroke_width: width,
-            dash: extra.dash.pattern(width),
+            dash: extra.dash.pattern_with_cap(width, extra.cap),
             cap: extra.cap,
         });
         if !closed
@@ -223,7 +223,14 @@ fn line_draws(
                 })
                 .collect();
             let width = path_stroke_width(stroke_width);
-            out.push(Draw::Path { segs, fill: None, stroke, stroke_width: width, dash: extra.dash.pattern(width), cap: extra.cap });
+            out.push(Draw::Path {
+                segs,
+                fill: None,
+                stroke,
+                stroke_width: width,
+                dash: extra.dash.pattern_with_cap(width, extra.cap),
+                cap: extra.cap,
+            });
         }
         None => out.push(Draw::Shape {
             rect,
@@ -233,7 +240,7 @@ fn line_draws(
             stroke_width,
             effects,
             corner: None,
-            dash: extra.dash.pattern(stroke_width),
+            dash: extra.dash.pattern_with_cap(stroke_width, extra.cap),
             cap: extra.cap,
         }),
     }
