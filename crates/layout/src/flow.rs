@@ -1,7 +1,7 @@
 use super::boxes::{BoxContext, BoxLayout, Edges, joined, layout_box, push_para};
 use super::cache::has_page_number_fields;
 use super::ctx::Ctx;
-use super::floats::{ObjFrame, anchor_floats, body_wraps, continued_exclusions, place_objects};
+use super::floats::{ObjFrame, PageStacks, StackSpan, anchor_floats, body_wraps, continued_exclusions, object_groups, place_objects};
 use super::notes::{DECOR_STORY, NoteBox, para_notes};
 use super::page::{PageBuilder, PageFrame, item_bottom};
 use super::placed::Placed;
@@ -417,8 +417,23 @@ fn place_para_in_flow(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block:
             table_chr: None,
             pinned: None,
         };
-        let (behind, front) = place_objects(ctx, StoryRef::Body, &[block as u32], p, &pl, (l0, l1), (x, y), &at, &float_rects, 0);
-        items.extend(front);
+        // The floating objects go in stacking order with the rest of the page's at the end.
+        let groups = object_groups(ctx, StoryRef::Body, &[block as u32], p, &pl, (l0, l1), (x, y), &at, &float_rects, 0);
+        let (mut behind, mut spans) = (Vec::new(), PageStacks::default());
+        for (key, b, f) in groups {
+            if let Some(key) = key {
+                pb.stack_seq = pb.stack_seq.saturating_add(1);
+                let span = |at: usize, len: usize| StackSpan { key, seq: pb.stack_seq, at, len };
+                if !b.is_empty() {
+                    spans.behind.push(span(0, b.len()));
+                }
+                if !f.is_empty() {
+                    spans.front.push(span(items.len(), f.len()));
+                }
+            }
+            behind.extend(b);
+            items.extend(f);
+        }
         // Line numbers in the left margin.
         if let Some(ln) = pb.sect.line_numbers.clone().filter(|_| !pb.web && pl.rp.style != "Header" && !pl.rp.suppress_line_numbers)
             && let Some(first) = pl.lines.get(l0)
@@ -450,6 +465,12 @@ fn place_para_in_flow(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block:
         if let Some(pg) = pb.pages.last_mut() {
             for (i, it) in behind.into_iter().enumerate() {
                 pg.items.insert(i.min(pg.items.len()), it);
+            }
+            // Front spans count from the end of the items behind the text.
+            let base = pg.items.len().saturating_sub(pb.behind.last().copied().unwrap_or(0).saturating_add(n_behind));
+            if let Some(st) = pb.stacks.last_mut() {
+                st.behind.splice(0..0, spans.behind);
+                st.front.extend(spans.front.into_iter().map(|s| StackSpan { at: s.at.saturating_add(base), ..s }));
             }
             pg.items.extend(items);
         }

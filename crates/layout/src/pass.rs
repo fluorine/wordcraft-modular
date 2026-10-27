@@ -1,6 +1,6 @@
 use super::cache::{LayoutCache, Totals, env_hash, hash_of};
 use super::ctx::{Ctx, Pass, with_pct_base};
-use super::floats::{EarlyFloats, WrapArea, early_covered};
+use super::floats::{EarlyFloats, WrapArea, early_covered, stack_page};
 use super::flow::{OutlinePass, place_outline_para, place_para};
 use super::headers::{HfLinks, bookmark_pages, headers_footers, headers_footers_refer_to_pages, marks_key, mirror_even_pages, section_side};
 use super::notes::{MAX_NOTE_PAGES, NoteSeps, note_info, place_endnotes};
@@ -149,6 +149,8 @@ pub(crate) fn layout_pass(
         seps: NoteSeps::default(),
         para_end: None,
         behind: Vec::new(),
+        stacks: Vec::new(),
+        stack_seq: 0,
         max_y: 0.0,
         content_bottom: 0.0,
         balance: None,
@@ -331,6 +333,10 @@ pub(crate) fn layout_pass(
         pb.flush_notes();
     }
     pb.carry.clear();
+    // Floating objects anchored in different paragraphs stack in their order too.
+    for ((pg, st), n) in pb.pages.iter_mut().zip(std::mem::take(&mut pb.stacks)).zip(pb.behind.iter().copied()) {
+        stack_page(pg, n, st);
+    }
     let mut pages = pb.pages;
     for p in &mut pages {
         if let Some((_, s)) = sections.get(p.section)
@@ -417,9 +423,9 @@ struct Snap<'a> {
 impl<'a> Snap<'a> {
     fn take(pb: &mut PageBuilder<'a>, ctx: &Ctx) -> Self {
         // The pages stay out of the copy: it would cost the whole document per block.
-        let (pages, behind) = (std::mem::take(&mut pb.pages), std::mem::take(&mut pb.behind));
+        let (pages, behind, stacks) = (std::mem::take(&mut pb.pages), std::mem::take(&mut pb.behind), std::mem::take(&mut pb.stacks));
         let copy = pb.clone();
-        (pb.pages, pb.behind) = (pages, behind);
+        (pb.pages, pb.behind, pb.stacks) = (pages, behind, stacks);
         Snap {
             pb: copy,
             pages: pb.pages.len(),
@@ -435,19 +441,23 @@ impl<'a> Snap<'a> {
     /// Go back to this state: drop the pages added since and what was added to the last one
     /// (appended, or inserted at the front behind the text).
     fn restore(&self, pb: &mut PageBuilder<'a>, ctx: &mut Ctx) {
-        let (mut pages, mut behind) = (std::mem::take(&mut pb.pages), std::mem::take(&mut pb.behind));
+        let (mut pages, mut behind, mut stacks) = (std::mem::take(&mut pb.pages), std::mem::take(&mut pb.behind), std::mem::take(&mut pb.stacks));
         pages.truncate(self.pages);
         behind.truncate(self.pages);
+        stacks.truncate(self.pages);
         if let Some(pg) = pages.last_mut() {
             let k = behind.last().copied().unwrap_or(0).saturating_sub(self.behind).min(pg.items.len());
             pg.items.drain(..k);
             pg.items.truncate(self.items);
+            if let Some(st) = stacks.last_mut() {
+                st.forget(k, self.items.saturating_sub(self.behind));
+            }
         }
         if let Some(b) = behind.last_mut() {
             *b = self.behind;
         }
         *pb = self.pb.clone();
-        (pb.pages, pb.behind) = (pages, behind);
+        (pb.pages, pb.behind, pb.stacks) = (pages, behind, stacks);
         ctx.counters = self.counters.clone();
         ctx.eq_count = self.eq_count;
         ctx.fields.page = self.page_field;
