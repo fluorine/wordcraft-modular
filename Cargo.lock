@@ -6731,6 +6731,7 @@ dependencies = [
  "wordcraft-engine",
  "wordcraft-fonts",
  "wordcraft-proof",
+ "wordcraft-render",
  "wordcraft-ui-egui",
  "zbus",
 ]
