@@ -668,3 +668,14 @@ fn rotation_drag_keeps_text_boxes_outline_only_until_their_text_can_rotate() {
     assert_eq!(selected(h.state()).unwrap().1.frame().unwrap().2.rot, 90.0);
     assert_eq!(h.state().session.undo_depth(), depth + 1);
 }
+
+#[test]
+fn drag_preview_scale_stays_within_the_gpu_texture_limit() {
+    // A 14,400 pt picture at 2x on a GPU limited to 8,192 px.
+    let px = preview_scale(2.0, 14_400.0, 100.0, 8192);
+    assert!((14_400.0f32 * px).ceil() <= 8192.0);
+    assert_eq!(preview_scale(2.0, 100.0, 50.0, 8192), 2.0);
+    for bad in [f32::NAN, f32::INFINITY, 0.0] {
+        assert!((100.0f32 * preview_scale(bad, 100.0, 100.0, 0)).ceil() <= 2.0);
+    }
+}
