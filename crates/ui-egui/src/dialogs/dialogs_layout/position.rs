@@ -151,7 +151,7 @@ impl PositionForm {
 /// A dropdown of `items` (name, label) setting `value` to a name.
 fn pick(ui: &mut Ui, salt: &str, value: &mut String, items: &[(&str, &str)]) {
     let shown = items.iter().find(|(n, _)| *n == value.as_str()).map_or("", |(_, l)| *l);
-    egui::ComboBox::from_id_salt(salt).selected_text(tl!(shown)).width(130.0).show_ui(ui, |ui| {
+    craft_ui::ComboBox::from_id_salt(salt).selected_text(tl!(shown)).width(130.0).show_ui(ui, |ui| {
         for (n, l) in items {
             ui.selectable_value(value, (*n).to_string(), tl!(l));
         }
