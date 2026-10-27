@@ -2,6 +2,7 @@
 
 > **Mail-merge maintenance:** 2026-10-27 · External source preservation and namespace-alias handling follow the current DOCX modules. Internal sources remain separate in #2443; readiness estimates unchanged.
 
+> **Search scope update:** 2026-10-27 · CLI and MCP find/selection accept an explicit body or part story (#3270). Replacement remains in the caret's story. Readiness estimates unchanged.
 
 > **Highlight update:** 2026-10-25 · Highlight shortcut toggles the last chosen colour off when the whole selection has it; explicit colour commands remain setters (#4085). Readiness estimates unchanged.
 
@@ -152,6 +153,8 @@ Ranked, to beta (detail and remaining milestones in [docs/roadmap.md](docs/roadm
    (20–30 h).
 
 ## Progress log
+
+- 2026-10-27: `edit.find` and `select.text` accept an explicit body or part story, with the caret's story as the default (#3270). Invalid selectors fail before changing state. Replacement commands reject story selectors and keep their existing caret scope.
 
 - 2026-10-22: View › Window › New Window opens a second window on the document (desktop). The windows are titled `Name:1` and `Name:2` and each keeps its own caret, scroll position, zoom and view; edits and Undo are the document's and show in both. Closing one of them asks nothing; the last one asks about unsaved changes, and quitting asks once per document.
 - 2026-10-22: One native window per open document on the desktop. File › New and Open (from the ribbon, File, shortcuts, the file manager, the command line or the control channel) open the document in a window of its own, focused and placed a step below and right of the last one; opening a file replaces a blank document nobody has used in its own window, and a file that is already open brings its window to the front. Each window keeps its own ribbon tab, File page, dialogs, panes, scroll position and composition. View › Window › Switch Windows lists the windows and brings the chosen one forward. File › Close and a window's close button close that window, asking about unsaved changes first; the last window stays open with no document. Quitting asks about each document with unsaved changes in its own window, and Cancel keeps everything open. The control channel's input and screenshots go to the window focused last. The web app keeps one window.
@@ -716,6 +719,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 | 2026-10-21 | trivial | Progress log: Read Aloud in the browser (#2978) |
 | 2026-10-21 | trivial | Progress log: Read Aloud voice choice (#2937) |
 | 2026-10-21 | trivial | Progress log: Linux Read Aloud through Speech Dispatcher (#2934) |
+| 2026-10-27 | trivial | Progress log: explicit story scope for find and selection (#3270) |
 | 2026-10-22 | trivial | Progress log: one native window per open document |
 | 2026-10-22 | trivial | Progress log: every open document keeps its own recovery copy |
 | 2026-10-22 | trivial | Progress log: several open documents in the desktop window |
