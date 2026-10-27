@@ -152,7 +152,7 @@ pub(crate) fn layout_box(
                     // offset would take it out, at its wrap distance from the edge. A letterhead
                     // logo anchored a few centimetres left of its cell lands at the cell's left
                     // edge, not off the page.
-                    if in_cell && !float.outside_cell && float.h_align.is_none() {
+                    if in_cell && !float.outside_cell && float.h_align.is_none() && float.wrap != Wrap::InFrontOfText {
                         r.x = keep_in_cell(r.x, w, width, float.dist);
                     }
                     let outline = ctx.wrap_outline(o);
@@ -378,11 +378,17 @@ pub(crate) fn clear_of_float_tables(mut r: Rect, f: &TableFloat, legacy: f32, te
 /// starts across: at `x` when that keeps it inside the cell, else moved in to the nearer side at
 /// `dist` (its wrap distance) from it. One wider than the cell starts at the left side. Word
 /// keeps the object within the cell's boundaries, "moving it if necessary"; it does not let an
-/// offset push it out of the cell or off the page.
+/// offset push it out of the cell or off the page. Clearance shrinks when both full wrap distances
+/// do not fit beside the object; an object as wide as the cell starts at its left side.
 pub(crate) fn keep_in_cell(x: f32, w: f32, width: f32, dist: f32) -> f32 {
-    let dist = dist.max(0.0).min(width / 2.0);
-    let (lo, hi) = (dist, width - dist - w);
-    if hi < lo { lo } else { x.clamp(lo, hi) }
+    let room = width - w;
+    if !room.is_finite() || room <= 0.0 {
+        return 0.0;
+    }
+    let dist = dist.max(0.0).min(room / 2.0);
+    // Derive both bounds from the same remaining space, avoiding cancellation at small sizes.
+    // max/min also place a non-finite offset at a finite edge without panicking.
+    x.max(dist).min(room - dist)
 }
 
 /// A text box's default internal margins (Word's: 0.1" left/right, 0.05" top/bottom); a box's
