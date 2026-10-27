@@ -204,7 +204,14 @@ pub(super) fn customize_keyboard(s: &mut Session, v: &Value) -> CmdResult {
     if let Some(r) = v.get("remove") {
         asked = true;
         let (id, key) = pair(r)?;
-        out.insert("removed".into(), json!(s.keymap.remove(&reg, &id, &key).map_err(CmdError::Params)?));
+        let locale = p::str(v, "locale");
+        let removed = match locale {
+            None => s.keymap.remove(&reg, &id, &key),
+            Some("pt-br") => s.keymap.remove_for_locale(&reg, "pt-br", &id, &key),
+            Some(other) => return Err(CmdError::Params(format!("unsupported shortcut locale {other:?}"))),
+        }
+        .map_err(CmdError::Params)?;
+        out.insert("removed".into(), json!(removed));
     }
     if let Some(id) = p::str(v, "command") {
         asked = true;
