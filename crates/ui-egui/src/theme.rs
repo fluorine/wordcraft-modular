@@ -632,6 +632,13 @@ pub fn regular(size: f32) -> FontId {
     FontId::proportional(size)
 }
 
+/// A document-derived size used for interface text: finite and small enough for epaint's glyph
+/// atlas (an unclamped caret height at a large line spacing and zoom panics the atlas, N-16 /
+/// #3624), and never too small to read.
+pub fn ui_font_size(px: f32) -> f32 {
+    if px.is_finite() { px.clamp(6.0, 160.0) } else { 12.0 }
+}
+
 /// A UI type rung: size, weight pairing, and size-specific letter-spacing (large text is
 /// tightened, small text opened). Use these instead of raw `regular(size)`/`semibold(size)`.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -820,6 +827,16 @@ pub fn c32(c: wordcraft_doc::Rgb) -> Color32 {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
+
+    #[test]
+    fn ui_font_size_is_always_in_range() {
+        // N-16 / #3624: an interface font size derived from document layout must stay finite
+        // and inside the glyph atlas, whatever the paragraph's spacing and the zoom say.
+        for px in [0.0, -3.0, 5.0, 12.5, 160.0, 1.0e9, f32::INFINITY, f32::NAN] {
+            let s = super::ui_font_size(px);
+            assert!(s.is_finite() && (6.0..=160.0).contains(&s), "{px} -> {s}");
+        }
+    }
 
     /// WCAG contrast ratio between two opaque colours.
     pub(super) fn contrast(a: egui::Color32, b: egui::Color32) -> f32 {
