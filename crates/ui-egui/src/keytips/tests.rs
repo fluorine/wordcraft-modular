@@ -540,7 +540,6 @@ fn alt_then_q_opens_search() {
     assert!(handle_key(&mut a, egui::Key::Q));
     assert_eq!(a.ui.keytips, Phase::Off);
     assert!(matches!(a.dialog, Some(crate::dialogs::Dialog::Commands { .. })), "{:?}", a.dialog.as_ref().map(|d| d.name()));
-
 }
 
 #[test]
@@ -593,10 +592,8 @@ fn smart_art_add_shape_keytip_preserves_the_selected_insertion_point() {
     let mut a = app();
     a.run("insert.smartArt", serde_json::json!({"items": ["A", "B"]})).unwrap();
     a.smart_art_item = Some(0);
-    let add_shape = controls("SmartArt Design")
-        .into_iter()
-        .find(|c| matches!(&c.target, Target::Cmd { id: "smartArt.addShape", .. }))
-        .expect("Add Shape keytip");
+    let add_shape =
+        controls("SmartArt Design").into_iter().find(|c| matches!(&c.target, Target::Cmd { id: "smartArt.addShape", .. })).expect("Add Shape keytip");
     add_shape.target.run(&mut a);
     let items = wordcraft_engine::cmd::smart_art::selected_smart_art(&a.session).expect("selected SmartArt");
     assert_eq!(items.items.iter().map(|item| item.text.as_str()).collect::<Vec<_>>(), ["A", "", "B"]);
