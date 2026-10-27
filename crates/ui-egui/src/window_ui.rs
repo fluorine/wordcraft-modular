@@ -13,6 +13,7 @@
 //! `swap_window` names every field, so a new field doesn't compile until it is classified.
 
 use crate::{AwaitingSave, UiState, WordApp, canvas, colors, content_controls, dialogs, dialogs_review, file_dialogs, keytips, previews, print_page};
+use crate::DamagedSaveContinuation;
 
 /// A window's state while another window is drawn. Fields mirror their namesakes in [`WordApp`]
 /// and, for the ribbon tab, Backstage, printing and keytips, in [`UiState`].
