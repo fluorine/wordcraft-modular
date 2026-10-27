@@ -254,6 +254,7 @@ Imported Word 97–2003 `.doc`/`.dot` files now ask for a supported DOCX target 
 | 2026-10-15 | A picture or shape placed down from its paragraph that would run past the bottom margin (over the footer) takes the paragraph to the next page, where it fits; a heading kept with that paragraph goes along |
 | 2026-10-15 | ODT headers and footers open (#863, ported from #873): each master page's header and footer, and page number and page count are live fields |
 | 2026-10-19 | Insert Table of Figures opens its dialog (#3013): pick the caption label (Figure, Table, Equation or your own), with or without label and number, page numbers and leader, so a document can have a list of figures and a list of tables. The list is a `TOC \c`/`\a` field (ECMA-376 §17.16.5.68); a Word table of figures with its switches in any order updates too, and Update Table keeps each list's label and leader. |
+| 2026-10-19 | `.epub` import (#3117): reads the OCF container and package document (manifest, spine, `dc:title`/`dc:creator`/`dc:language`), parses each spine XHTML content document through the existing HTML importer and resolves its images from the ZIP archive, concatenating chapters in spine order. Export is a separate effort (#2265, #2815). |
 | 2026-10-19 | Right-clicking text or pressing Shift+F10 offers the existing two-row formatting mini toolbar above the context-menu commands. Formatting keeps the selection and popup; menu commands, Escape and outside clicks dismiss it. This is the mini-toolbar portion of #2959; paste choices are in PR #2599. |
 | 2026-10-20 | The move and resize handles of a table show while the caret is in it, not only under the pointer, as in Word (#2428) |
 | 2026-10-19 | Personal templates (#2852): File › New lists the `.dotx` and `.dotm` files in your templates folder under Personal (a subfolder per category; the search box covers them), and one opens as a new untitled document attached to it, as in Word. Save As › Save as Word Template starts in that folder, made on first use in the settings folder; File › Options › Advanced › File locations › User templates points it elsewhere. Agents list them with `file.listTemplates`. |
@@ -756,6 +757,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 | 2026-10-16 | trivial | Progress log: `HYPERLINK` fields read as links (#2174) |
 | 2026-10-18 | trivial | Progress log: German text hyphenates by the German patterns |
 | 2026-10-21 | trivial | Progress log: File › Recover follows the app theme (#3243) |
+| 2026-10-19 | trivial | Progress log: `.epub` import through the existing HTML importer and the ZIP archive's manifest/spine (#3117) |
 | 2026-10-21 | trivial | Bullets and Numbering toggle off style-inherited lists at their effective level, including basedOn chains and numbered ListParagraph styles; other paragraphs and list definitions stay unchanged (related to #3459) |
 | 2026-10-21 | trivial | Progress log: table style band sizes, banded rows as in Word (#3415) |
 | 2026-10-21 | trivial | Progress log: ODT table column widths are read, so widths set in LibreOffice or changed in WordCraft survive a save |
