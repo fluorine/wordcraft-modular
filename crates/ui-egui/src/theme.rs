@@ -836,6 +836,11 @@ mod tests {
             let s = super::ui_font_size(px);
             assert!(s.is_finite() && (6.0..=160.0).contains(&s), "{px} -> {s}");
         }
+        // The composition's size is the caret height times the zoom times 0.8, and the caret
+        // height covers the line height: a 1638 pt font at the largest Multiple spacing (132)
+        // on a 500 % zoom. That is the document the issue names, and it must come out at the
+        // cap rather than at the raw value.
+        assert_eq!(super::ui_font_size(1638.0 * 132.0 * 5.0 * 0.8), 160.0);
     }
 
     /// WCAG contrast ratio between two opaque colours.
