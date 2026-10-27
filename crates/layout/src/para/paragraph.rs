@@ -467,7 +467,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
         .clusters
         .iter()
         .filter_map(|c| {
-            if !matches!(c.kind, ClKind::Text | ClKind::Space) {
+            if !has_thai || !matches!(c.kind, ClKind::Text | ClKind::Space) {
                 return None;
             }
             let visible = to_visible(c.end)?;

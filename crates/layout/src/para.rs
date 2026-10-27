@@ -425,6 +425,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn non_thai_paragraph_has_no_thai_emergency_breaks() {
+        use crate::{LayoutCache, LayoutOptions, Placed};
+        use wordcraft_doc::{Document, StoryRef};
+
+        let doc = Document::from_text("English words and ligatures");
+        let layout = crate::layout(&doc, &mut LayoutCache::new(), &LayoutOptions::default());
+        let para = layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.items)
+            .find_map(|item| match item {
+                Placed::Lines { story: StoryRef::Body, path, para, .. } if path.0 == vec![0] => Some(para),
+                _ => None,
+            })
+            .expect("body paragraph is laid out");
+        assert!(!para.clusters.is_empty());
+        assert!(para.clusters.iter().all(|cluster| !cluster.emergency_break_after));
+    }
+
+    #[test]
     fn bare_bookmark_offsets_map_to_visible_thai_boundaries() {
         use crate::{LayoutCache, LayoutOptions, Placed};
         use wordcraft_doc::{Document, Pos, StoryRef};
