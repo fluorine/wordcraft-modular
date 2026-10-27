@@ -908,6 +908,5 @@ fn position_dialog_floats_an_inline_picture() {
     a.run("arrange.positionOptions", p).unwrap();
     assert_ne!(float_of(&a).wrap, wordcraft_doc::para::Wrap::Inline);
     let r = a.session.layout().object(&at, 0).unwrap().rect;
-    let r = a.session.layout().object(&at, 0).unwrap().rect;
     assert!((r.x - r0.x - 50.0).abs() < 0.5 && (r.y - r0.y).abs() < 0.5, "{r0:?} -> {r:?}");
 }
