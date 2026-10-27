@@ -155,7 +155,13 @@ fn place_para_in_flow(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block:
     let above = joined(ctx.doc, &ctx.doc.body, block, block.checked_sub(1), None);
     let below = joined(ctx.doc, &ctx.doc.body, block, Some(block + 1), None);
     let own = Edges::own(&pl, 0, pl.lines.len());
-    let (top_room, bottom_room) = (if above { 0.0 } else { own.top }, if below { 0.0 } else { own.bottom });
+    let break_mark = !pb.web
+        && pl.lines.len() >= 2
+        && pl
+            .lines
+            .get(pl.lines.len() - 2)
+            .is_some_and(|line| line.end == LineEnd::PageBreak && pl.lines.last().is_some_and(|mark| only_markers(p, mark.start..mark.stop)));
+    let (top_room, bottom_room) = (if above { 0.0 } else { own.top }, if below || break_mark { 0.0 } else { own.bottom });
     // Keep lines together: if it doesn't fit but would on an empty column, move it. Keep with
     // next alone moves a paragraph only when it would fit here by itself (Word for Windows): one
     // that doesn't breaks as usual, its last lines going over with the next paragraph.
