@@ -153,7 +153,7 @@ pub(crate) fn layout_box(
                     // logo anchored a few centimetres left of its cell lands at the cell's left
                     // edge, not off the page.
                     if in_cell && !float.outside_cell && float.h_align.is_none() && float.wrap != Wrap::InFrontOfText {
-                        r.x = keep_in_cell(r.x, w, width, float.dist);
+                        r.x = keep_in_cell(r.x, r.w, width, float.dist);
                     }
                     let outline = ctx.wrap_outline(o);
                     excl.extend(wrap_area(r, float, outline.as_deref().map(Vec::as_slice)));
