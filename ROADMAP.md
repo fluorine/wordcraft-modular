@@ -309,6 +309,7 @@ Imported Word 97–2003 `.doc`/`.dot` files now ask for a supported DOCX target 
 | 2026-10-15 | Saved DOCX files keep the order of mixed right-to-left and left-to-right text in Word: Hebrew around a Latin name, numbers, brackets or an e-mail address no longer changes places, and Word reports the Hebrew as Hebrew rather than Arabic (#1543). |
 | 2026-10-15 | Web: typing in Cyrillic or another non-Latin script no longer repeats text. WordCraft now honours the input method's request to erase around the caret before retyping (#1480). Chrome can still move the hidden text field's caret, so later letters may still land out of order. That cause is still open |
 | 2026-10-16 | Drawing dispatch uses the direct graphic-data child so nested pictures keep their text boxes. |
+| 2026-10-16 | The Styles pane docks on the right or left or floats as a movable, resizable window (header menu, drag the title out, drop at a window edge to dock); `view.stylesPaneDock`; kept in the preferences, a floating pane saved off screen comes back (#1756) |
 | 2026-10-15 | Equations: typing `V_dd` or `x^ab` and pressing Space keeps `dd` and `ab` whole in the subscript or superscript, like `V_(dd)`, as Word for Mac does; Linear format shows the bare form |
 | 2026-10-16 | Zotero's edits obey Restrict Editing, content-control locks and Track Changes (#1323): a protected document refuses citation inserts, refreshes, unlinks, deletions and bibliography-style changes outside its editable regions, and with Track Changes on their text changes are revisions that Reject undoes; hidden citation-code changes are not tracked and can survive Reject All |
 | 2026-10-15 | Plain text pasted from another program keeps the formatting of the paragraph it lands in: Paste inserts it as Keep Text Only does, so every pasted line, empty lines too, becomes a paragraph with that paragraph's direction, style, alignment, indents and list, and the text after the caret keeps them. The lines after the first had default formatting, so pasting several lines into a right-to-left paragraph turned all but the first left-to-right |
@@ -792,6 +793,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 | 2026-10-18 | trivial | Progress log: `wordcraft-cli run --script` (#1963) |
 | 2026-10-18 | trivial | Progress log: header-cell picture watermarks drawn behind the text (#1775); readiness estimates unchanged |
 | 2026-10-14 | trivial | Progress log: comment drafts kept and written before saving or closing (#1348) |
+| 2026-10-16 | trivial | Progress log: the Styles pane docks left or right, or floats (#1756) |
 | 2026-10-17 | trivial | Language dialog keeps inherited proofing language and no-proof choices (#2717); readiness estimates unchanged |
 | 2026-10-15 | trivial | Progress log: Compare results resolve to exactly the original or the revised document (#1317) |
 | 2026-10-16 | trivial | Progress log: Zotero session limits and cancel (#1332) |
