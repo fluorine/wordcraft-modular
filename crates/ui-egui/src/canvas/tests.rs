@@ -3867,8 +3867,8 @@ fn space_and_enter_on_the_canvas_do_not_interrupt_ime() {
 /// chain. Draw a stand-in for exactly those characters; every other missing glyph still panics.
 fn kana_test_glyphs(ctx: &egui::Context) {
     ctx.add_glyph_rasterizer(egui::GlyphRasterizer::new("wordcraft::canvas::tests::kana", |req| {
-        let kana =
-            *req.family == egui::FontFamily::Proportional && !req.cluster.is_empty() && req.cluster.chars().all(|c| matches!(c, 'に' | 'ほ' | 'ん'));
+        let family = *req.family == egui::FontFamily::Proportional || *req.family == crate::theme::composition_family();
+        let kana = family && !req.cluster.is_empty() && req.cluster.chars().all(|c| matches!(c, 'に' | 'ほ' | 'ん'));
         kana.then(|| egui::RasterizedGlyph {
             bitmap: egui::GlyphBitmap {
                 image: egui::ColorImage::new([1, 1], vec![egui::Color32::WHITE]),
