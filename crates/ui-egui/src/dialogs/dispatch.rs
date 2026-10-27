@@ -1022,11 +1022,13 @@ pub(super) fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             ui.add_space(4.0);
             ui.label(egui::RichText::new(path.as_str()).small().weak());
             ui.add_space(8.0);
-            let answer = ui.horizontal(|ui| {
-                let cancel = ui.button(tl!("Cancel"));
-                let save = ui.add(crate::widgets::primary_button(ui, tl!("Save Anyway")));
-                (cancel.clicked(), save.clicked())
-            }).inner;
+            let answer = ui
+                .horizontal(|ui| {
+                    let cancel = ui.button(tl!("Cancel"));
+                    let save = ui.add(crate::widgets::primary_button(ui, tl!("Save Anyway")));
+                    (cancel.clicked(), save.clicked())
+                })
+                .inner;
             if ui.input(|i| i.key_pressed(egui::Key::Escape)) || answer.0 {
                 if let Some(wait) = app.damaged_save_continuation.take() {
                     let name = app.prompt_name();
@@ -1043,7 +1045,9 @@ pub(super) fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                     return true;
                 }
                 let mut save_params = params.clone();
-                if !save_params.is_object() { save_params = json!({}); }
+                if !save_params.is_object() {
+                    save_params = json!({});
+                }
                 save_params["path"] = json!(path);
                 save_params["confirmDamaged"] = json!(true);
                 match app.run("file.save", save_params) {
@@ -1052,7 +1056,9 @@ pub(super) fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                         if let Some(wait) = app.damaged_save_continuation.take()
                             && wait.document == app.session.document_id()
                             && let Err(error) = app.execute_user(&wait.then, wait.params)
-                        { app.status(error); }
+                        {
+                            app.status(error);
+                        }
                         return true;
                     }
                     Ok(_) => app.status(tl!("The damaged document was not saved.")),

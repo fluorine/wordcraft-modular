@@ -442,13 +442,16 @@ impl WordApp {
                 "openFile" => self.open_dialog(),
                 "confirmDamagedSave" => {
                     let Some(path) = req.get("path").and_then(Value::as_str) else { return };
-                    let skipped_parts = req.get("skippedParts").and_then(Value::as_array)
+                    let skipped_parts = req
+                        .get("skippedParts")
+                        .and_then(Value::as_array)
                         .map(|parts| parts.iter().filter_map(Value::as_str).map(str::to_owned).take(3).collect())
                         .unwrap_or_default();
                     let skipped_parts_more = req.get("skippedPartsMore").and_then(Value::as_u64).unwrap_or(0) as usize;
                     let document = req.get("document").and_then(Value::as_u64).unwrap_or_else(|| self.session.document_id());
                     let params = req.get("params").cloned().unwrap_or_else(|| json!({"path": path}));
-                    self.dialog = Some(dialogs::Dialog::ConfirmDamagedSave { path: path.into(), skipped_parts, skipped_parts_more, document, params });
+                    self.dialog =
+                        Some(dialogs::Dialog::ConfirmDamagedSave { path: path.into(), skipped_parts, skipped_parts_more, document, params });
                 }
                 "saveAs" => {
                     self.save_as_dialog();
