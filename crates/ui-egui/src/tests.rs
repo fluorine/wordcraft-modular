@@ -274,7 +274,8 @@ fn recent_thai_paths_load_interface_fonts_without_opening_a_document() {
     for page in ["home", "open"] {
         let ctx = egui::Context::default();
         let mut a = app();
-        a.ui.backstage = true;
+        a.ui.start_screen = true;
+        assert!(a.start_screen());
         a.ui.backstage_page = page.into();
         a.ui.recent = paths.clone();
         for _ in 0..6 {
@@ -284,7 +285,7 @@ fn recent_thai_paths_load_interface_fonts_without_opening_a_document() {
             })
             .drop_without_applying_deltas();
         }
-        assert!(a.session.path.is_none(), "no document was opened");
+        assert!(!a.has_document(), "no document was opened");
         for font in [theme::medium(13.0), theme::regular(11.0)] {
             // Inspect rendered glyphs: egui 0.36's has_glyph can report a false negative
             // when the Thai fallback also owns the replacement-square glyph.

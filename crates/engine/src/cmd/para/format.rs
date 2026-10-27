@@ -56,7 +56,9 @@ fn distribute(s: &mut Session) -> CmdResult {
         })
         .collect();
     let all_active = !targets.is_empty()
-        && targets.iter().all(|(path, target)| s.doc.para(story, path).is_some_and(|p| s.doc.styles.resolve_para(&p.props).align == *target));
+        && targets.iter().all(|(path, _)| {
+            s.doc.para(story, path).is_some_and(|p| matches!(s.doc.styles.resolve_para(&p.props).align, Align::Distribute | Align::ThaiDistribute))
+        });
     for (path, target) in targets {
         let para = s.doc.para_mut(story, &path)?;
         para.props.align = Some(if all_active { Align::Left } else { target });

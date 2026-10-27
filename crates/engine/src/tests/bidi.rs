@@ -286,6 +286,41 @@ fn later_text_edits_do_not_reinfer_an_alignment_mode() {
 }
 
 #[test]
+fn distributed_command_toggles_off_after_text_changes_script() {
+    for (before, after, initial, next) in
+        [("ไทย", "English", Align::ThaiDistribute, Align::Distribute), ("English", "ไทย", Align::Distribute, Align::ThaiDistribute)]
+    {
+        let mut s = session(before, false);
+        run(&mut s, "para.distribute", json!({}));
+        assert_eq!(props(&s, 0).align, Some(initial));
+        run(&mut s, "select.all", json!({}));
+        run(&mut s, "text.insert", json!({"text": after}));
+        assert_eq!(props(&s, 0).align, Some(initial), "text edits retain the stored mode");
+        run(&mut s, "para.distribute", json!({}));
+        assert_eq!(props(&s, 0).align, Some(Align::Left), "either distributed mode toggles off");
+        run(&mut s, "edit.undo", json!({}));
+        assert_eq!(props(&s, 0).align, Some(initial));
+        run(&mut s, "edit.redo", json!({}));
+        assert_eq!(props(&s, 0).align, Some(Align::Left));
+        run(&mut s, "para.distribute", json!({}));
+        assert_eq!(props(&s, 0).align, Some(next), "turning it on chooses the current text's mode");
+    }
+}
+
+#[test]
+fn distributed_command_toggles_off_a_mixed_selection_with_modes_from_earlier_text() {
+    let mut s = session("English\nไทย", false);
+    run(&mut s, "select.text", json!({"text": "English"}));
+    run(&mut s, "para.align", json!({"value": "thaiDistribute"}));
+    run(&mut s, "select.text", json!({"text": "ไทย"}));
+    run(&mut s, "para.align", json!({"value": "distribute"}));
+    run(&mut s, "select.all", json!({}));
+    run(&mut s, "para.distribute", json!({}));
+    assert_eq!(props(&s, 0).align, Some(Align::Left));
+    assert_eq!(props(&s, 1).align, Some(Align::Left));
+}
+
+#[test]
 fn distributed_command_keeps_rtl_start_alignment_semantics() {
     let mut s = session("ไทย\nEnglish", true);
     run(&mut s, "select.all", json!({}));
