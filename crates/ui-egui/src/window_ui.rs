@@ -155,6 +155,7 @@ impl WordApp {
         let WordApp {
             // App-wide.
             session: _,
+            paste_options: _,
             services: _,
             printing: _,
             print_feedback_seen: _,
@@ -249,6 +250,7 @@ impl WordApp {
             // App-wide: preferences, recent lists, and the settings the session owns while
             // running.
             ribbon_collapsed: _,
+            default_paste: _,
             quick_access_toolbar: _,
             recent: _,
             recent_symbols: _,

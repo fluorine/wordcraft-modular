@@ -211,18 +211,8 @@ impl<'a> Builder<'a> {
                 Inline::Image(img) => {
                     let key = self.doc.add_media(img.data.to_vec(), &img.ext);
                     let (w, h) = (finite_or(img.w, 72.0).clamp(1.0, 1584.0), finite_or(img.h, 72.0).clamp(1.0, 1584.0));
-                    let obj = InlineObject::Image {
-                        media: key,
-                        w,
-                        h,
-                        alt: img.alt.clone(),
-                        float: Default::default(),
-                        crop: [0.0; 4],
-                        ole: None,
-                        shape: None,
-                    };
                     let float = img.float.clone().unwrap_or_default();
-                    let obj = InlineObject::Image { media: key, w, h, alt: img.alt.clone(), float, crop: [0.0; 4], ole: None };
+                    let obj = InlineObject::Image { media: key, w, h, alt: img.alt.clone(), float, crop: [0.0; 4], ole: None, shape: None };
                     append(&mut out, "", &CharProps::default(), Some(obj));
                 }
                 Inline::Shape(s) => {

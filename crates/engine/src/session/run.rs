@@ -192,7 +192,7 @@ impl Session {
                     // it, and `document_id` catches any other that does (through
                     // `set_document`, which starts a new history the old one must not overwrite).
                     let unchanged = |s: &Session| match (&before_doc, &pending_before) {
-                        (Some((doc, sel, _, _, _, _, column)), Some(pending)) => {
+                        (Some((doc, sel, _, _, _, _, column, _)), Some(pending)) => {
                             !replaces_document && s.document_id == document_id_before && s.unchanged(doc, sel, column, pending)
                         }
                         _ => false,
@@ -217,7 +217,7 @@ impl Session {
                         // they were, so the redo stack survives and no step is evicted. The
                         // group it belonged to is left without a step of its own, so the next
                         // command in it starts one.
-                        if let Some((_, _, history, redo, typing_open, evicted, _)) = &before_doc {
+                        if let Some((_, _, history, redo, typing_open, evicted, _, _)) = &before_doc {
                             self.history = history.clone();
                             self.redo = redo.clone();
                             self.typing_open = *typing_open;
