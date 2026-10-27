@@ -17,6 +17,8 @@ pub(crate) fn embed_on_web(scripts: &str) -> bool {
 mod tests {
     use super::embed_on_web;
 
+    /// The Georgian and Thai manifest lines pass the web filter, whatever their spacing or other
+    /// scripts; the large CJK faces and the other scripts don't.
     #[test]
     fn web_builds_embed_the_georgian_and_thai_faces_only() {
         assert!(embed_on_web("Geor"));
