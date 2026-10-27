@@ -21,6 +21,12 @@ mod prefs;
 mod save_fallback;
 #[cfg(any(target_arch = "wasm32", test))]
 mod size_gate;
+
+#[cfg(any(target_arch = "wasm32", test))]
+mod host_filter;
+
+#[cfg(target_arch = "wasm32")]
+mod host;
 #[cfg(target_arch = "wasm32")]
 mod web;
 
