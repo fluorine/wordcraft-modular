@@ -186,7 +186,6 @@ dependencies = [
  "ndk-context",
  "ndk-sys",
  "num_enum",
- "simd_cesu8",
  "thiserror 2.0.21",
 ]
 
@@ -195,23 +194,6 @@ name = "android-properties"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc7eb209b1518d6bb87b283c20095f5228ecda460da70b44f0802523dea6da04"
-
-[[package]]
-name = "android_log-sys"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84521a3cf562bc62942e294181d9eef17eb38ceb8c68677bc49f144e4c3d4f8d"
-
-[[package]]
-name = "android_logger"
-version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbb4e440d04be07da1f1bf44fb4495ebd58669372fe0cffa6e48595ac5bd88a3"
-dependencies = [
- "android_log-sys",
- "env_filter",
- "log",
-]
 
 [[package]]
 name = "android_system_properties"
@@ -1117,7 +1099,7 @@ dependencies = [
  "sha2 0.10.9",
  "tar",
  "tempfile",
- "ureq 3.5.0",
+ "ureq",
  "verifysign",
  "winreg",
  "winsafe",
@@ -1400,7 +1382,6 @@ dependencies = [
  "egui-wgpu",
  "egui-winit",
  "egui_glow",
- "glow",
  "glutin",
  "glutin-winit",
  "image",
@@ -1574,16 +1555,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "env_filter"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bf3c259d255ca70051b30e2e95b5446cdb8949ac4cd22c0d7fd634d89f568e2"
-dependencies = [
- "log",
- "regex",
 ]
 
 [[package]]
@@ -2658,28 +2629,6 @@ dependencies = [
  "zerotrie",
  "zerovec",
 ]
-
-[[package]]
-name = "icu_segmenter"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82d07aafccd67af15d02512a6adf5896fbc5ed00f2e99b471d2efa14016db3db"
-dependencies = [
- "icu_collections",
- "icu_locale_fallback",
- "icu_provider",
- "icu_segmenter_data",
- "potential_utf",
- "smallvec",
- "utf8_iter",
- "zerovec",
-]
-
-[[package]]
-name = "icu_segmenter_data"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae293c039020f9ec10710af98d29ce6aa2051486638b49c9a6409f3b4a9e98ad"
 
 [[package]]
 name = "idna"
@@ -5133,16 +5082,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spellbook"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d204abcbdf8e88729306a8d0ca01a79d8a49969fe1f84696909d6dbc4321c1a"
-dependencies = [
- "foldhash 0.2.0",
- "hashbrown 0.17.1",
-]
-
-[[package]]
 name = "spirv"
 version = "0.4.0+sdk-1.4.341.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5770,21 +5709,6 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "ureq"
-version = "2.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02d1a66277ed75f640d608235660df48c8e3c19f3b4edb6a263315626cc3c01d"
-dependencies = [
- "base64 0.22.1",
- "log",
- "once_cell",
- "rustls",
- "rustls-pki-types",
- "url",
- "webpki-roots 0.26.11",
-]
-
-[[package]]
-name = "ureq"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cde93ff05758a36a851a398a772b0b79a82fbe3c186a46f2696baaeaf84c966b"
@@ -6177,24 +6101,6 @@ name = "webpki-root-certs"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e49d0e65abc00c142e8f9428da991da9f1a250c39be97459901eb12b9b49f62a"
-dependencies = [
- "rustls-pki-types",
-]
-
-[[package]]
-name = "webpki-roots"
-version = "0.26.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
-dependencies = [
- "webpki-roots 1.0.11",
-]
-
-[[package]]
-name = "webpki-roots"
-version = "1.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -6770,26 +6676,8 @@ dependencies = [
  "wordcraft-engine",
  "wordcraft-fonts",
  "wordcraft-proof",
- "wordcraft-render",
  "wordcraft-ui-egui",
  "zbus",
-]
-
-[[package]]
-name = "wordcraft-android"
-version = "0.10.0"
-dependencies = [
- "android_logger",
- "eframe",
- "egui",
- "jni",
- "log",
- "ndk-context",
- "serde_json",
- "winit",
- "wordcraft-doc",
- "wordcraft-engine",
- "wordcraft-ui-egui",
 ]
 
 [[package]]
@@ -6881,8 +6769,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
- "wasm-bindgen",
- "web-sys",
  "wordcraft-doc",
  "wordcraft-docbin",
  "wordcraft-docx",
@@ -6938,24 +6824,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "wordcraft-languagetool"
-version = "0.11.0"
-dependencies = [
- "form_urlencoded",
- "log",
- "proptest",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "ureq 2.12.1",
- "wordcraft-proof",
-]
-
-[[package]]
 name = "wordcraft-layout"
 version = "0.11.0"
 dependencies = [
- "icu_segmenter",
  "image",
  "js-sys",
  "kurbo",
@@ -7020,7 +6891,6 @@ dependencies = [
  "log",
  "miniz_oxide 0.9.1",
  "proptest",
- "spellbook",
  "unicode-normalization",
 ]
 
@@ -7062,9 +6932,7 @@ dependencies = [
  "wordcraft-engine",
  "wordcraft-fonts",
  "wordcraft-geom",
- "wordcraft-languagetool",
  "wordcraft-layout",
- "wordcraft-proof",
  "wordcraft-render",
  "wordcraft-zotero",
  "zbus",
