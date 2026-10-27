@@ -4452,6 +4452,13 @@ fn failed_command_leaves_document_unchanged() {
     assert_eq!(text(&s), before);
 }
 
+/// Runs a command on junk; `Session::run` turns a panic into an error, which fails the test.
+fn run_junk(s: &mut Session, id: &str, params: &serde_json::Value) {
+    if let Err(crate::CmdError::Failed(m)) = s.run(id, params) {
+        assert!(!m.starts_with(&format!("{id} panicked: ")), "{m}");
+    }
+}
+
 /// Review of #3692: the line cap on typed paragraphs is the engine's, so a control-channel or
 /// CLI `text.insert` is held to it as the MCP tool is. At the cap every line goes in as one undo
 /// step; one line more is refused before anything is typed.
@@ -4504,7 +4511,7 @@ fn hostile_params_never_panic() {
         for j in &junk {
             let mut s = Session::new(crate::sample::sample_document());
             assert_ne!(s.read_aloud.backend, crate::speech::Backend::System, "tests must never start real speech");
-            let _ = s.run(spec.id, j);
+            run_junk(&mut s, spec.id, j);
             s.clamp_selection();
             let _ = s.layout();
         }
@@ -9657,7 +9664,7 @@ fn outline_level_changes_are_undoable() {
     for spec in cmd::registry().all().iter().filter(|c| c.id.starts_with("outline.")) {
         for j in [json!(null), json!({"block": 99999, "level": "x", "value": 5}), json!({"block": -1, "level": 0})] {
             let mut s = outline_doc();
-            let _ = s.run(spec.id, &j);
+            run_junk(&mut s, spec.id, &j);
             let _ = s.layout();
         }
     }

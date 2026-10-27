@@ -4810,6 +4810,31 @@ fn autosave_is_unavailable_in_the_browser() {
     assert!(err.contains("browser"), "{err}");
 }
 
+/// #3307: an opened file isn't rewritten until the user says so, but the switch says so
+/// without Save As: turning it on lets AutoSave write the file.
+#[test]
+fn turning_autosave_on_covers_a_file_only_opened_here() {
+    let dir = scratch("autosave-opened");
+    let path = dir.join("report.docx");
+    let mut a = typed();
+    a.run("file.save", json!({"path": path.to_string_lossy()})).unwrap();
+    let mut b = app();
+    b.run("file.open", json!({"path": path.to_string_lossy()})).unwrap();
+    assert_eq!(b.autosave_block(), Some(AutoSaveBlock::NotSavedHere));
+    b.run("text.insert", json!({"text": "Opened "})).unwrap();
+    b.autosave_tick(now_ms() + 10_000.0);
+    assert!(b.session.dirty, "opening alone never rewrites the file");
+    assert!(b.run("file.autosave", json!({"value": "false"})).is_err());
+    assert!(!b.autosaves(), "a value that isn't a bool grants nothing");
+    assert_eq!(b.run("file.autosave", json!({})).unwrap(), json!({"value": true}));
+    assert!(b.autosaves());
+    b.autosave_tick(now_ms() + 20_000.0);
+    assert!(!b.session.dirty, "AutoSave wrote the opened file");
+    assert!(b.run("file.autosave", json!({"value": false})).is_ok());
+    assert!(!b.autosaves());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Cancelling the Open picker (Mod+O) left the document as it was but turned AutoSave off.
 #[test]
 fn cancelling_open_keeps_autosave() {
