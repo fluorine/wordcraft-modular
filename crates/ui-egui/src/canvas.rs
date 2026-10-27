@@ -12,7 +12,7 @@ use wordcraft_layout::display::CommentDisplay;
 use wordcraft_layout::{DocLayout, Page, Placed};
 
 use crate::WordApp;
-use crate::theme::{Tokens, regular, semibold};
+use crate::theme::{Tokens, regular, semibold, ui_font_size};
 
 mod balloons;
 mod context_menu;
@@ -1176,6 +1176,9 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     _ => (regular(size(c.height * scale * 0.8)), None),
                 };
                 let g = painter.layout_no_wrap(app.canvas.ime_preedit.clone(), font, Color32::PLACEHOLDER);
+                // The composition is drawn at a document-derived size: clamp it, or a very
+                // large line height (or zoom) panics epaint's glyph atlas (#3624).
+                let g = painter.layout_no_wrap(app.canvas.ime_preedit.clone(), regular(ui_font_size(c.height * scale * 0.8)), Color32::PLACEHOLDER);
                 let at = preedit_cursor_chars(&app.canvas.ime_preedit, app.canvas.ime_preedit_range.as_ref());
                 ime_dx = g.pos_from_cursor(egui::text::CCursor::new(at)).min.x;
                 // The galley's first baseline sits on the line's baseline, as typed text would.
