@@ -95,3 +95,7 @@ background colour; the density folders hold the same stand-in at each scale.
 | `apps/wordcraft-android/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png` | The Android Open Source Project | Android Studio new-project template (default launcher art), unmodified | Apache-2.0 |
 | `apps/wordcraft-android/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png` | The Android Open Source Project | Android Studio new-project template (default launcher art), unmodified | Apache-2.0 |
 | `apps/wordcraft-android/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png` | The Android Open Source Project | Android Studio new-project template (default launcher art), unmodified | Apache-2.0 |
+Spellbook 0.4.2 source in `vendor/spellbook/` is by Michael Davis and contributors, from [helix-editor/spellbook](https://github.com/helix-editor/spellbook), under MPL-2.0. Local changes and source-availability requirements are recorded in `vendor/spellbook/WORDCRAFT-NOTICE.txt` and `NOTICE`.
+
+`vendor/spellbook/src/test_fixture.rs` contains original WordCraft synthetic test data
+under MPL-2.0, solely for the vendored unit tests. No upstream English dictionary is bundled.

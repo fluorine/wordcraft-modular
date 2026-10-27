@@ -9,3 +9,6 @@ plan/
 /.claude/
 /target-*/
 /craft-fonts/
+
+/.work/
+/vendor/spellbook/Cargo.lock
