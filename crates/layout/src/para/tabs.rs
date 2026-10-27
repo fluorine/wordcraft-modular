@@ -1,4 +1,3 @@
-use super::model::Cluster;
 use super::*;
 
 /// Next tab stop after `x` (column coordinates): explicit stops, the hanging-indent implicit stop,

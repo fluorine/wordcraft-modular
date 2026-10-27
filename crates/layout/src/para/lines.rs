@@ -1,7 +1,7 @@
 use super::bidi::{even_row, reorder_line};
 use super::grid::Exclusion;
 use super::justify::{HYPHENATION_ZONE, hyphen_glyph, shrink_line_spaces, space_room};
-use super::model::{ClKind, Cluster, Line, LineEnd, ParaEnv};
+use super::model::{ClKind, Line, LineEnd, ParaEnv};
 use super::paragraph::word_widths;
 use super::tabs::{next_tab, pl_text_at, ptab_stop, resolve_tab};
 use super::*;
@@ -793,17 +793,6 @@ fn baseline_offset(spacing: LineSpacing, asc: f32, height: f32, desc: f32) -> f3
     }
 }
 
-fn picture_clusters_only(pl: &ParaLayout, c0: usize, c1: usize) -> bool {
-    pl.clusters.get(c0..c1).is_some_and(|cs| {
-        cs.iter().all(|c| match c.kind {
-            ClKind::Object(i) => !pl.maths.iter().any(|(k, _)| *k == i),
-            ClKind::Space | ClKind::Tab | ClKind::Marker => true,
-            ClKind::LineBreak | ClKind::PageBreak | ClKind::ColumnBreak => true,
-            _ => false,
-        })
-    })
-}
-
 /// The spans of a row at `top` (about `h` tall) between `lo` and `hi` that text can use around
 /// the exclusions, left to right (Square wrapping uses both sides of an object). `Err(y)`: none
 /// here, try again at `y` (below what's in the way).
@@ -851,4 +840,17 @@ fn row_spans(exclusions: &[Exclusion], top: f32, h: f32, table_h: f32, lo: f32, 
         return Err(taken.iter().map(|t| t.2).reduce(f32::min).unwrap_or(top));
     }
     Ok(spans.into())
+}
+
+fn picture_clusters_only(pl: &ParaLayout, c0: usize, c1: usize) -> bool {
+    pl.clusters.get(c0..c1).is_some_and(|cs| {
+        cs.iter().enumerate().all(|(i, c)| match c.kind {
+            // Hidden and floating anchors have no inline extent or font height.
+            ClKind::Object(_) => c.picture || (c.adv == 0.0 && c.obj_h == 0.0),
+            ClKind::Space | ClKind::Tab | ClKind::Marker => true,
+            // A terminal manual break has no ink and keeps the picture's leading policy.
+            ClKind::LineBreak => i + 1 == cs.len() && c.adv == 0.0 && c.obj_h == 0.0 && c.obj_d == 0.0 && c.g0 == c.g1,
+            _ => false,
+        })
+    })
 }

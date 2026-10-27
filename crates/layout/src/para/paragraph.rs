@@ -4,7 +4,7 @@ use super::chars::caps_char;
 use super::grid::{auto_space, snap_chars};
 use super::justify::hyphenation_points;
 use super::lines::break_lines;
-use super::model::{ClKind, Cluster, Glyph, Label, LabelRun, ParaEnv, undrawable_bullet};
+use super::model::{ClKind, Glyph, Label, LabelRun, ParaEnv, undrawable_bullet};
 use super::proof::{ProofRun, is_list_item, proof_issues};
 use super::*;
 
@@ -116,6 +116,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
                     obj_h: 0.0,
                     obj_d: 0.0,
                     dot: false,
+                    picture: false,
                 });
             }
             continue;
@@ -166,7 +167,20 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
             let si = b.style(&rc, None, false);
             let g = b.glyphs.len() as u32;
             let push = |b: &mut Builder, kind: ClKind, adv: f32, h: f32| {
-                b.clusters.push(Cluster { start, end, adv, kind, style: si, g0: g, g1: g, break_after: false, obj_h: h, obj_d: 0.0, dot: false })
+                b.clusters.push(Cluster {
+                    start,
+                    end,
+                    adv,
+                    kind,
+                    style: si,
+                    g0: g,
+                    g1: g,
+                    break_after: false,
+                    obj_h: h,
+                    obj_d: 0.0,
+                    dot: false,
+                    picture: false,
+                })
             };
             match c {
                 '\t' => push(&mut b, ClKind::Tab, 0.0, 0.0),
@@ -196,6 +210,15 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
                                 let [el, et, er, eb] = float.effect_extent();
                                 let (px, py) = float.spin_pad(w * s, h * s);
                                 push(&mut b, ClKind::Object(k), w * s + el + er + 2.0 * px, h * s + et + eb + 2.0 * py);
+                                if let Some(c) = b.clusters.last_mut() {
+                                    c.picture = match o {
+                                        InlineObject::Image { .. } | InlineObject::Graphic { .. } | InlineObject::Group { .. } => true,
+                                        InlineObject::Shape { kind, story, .. } => {
+                                            *kind != wordcraft_doc::para::ShapeKind::TextBox && story.is_none()
+                                        }
+                                        _ => false,
+                                    };
+                                }
                             } else {
                                 push(&mut b, ClKind::Object(k), 0.0, 0.0);
                             }
@@ -221,6 +244,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
                                     obj_h: a.max(0.01),
                                     obj_d: d,
                                     dot: false,
+                                    picture: false,
                                 });
                             } else if let Some(text) = form.as_ref().and_then(|f| f.shown_text()) {
                                 // A drop-down shows its selected entry, whatever result was saved.
@@ -285,6 +309,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
                                 obj_h: ml.ascent.max(a).max(0.01),
                                 obj_d: ml.descent.max(d),
                                 dot: false,
+                                picture: false,
                             });
                             if *display {
                                 displays.push((b.clusters.len() - 1, math.jc));

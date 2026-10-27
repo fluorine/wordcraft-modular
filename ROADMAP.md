@@ -1048,3 +1048,4 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 
 > 2026-10-25 · Picture-only lines retain the label floor on the visible label line, including after a pure leading page break (#2454). Manual line-break continuations without the label use the picture floor. Synthetic coverage; no new Word observation.
 | 2026-10-23 | trivial | Progress log: header and footer commands change the section of the header the caret is in (#3639) |
+> 2026-10-27 · Port #2454 to split layout modules: picture-only automatic leading, visible-label exclusion and zero-extent anchor handling. Native font equivalence remains unqualified. Source port only; no test execution or new native measurements.
