@@ -474,6 +474,12 @@ pub(super) fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u32, l
             asc = st.ascent;
             desc = st.descent;
         }
+        let label_here = pl.label.is_some() && (first || (lines.len() == 1 && label_line_index(&lines, &pl.clusters) == 1));
+        let picture_only = matches!(rp.line_spacing, LineSpacing::Multiple(m) if m >= 1.0)
+            && grid.is_none()
+            && obj_asc > asc
+            && !label_here
+            && picture_clusters_only(pl, c0, c1);
         let text_natural = asc + desc;
         let (text_asc, text_desc) = (asc.max(obj_asc), desc);
         let text_pictures = if obj_asc > asc { obj_asc + desc } else { 0.0 };
@@ -491,17 +497,18 @@ pub(super) fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u32, l
                 }
             }
         }
-        // Keep the picture floor independent of list-label metrics and line-spacing multipliers.
-        // shortcut: Word leaves less than a full descent below a line of only pictures (0.5pt to
-        // 1.9pt in docxide-pdf's header fixtures case121/case123, where the descent is 3.3pt), and
-        // no rule tried so far (none, only the text's descent) matched both; it needs Word probes.
+        // Picture-only auto-spaced lines add the font's extra leading below the picture
+        // (Word Mac probes at single, 1.15 and double spacing). Labels and grids keep their floor.
         let natural = asc + desc;
         let pictures = if obj_asc > asc { obj_asc + desc } else { 0.0 };
         // Document grid: the line takes whole line pitches, its text centred in them.
         let (height, centred) = match (rp.line_spacing, grid) {
             (LineSpacing::Multiple(m), Some(g)) => ((g.snap_height(natural) * m).max(g.snap_height(pictures)), true),
             (LineSpacing::AtLeast(v), Some(g)) => (g.snap_height(natural.max(pictures)).max(v), true),
-            (LineSpacing::Multiple(m), None) => ((text_natural * m + label_extra).max(text_pictures), false),
+            (LineSpacing::Multiple(m), None) => {
+                let floor = if picture_only { obj_asc + text_natural * (m - 1.0).max(0.0) } else { text_pictures };
+                ((text_natural * m + label_extra).max(floor), false)
+            }
             (LineSpacing::AtLeast(v), None) => (natural.max(text_pictures).max(v), false),
             (LineSpacing::Exactly(v), _) => (v, false),
         };
@@ -509,7 +516,8 @@ pub(super) fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u32, l
             let up = asc.max(obj_asc);
             top + ((height - up - desc) / 2.0).max(0.0) + up
         } else {
-            top + baseline_offset(rp.line_spacing, asc, height, desc).max(obj_asc.min(height - desc))
+            let cap = if picture_only { height } else { height - desc };
+            top + baseline_offset(rp.line_spacing, asc, height, desc).max(obj_asc.min(cap))
         };
 
         // Alignment / justification (trailing spaces hang).
@@ -783,6 +791,17 @@ fn baseline_offset(spacing: LineSpacing, asc: f32, height: f32, desc: f32) -> f3
         LineSpacing::Multiple(m) => asc * m.min(1.0),
         LineSpacing::AtLeast(_) | LineSpacing::Exactly(_) => height - desc,
     }
+}
+
+fn picture_clusters_only(pl: &ParaLayout, c0: usize, c1: usize) -> bool {
+    pl.clusters.get(c0..c1).is_some_and(|cs| {
+        cs.iter().all(|c| match c.kind {
+            ClKind::Object(i) => !pl.maths.iter().any(|(k, _)| *k == i),
+            ClKind::Space | ClKind::Tab | ClKind::Marker => true,
+            ClKind::LineBreak | ClKind::PageBreak | ClKind::ColumnBreak => true,
+            _ => false,
+        })
+    })
 }
 
 /// The spans of a row at `top` (about `h` tall) between `lo` and `hi` that text can use around
