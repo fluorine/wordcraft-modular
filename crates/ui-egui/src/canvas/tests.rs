@@ -395,6 +395,9 @@ fn read_mode_page_color_sets_the_reading_paper() {
     // With Switch Modes on, Read Mode's paper still follows the Page color: None is white and Sepia is sepia.
     a.session.view.dark_mode = true;
     a.run("view.readMode", json!({})).unwrap();
+    assert!(page_render_options(&a, false).dark, "the selected Read Mode page color is retained on re-entry");
+    assert_eq!(paper(&a), Rgb(wordcraft_render::DARK_PAPER, wordcraft_render::DARK_PAPER, wordcraft_render::DARK_PAPER));
+    a.run("view.readPageColor", json!({"value": "none"})).unwrap();
     assert!(!page_render_options(&a, false).dark);
     assert_eq!(paper(&a), Rgb::WHITE);
     a.run("view.readPageColor", json!({"value": "sepia"})).unwrap();
