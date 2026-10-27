@@ -52,6 +52,19 @@ pub(super) fn text_cluster_source<'a>(p: &'a Paragraph, c: &Cluster) -> Option<&
     (!text.chars().any(|ch| matches!(ch, OBJ | LINE_BREAK | PAGE_BREAK | COLUMN_BREAK | '\t'))).then_some(text)
 }
 
+/// Select the sorted Thai gap indices wholly inside the line's justified content.
+fn line_thai_groups(indices: &[usize], c0: usize, c1: usize, align_from: usize) -> &[usize] {
+    let start = indices.partition_point(|&k| {
+        crate::work::steps(1);
+        k < c0.max(align_from)
+    });
+    let end = indices.partition_point(|&k| {
+        crate::work::steps(1);
+        k.saturating_add(1) < c1
+    });
+    indices.get(start..end).unwrap_or(&[])
+}
+
 fn space_text_neighbors(pl: &ParaLayout, p: &Paragraph, k: usize, c0: usize, c1: usize) -> Option<(usize, usize)> {
     if pl.clusters.get(k)?.kind != ClKind::Space {
         return None;
@@ -118,7 +131,7 @@ fn apply_thai_justification(
         remaining = (remaining - add).max(0.0);
     }
 
-    let group_indices: Vec<usize> = thai_justify_after.iter().copied().filter(|k| *k >= align_from && *k >= c0 && k.saturating_add(1) < c1).collect();
+    let group_indices = line_thai_groups(thai_justify_after, c0, c1, align_from);
     let group_caps: Vec<f32> = group_indices.iter().map(|k| THAI_JUSTIFY_GROUP_MAX_EM * style_size(pl, *k).min(style_size(pl, k + 1))).collect();
     for (k, add) in group_indices.iter().zip(capped_equal_spacing(remaining, &group_caps)) {
         if let Some(slot) = increments.get_mut(k - c0) {
@@ -941,4 +954,29 @@ fn row_spans(exclusions: &[Exclusion], top: f32, h: f32, table_h: f32, lo: f32, 
         return Err(taken.iter().map(|t| t.2).reduce(f32::min).unwrap_or(top));
     }
     Ok(spans.into())
+}
+
+#[cfg(test)]
+mod thai_group_tests {
+    use super::line_thai_groups;
+
+    #[test]
+    fn sorted_gaps_are_restricted_to_the_current_line_and_after_tabs() {
+        let gaps: Vec<usize> = (0..100_000).step_by(2).collect();
+        let mut total = 0;
+        let comparisons = crate::work::count(|| {
+            for start in (0..100_000).step_by(100) {
+                let end = start + 100;
+                let selected = line_thai_groups(&gaps, start, end, start + 10);
+                let expected: Vec<usize> = (start + 10..end - 1).step_by(2).collect();
+                assert_eq!(selected, expected);
+                total += selected.len();
+            }
+        });
+        assert_eq!(total, 45_000);
+        assert!(comparisons < 40_000, "line lookup took {comparisons} comparisons");
+        assert!(line_thai_groups(&gaps, 100, 100, 100).is_empty());
+        assert!(line_thai_groups(&gaps, 100, 120, 120).is_empty());
+        assert!(line_thai_groups(&[], 0, 20, 0).is_empty());
+    }
 }
