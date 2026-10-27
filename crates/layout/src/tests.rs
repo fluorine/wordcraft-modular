@@ -5319,6 +5319,54 @@ fn floats_in_headers_and_table_cells_are_drawn() {
     assert!(c[0].x > 72.0 && c[0].x < 72.0 + 234.0, "inside the first cell: {:?}", c[0]);
 }
 
+/// A float laid out in its cell (`layoutInCell`) whose offset would take it out of the cell is
+/// moved in to the cell's side, at its wrap distance (a letterhead logo anchored left of its
+/// header cell). One laid out on the page (`layoutInCell="0"`) keeps its offset.
+#[test]
+fn cell_floats_laid_out_in_the_cell_stay_in_it() {
+    use wordcraft_doc::para::{Anchor, Float, Wrap};
+    let cell_w = 234.0;
+    let place = |x: f32, outside_cell: bool| {
+        let mut d = Document::from_text("Body text.");
+        let mut t = Table::new(1, 2, 468.0);
+        let mut cp = wordcraft_doc::Paragraph::with_text("cell", Default::default());
+        let f = Float { wrap: Wrap::Tight, h_rel: Anchor::Column, v_rel: Anchor::Paragraph, x, dist: 9.0, outside_cell, ..Default::default() };
+        cp.insert_object(0, rect_shape(80.0, 48.0, f), &Default::default()).unwrap();
+        t.rows[0].cells[0].blocks = vec![wordcraft_doc::para_block(cp)];
+        d.insert_block(StoryRef::Body, &Path::top(1), wordcraft_doc::Block::Table(t)).unwrap();
+        let c = shapes(&lay(&d).pages[0].items);
+        assert_eq!(c.len(), 1, "cell float drawn");
+        c[0].x
+    };
+    // An offset inside the cell is kept: the cell's text starts 20 pt left of this one.
+    let text_left = place(20.0, false) - 20.0;
+    assert!(text_left > 72.0 && text_left < 72.0 + 12.0, "the cell's text starts past its margin: {text_left}");
+    let text_w = cell_w - 2.0 * (text_left - 72.0);
+    // Anchored 95 pt left of the column: moved in to the cell's left side at its wrap distance.
+    let left = place(-95.0, false);
+    assert!((left - (text_left + 9.0)).abs() < 0.5, "pulled in to the left side: {left} vs {text_left}");
+    // Past the right side: moved in to it.
+    let right = place(cell_w + 40.0, false);
+    // (within a point: the cell's border room is not split evenly between its two sides)
+    assert!((right - (text_left + text_w - 9.0 - 80.0)).abs() < 1.0, "pulled in to the right side: {right}");
+    // Not laid out in the cell: the offset is kept, off the cell or not.
+    let out = place(-95.0, true);
+    assert!((out - (text_left - 95.0)).abs() < 0.5, "layoutInCell=0 keeps the offset: {out}");
+}
+
+#[test]
+fn keep_in_cell_bounds() {
+    use super::boxes::keep_in_cell;
+    assert_eq!(keep_in_cell(-95.0, 80.0, 234.0, 9.0), 9.0);
+    assert_eq!(keep_in_cell(300.0, 80.0, 234.0, 9.0), 234.0 - 9.0 - 80.0);
+    assert_eq!(keep_in_cell(20.0, 80.0, 234.0, 9.0), 20.0);
+    // Wider than the cell: starts at the left side.
+    assert_eq!(keep_in_cell(50.0, 300.0, 234.0, 9.0), 9.0);
+    // No wrap distance, and a negative one is treated as none.
+    assert_eq!(keep_in_cell(-5.0, 80.0, 234.0, 0.0), 0.0);
+    assert_eq!(keep_in_cell(-5.0, 80.0, 234.0, -4.0), 0.0);
+}
+
 /// Paragraph anchors exclude space-before; line and frameless page/margin anchors retain it.
 #[test]
 fn box_float_origins_respect_vertical_anchor_with_space_before() {
