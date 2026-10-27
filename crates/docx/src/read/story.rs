@@ -17,6 +17,7 @@ use super::shape_style::{own_fill, preset_kind, shape_paint, vml_color, vml_fill
 use crate::package::{ContentTypes, Rels, rt};
 use crate::units::{int, measure, u32_of};
 use crate::xml::{El, Node};
+use wordcraft_doc::link::hyperlink_target;
 use wordcraft_doc::wordart::TextWarp;
 
 mod blocks;
