@@ -2,9 +2,9 @@
 //! reader (#863).
 use std::collections::HashSet;
 
-use wordcraft_doc::PartKind;
+use wordcraft_doc::{Document, PartKind};
 
-use super::*;
+use super::{Body, Ev, FBlock, Pages, SectionProps, Styles, events, get, model};
 
 /// Most XML events kept for all headers and footers together; a slot past it is left out.
 const MAX_EVENTS: usize = 1 << 20;

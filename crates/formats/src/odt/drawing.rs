@@ -3,6 +3,7 @@
 use wordcraft_doc::para::{Anchor, Float, FloatAlign, ShapeKind, Wrap, WrapText};
 use wordcraft_doc::props::VAlign;
 
+use super::xml::{Attrs, length};
 use super::*;
 
 /// Key of the document's default graphic style (`style:default-style style:family="graphic"`),
