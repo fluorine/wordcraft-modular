@@ -8,12 +8,15 @@ use super::*;
 /// Escape text for Markdown (inline context).
 pub(crate) fn escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 8);
-    for c in s.chars() {
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
         match c {
             '\\' | '`' | '*' | '_' | '[' | ']' | '<' | '>' | '~' | '|' | '&' => {
                 out.push('\\');
                 out.push(c);
             }
+            // `$$` opens a display equation; a single `$` is left as typed.
+            '$' if chars.peek() == Some(&'$') => out.push_str("\\$"),
             '\u{000C}' | '\u{000E}' => {}
             _ => out.push(c),
         }
@@ -89,19 +92,20 @@ enum Mark {
 
 /// Inline spans → Markdown with properly nested markers.
 pub(super) fn inlines_md(inlines: &[Inline]) -> String {
-    inlines_md_impl(inlines, false)
+    inlines_md_impl(inlines, false, true)
 }
 
 fn inlines_md_table(inlines: &[Inline]) -> String {
-    inlines_md_impl(inlines, true)
+    inlines_md_impl(inlines, true, false)
 }
 
-fn inlines_md_impl(inlines: &[Inline], in_table: bool) -> String {
+/// `own_line`: the inlines fill a line that a `$$` display block can stand on.
+fn inlines_md_impl(inlines: &[Inline], in_table: bool, own_line: bool) -> String {
     // Split into (text, fmt) pieces with whitespace moved outside emphasis.
     let mut pieces: Vec<(String, Fmt, Option<String>)> = Vec::new();
-    let eq = crate::model::equations_as_text(inlines);
     // Markdown keeps no ruby: its base text goes through the text path below.
-    let inlines = crate::model::ruby_as_text(&eq);
+    let inlines = crate::model::ruby_as_text(inlines);
+    let alone = own_line && inlines.len() == 1;
     for i in inlines.iter() {
         match i {
             Inline::Text(t, f) => {
@@ -135,6 +139,19 @@ fn inlines_md_impl(inlines: &[Inline], in_table: bool) -> String {
             Inline::Figure(alt) => pieces.push((String::new(), Fmt::default(), Some(format!("![{}]()", escape(alt))))),
             // Equations and fields are text by now (`equations_as_text`).
             Inline::Equation { .. } | Inline::Field { .. } | Inline::Shape(_) => {}
+            Inline::Equation { linear, display } => {
+                let latex = crate::latex::linear_to_latex(linear).replace(['\r', '\n'], " ");
+                let latex = latex.trim();
+                if latex.is_empty() {
+                    pieces.push((linear.clone(), Fmt::default(), None));
+                } else if *display && alone {
+                    pieces.push((String::new(), Fmt::default(), Some(format!("$${latex}$$"))));
+                } else {
+                    // Only a body line of its own can be a `$$` block; a bare `|` would end the cell.
+                    let latex = if in_table { latex.replace('|', "\\|") } else { latex.to_string() };
+                    pieces.push((String::new(), Fmt::default(), Some(format!("${latex}$"))));
+                }
+            }
             // Read as its base text by `ruby_as_text` above.
             Inline::Ruby { .. } => {}
         }
@@ -147,6 +164,8 @@ fn inlines_md_impl(inlines: &[Inline], in_table: bool) -> String {
             out.push_str(marker(m));
         }
     };
+    // Whether `out` ends with raw output, such as an equation's closing `$`.
+    let mut after_raw = false;
     for (text, f, raw) in pieces {
         // Links are the outermost construct; a script or other non-web target is plain text.
         let f_link = f.link.clone().filter(|l| wordcraft_doc::link::is_safe_href(l));
@@ -157,7 +176,13 @@ fn inlines_md_impl(inlines: &[Inline], in_table: bool) -> String {
             }
             link = None;
             if let Some(r) = raw {
+                // A text `$` before an opening `$` would make `$$`.
+                if r.starts_with('$') && !after_raw && out.ends_with('$') {
+                    out.pop();
+                    out.push_str("\\$");
+                }
                 out.push_str(&r);
+                after_raw = true;
                 continue;
             }
             if let Some(l) = f_link {
@@ -189,8 +214,14 @@ fn inlines_md_impl(inlines: &[Inline], in_table: bool) -> String {
                 out.push_str(&code_span(&text));
             }
         } else {
-            out.push_str(&escape(&text).replace('\n', "\\\n").replace('\t', "    "));
+            let t = escape(&text).replace('\n', "\\\n").replace('\t', "    ");
+            // After an equation or another span's `$`, which a span split by underline can leave.
+            if out.ends_with('$') && t.starts_with('$') {
+                out.push('\\');
+            }
+            out.push_str(&t);
         }
+        after_raw = false;
     }
     close_all(&mut out, &mut stack);
     if let Some(l) = &link {
@@ -335,7 +366,11 @@ pub(super) fn write_blocks(blocks: &[FBlock], out: &mut Vec<String>) {
                 continue;
             }
             FBlock::Para(p) => {
-                let body = inlines_md(&p.inlines);
+                // A `#` line is read before `$$` blocks, so a heading writes its equations `$…$`.
+                let body = match p.kind {
+                    Kind::Heading(_) | Kind::Title => inlines_md_impl(&p.inlines, false, false),
+                    _ => inlines_md(&p.inlines),
+                };
                 match p.list {
                     Some(li) => {
                         let lv = li.level.min(8) as usize;
