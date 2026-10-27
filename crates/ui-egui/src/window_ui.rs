@@ -46,6 +46,7 @@ pub(crate) struct WindowUi {
     pub(crate) outline_prev_tab: Option<String>,
     pub(crate) read_aloud_at: Option<wordcraft_engine::doc::Pos>,
     pub(crate) awaiting_save: Option<AwaitingSave>,
+    pub(crate) damaged_save_continuation: Option<DamagedSaveContinuation>,
     pub(crate) file_dialog: Option<file_dialogs::PendingDialog>,
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) file_browser: crate::file_browser::State,
@@ -115,6 +116,7 @@ impl WindowUi {
             outline_prev_tab: None,
             read_aloud_at: None,
             awaiting_save: None,
+            damaged_save_continuation: None,
             file_dialog: None,
             #[cfg(not(target_arch = "wasm32"))]
             file_browser: Default::default(),
@@ -178,7 +180,6 @@ impl WordApp {
             fonts_korean: _,
             fonts_system_cjk: _,
             want_system_cjk: _,
-            damaged_save_continuation: _,
             recent_fonts_for: _,
             // File › Recover lists the copies of every window's documents.
             recover_fonts_for: _,
@@ -237,6 +238,7 @@ impl WordApp {
             outline_prev_tab,
             read_aloud_at,
             awaiting_save,
+            damaged_save_continuation,
             file_dialog,
             #[cfg(not(target_arch = "wasm32"))]
             file_browser,
@@ -333,6 +335,7 @@ impl WordApp {
             outline_prev_tab,
             read_aloud_at,
             awaiting_save,
+            damaged_save_continuation,
             file_dialog,
             #[cfg(not(target_arch = "wasm32"))]
             file_browser,
