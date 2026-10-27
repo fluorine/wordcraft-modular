@@ -134,6 +134,9 @@ impl WordApp {
         if let Some(r) = table_pen::toggle(self, id, &params) {
             return r;
         }
+        if let Some(r) = languagetool::command(self, id, &params) {
+            return r;
+        }
         let ctx = self.ctx.clone();
         if let Some(r) = zotero::command(self, id, &params, ctx.as_ref()) {
             if let Err(e) = &r {
@@ -973,6 +976,7 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "readAloud.skipCitations"
             | "tools.customizeKeyboard"
             | "tools.customizeRibbon"
+            | "ui.languageTool"
             | "view.darkMode"
             | "view.marks"
             | "view.ruler"

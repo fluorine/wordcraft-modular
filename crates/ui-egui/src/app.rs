@@ -123,6 +123,7 @@ impl WordApp {
             quit_requested: false,
             autosave: true,
             zotero: zotero::ZoteroLink::default(),
+            language_tool: languagetool::LtLink::default(),
             ctx: None,
             ime_origin: false,
             read_aloud_error: None,
@@ -356,6 +357,7 @@ impl WordApp {
             }
         }
         zotero::poll(self, ctx);
+        languagetool::poll(self, ctx);
         read_aloud::poll(self, ctx);
         self.clear_stale_change_picture();
         let _ = self.poll_file_dialog();
