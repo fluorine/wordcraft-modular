@@ -36,12 +36,19 @@ pub fn enabled(app: &WordApp, id: &str) -> bool {
 }
 
 pub(crate) fn bg(ui: &Ui, r: Rect, resp: &Response, checked: bool, t: &Tokens) {
-    let fill = if resp.is_pointer_button_down_on() {
+    bg_if(ui, r, resp, checked, t, true);
+}
+
+/// Paints a button background with an optional hover/press response. Disabled ribbon commands
+/// pass `false` so their visual state cannot imply that they are interactive.
+pub(crate) fn bg_if(ui: &Ui, r: Rect, resp: &Response, checked: bool, t: &Tokens, on: bool) {
+    let hover = ui.ctx().animate_bool_responsive(resp.id.with("hover"), resp.hovered() && on);
+    let fill = if resp.is_pointer_button_down_on() && on {
         t.pressed
     } else if checked {
         t.checked
-    } else if resp.hovered() {
-        t.hover
+    } else if hover > 0.0 {
+        Color32::TRANSPARENT.lerp_to_gamma(t.hover, hover)
     } else {
         return;
     };
@@ -99,7 +106,7 @@ fn big_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str,
     let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
     keytip_badge(ui, r, id, &label.replace('\n', " "));
     let on = enabled(app, id);
-    bg(ui, r, &resp, checked, &t);
+    bg_if(ui, r, &resp, checked, &t, on);
     let ic = Rect::from_center_size(pos2(r.center().x, r.min.y + BIG_ICON_Y), vec2(32.0, 32.0));
     let (c, a) = if on { (t.icon, t.accent) } else { (t.text_disabled, t.text_disabled) };
     icons::paint_state(ui.painter(), ic, icon, c, a, !on);
@@ -129,6 +136,8 @@ pub fn small(ui: &mut Ui, app: &mut WordApp, icon: &str, label: Option<&str>, ti
     let on = enabled(app, id);
     bg(ui, r, &resp, checked, &t);
     let ic = Rect::from_center_size(pos2(r.min.x + 12.0, r.center().y), vec2(16.0, 16.0));
+    bg_if(ui, r, &resp, checked, &t, on);
+    let ic = Rect::from_center_size(pos2(r.min.x + 12.0, r.center().y), vec2(17.0, 17.0));
     let (c, a) = if on { (t.icon, t.accent) } else { (t.text_disabled, t.text_disabled) };
     icons::paint_state(ui.painter(), ic, icon, c, a, !on);
     if let Some(l) = label {
@@ -173,6 +182,18 @@ pub fn split(
     let (c, a) = split_colors(on, swatch, &t);
     icons::paint_state(ui.painter(), ic, icon, c, a, !on);
     icons::paint(ui.painter(), Rect::from_center_size(ar.center(), vec2(DROPDOWN, DROPDOWN)), "dropdown", c, c);
+    bg_if(ui, r, &resp, checked, &t, on);
+    bg_if(ui, ar, &aresp, false, &t, on);
+    let ic = Rect::from_center_size(r.center(), vec2(17.0, 17.0));
+    let (c, a) = if on { (t.icon, t.accent) } else { (t.text_disabled, t.text_disabled) };
+    icons::paint(ui.painter(), ic, icon, c, a);
+    if let Some(sw) = swatch {
+        let sw = if on { sw } else { t.text_disabled };
+        let bar = Rect::from_min_max(pos2(r.min.x + 4.0, r.max.y - 5.0), pos2(r.max.x - 4.0, r.max.y - 2.0));
+        ui.painter().rect_filled(bar, 0.0, sw);
+        ui.painter().rect_stroke(bar, 0.0, Stroke::new(0.5, t.border), egui::StrokeKind::Inside);
+    }
+    icons::paint(ui.painter(), Rect::from_center_size(ar.center(), vec2(DROPDOWN, DROPDOWN)), "dropdown", c, a);
     let resp = tooltip(app, resp, tip, id);
     command_menu(&resp, app, id);
     if resp.clicked() && on {
@@ -225,7 +246,7 @@ pub fn menu_button(
         let w = (galley_w + 22.0).max(44.0);
         let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
         keytip_badge(ui, r, "menu", tip);
-        bg(ui, r, &resp, false, &t);
+        bg_if(ui, r, &resp, false, &t, on);
         icons::paint(ui.painter(), Rect::from_center_size(pos2(r.center().x, r.min.y + BIG_ICON_Y), vec2(32.0, 32.0)), icon, c, a);
         let lines: Vec<&str> = label.unwrap_or("").split('\n').collect();
         let mut y = r.min.y + BIG_LABEL_Y;
@@ -240,6 +261,8 @@ pub fn menu_button(
         keytip_badge(ui, r, "menu", tip);
         bg(ui, r, &resp, false, &t);
         icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 12.0, r.center().y), vec2(16.0, 16.0)), icon, c, a);
+        bg_if(ui, r, &resp, false, &t, on);
+        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 12.0, r.center().y), vec2(17.0, 17.0)), icon, c, a);
         if let Some(l) = label {
             ui.painter().text(pos2(r.min.x + 24.0, r.center().y), Align2::LEFT_CENTER, l, regular(11.5), text);
         }
