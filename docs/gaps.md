@@ -182,6 +182,7 @@ Small follow-ups from the 2026-10-25 field, table and AutoFormat batch (#4232):
 | 2026-10-27 | trivial | Thai justification selects sorted group gaps by line using binary search; a regression bounds comparisons over a long paragraph. |
 | 2026-10-26 | trivial | Thai layout review: mixed Thai/Latin paragraphs use Thai capped spacing only on lines containing Thai; Latin-only wrapped lines retain ordinary justification. Thai dictionary boundaries and runs now use one sorted pass to avoid quadratic rescans. |
 | 2026-10-26 | trivial | Consolidated the gap status header after merging main; readiness estimates unchanged |
+| 2026-10-26 | trivial | Linux system theme reads the standard portal setting and follows change notifications, including Settings v1 compatibility, portal restarts, failed-read recovery, missing settings and watcher shutdown; private-bus regression tests include a Read-only portal; contributor confirmed live switching on Linux |
 | 2026-10-22 | trivial | View windows: several open documents and Switch Windows in the engine |
 | 2026-10-19 | minor | Reject complete percentage rows above 100% beyond float roundoff before solving cell boundaries. |
 | 2026-10-25 | trivial | egui 0.37 migration: interface catalogs remain pinned by `craft-i18n.rev` (`9205108…`; 27 languages, English fallback); IME surrounding deletions and composition resets are implemented with regressions, but managed CI passed; native IME acceptance and native-speaker catalog review remain open; no gap or readiness change |

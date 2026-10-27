@@ -697,6 +697,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 | 2026-10-27 | trivial | Thai justification selects sorted group gaps by line using binary search; a regression bounds comparisons over a long paragraph. |
 | 2026-10-26 | trivial | PR #1713 review follow-up: correct bare-marker emergency offsets, compare PDF glyph positions for every page, clarify Thai alignment and known test results, remove quadratic rescans across Thai runs, and record the successful standalone Heading 1 tile test rerun. |
 | 2026-10-15 | trivial | Progress log: file opening checks regular file and size and bounds the read (#1333) |
+| 2026-10-26 | trivial | Linux system theme reads the standard portal setting and follows change notifications, including Settings v1 compatibility, portal restarts, failed-read recovery, missing settings and watcher shutdown; private-bus regression tests include a Read-only portal; contributor confirmed live switching on Linux |
 | 2026-10-22 | trivial | Progress log: one native window per open document |
 | 2026-10-22 | trivial | Progress log: every open document keeps its own recovery copy |
 | 2026-10-22 | trivial | Progress log: several open documents in the desktop window |
