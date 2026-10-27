@@ -992,6 +992,8 @@ fn input_dialog(id: &str, params: &Value) -> Option<&'static str> {
         "references.citation" if !has("tag") && !has("source") => Some("createSource"),
         // Templates and Add-ins, and the Organizer without a file to list (#377).
         "tools.templates" => Some("templates"),
+        // Macros without a name to run, define or delete shows its dialog (#4327); scripts get the list.
+        "tools.macros" if !["run", "define", "delete"].into_iter().any(has) => Some("macros"),
         "styles.organizer" if !has("path") => Some("organizer"),
         // Design › Colors › Customize Colors… and Fonts › Customize Fonts… (#1869).
         "design.customColors" if !has("colors") => Some("customizeColors"),

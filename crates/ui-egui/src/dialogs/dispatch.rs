@@ -1,4 +1,4 @@
-use super::bookmarks::{bookmark, enclose_preview, icons_body};
+use super::bookmarks::{bookmark, enclose_preview, icons_body, macros};
 use super::chrome::{buttons, color_field};
 use super::find::{FindTab, SEARCH_SUGGESTIONS, command_matches, find_in_navigation_pane, goto_body, special_menu, swallow_shortcut_text};
 use super::font::{apply_font, font_sample_box, font_sample_props, sample_paper};
@@ -872,6 +872,7 @@ pub(super) fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
         }
         Dialog::Insert(f) => crate::dialogs_insert::body(app, ui, f),
         Dialog::Refs(f) => crate::dialogs_refs::body(app, ui, f),
+        Dialog::Macros { name } => macros(app, ui, name),
         Dialog::Commands { query, swallow } => {
             if *swallow {
                 ui.ctx().input_mut(|i| i.events.retain(|e| !swallow_shortcut_text(swallow, e)));
