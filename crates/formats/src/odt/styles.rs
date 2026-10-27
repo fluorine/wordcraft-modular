@@ -1,3 +1,6 @@
+use wordcraft_doc::props::{TabAlign, TabLeader, TabStop};
+
+use super::limits::MAX_TAB_STOPS;
 use super::xml::{Attrs, Ev, events, get, length, local};
 use super::*;
 
@@ -66,6 +69,35 @@ struct StyleInfo {
     page_number: Option<Option<u32>>,
     /// `style:columns` of a section style.
     columns: Option<Columns>,
+    /// `style:tab-stops` of a paragraph style: they replace the parent style's.
+    tabs: Option<Vec<TabStop>>,
+}
+
+/// A `style:tab-stop` (ODF 1.3 §17.8): position, kind and leader; `None` without a usable
+/// position. Positions are from the paragraph's left edge (LibreOffice's "tabs relative to
+/// indent"; the reader keeps no indents, so both readings agree).
+fn tab_stop(a: &Attrs) -> Option<TabStop> {
+    let pos = get(a, "style:position").and_then(length).filter(|v| *v >= 0.0)?.min(1584.0);
+    let align = match get(a, "style:type") {
+        Some("center") => TabAlign::Center,
+        Some("right") => TabAlign::Right,
+        Some("char") => TabAlign::Decimal,
+        _ => TabAlign::Left,
+    };
+    let leader = match get(a, "style:leader-text").and_then(|t| t.chars().next()) {
+        Some('.') | Some('…') => TabLeader::Dot,
+        Some('-') => TabLeader::Hyphen,
+        Some('_') => TabLeader::Underscore,
+        Some('·') => TabLeader::MiddleDot,
+        Some(' ') => TabLeader::None,
+        _ => match get(a, "style:leader-style") {
+            Some("dotted") => TabLeader::Dot,
+            Some("dash" | "long-dash" | "dot-dash" | "dot-dot-dash") => TabLeader::Hyphen,
+            Some("solid") => TabLeader::Underscore,
+            _ => TabLeader::None,
+        },
+    };
+    Some(TabStop { pos, align, leader })
 }
 
 /// Columns of a `style:columns` element (ODF 1.3 §17.12): count and gap, clamped as the RTF and
@@ -90,6 +122,8 @@ pub(super) fn column_sep(a: &Attrs) -> bool {
 pub(super) struct Styles {
     map: HashMap<String, StyleInfo>,
     pub(super) lists: HashMap<String, Vec<bool>>,
+    /// Default tab interval of the paragraph default style (`style:tab-stop-distance`), points.
+    pub(super) default_tab: Option<f32>,
     /// Font of `style:default-style` for paragraphs (the document default, ODF 1.3 §16.4).
     default_font: Option<String>,
 }
@@ -103,6 +137,12 @@ impl Styles {
         events(xml, |ev| match ev {
             Ev::Start(q, a) => match local(&q) {
                 "automatic-styles" => in_auto = true,
+                "paragraph-properties" if in_default => {
+                    // Word's limits for the default tab interval: more than nothing, at most 22".
+                    if let Some(d) = get(&a, "style:tab-stop-distance").and_then(length).filter(|v| *v > 0.0) {
+                        self.default_tab = Some(d.min(1584.0));
+                    }
+                }
                 "style" if q.starts_with("style:") => {
                     if let Some(name) = get(&a, "style:name") {
                         let info = StyleInfo {
@@ -182,6 +222,20 @@ impl Styles {
                                 d.font = model::kept_font(&fam);
                             }
                         }
+                    }
+                }
+                "tab-stops" if q.starts_with("style:") => {
+                    if let Some((_, s)) = &mut cur {
+                        s.tabs = Some(Vec::new());
+                    }
+                }
+                "tab-stop" if q.starts_with("style:") => {
+                    if let Some((_, s)) = &mut cur
+                        && let Some(tabs) = &mut s.tabs
+                        && tabs.len() < MAX_TAB_STOPS
+                        && let Some(t) = tab_stop(&a)
+                    {
+                        tabs.push(t);
                     }
                 }
                 "table-properties" => {
@@ -340,6 +394,11 @@ impl Styles {
     /// Vertical alignment of a table-cell style (whole chain).
     pub(super) fn cell_valign(&self, name: &str) -> Option<VAlign> {
         self.chain(name).iter().find_map(|(_, s)| s.cell_valign)
+    }
+
+    /// The tab stops of paragraph style `name`: its own, or the nearest parent's.
+    pub(super) fn tabs(&self, name: &str) -> Option<Vec<TabStop>> {
+        self.chain(name).iter().find_map(|(_, s)| s.tabs.clone())
     }
 
     /// Paragraph kind, alignment, page break, rule, keep-with-next and base formatting. The text formatting of
