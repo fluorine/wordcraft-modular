@@ -563,7 +563,7 @@ pub(super) fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u32, l
             let mode = if rp.align == Align::KhmerJustify { crate::khmer_just::Mode::Tiered } else { crate::khmer_just::Mode::Even };
             let blank = |k: usize| {
                 pl.clusters.get(k).is_some_and(|c| {
-                    matches!(c.kind, ClKind::Space | ClKind::Marker | ClKind::LineBreak)
+                    matches!(c.kind, ClKind::Space | ClKind::Marker | ClKind::LineBreak | ClKind::PageBreak | ClKind::ColumnBreak)
                         || (matches!(c.kind, ClKind::Object(_)) && c.adv == 0.0 && c.obj_h == 0.0)
                 })
             };
