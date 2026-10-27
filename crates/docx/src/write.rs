@@ -67,7 +67,10 @@ fn unanchored_replies(doc: &Document) -> HashMap<u32, Vec<u32>> {
     };
     let mut out: HashMap<u32, Vec<u32>> = HashMap::new();
     for (id, c) in &doc.comments {
-        if c.parent.is_some() && !anchored.contains(id) && let Some(root) = anchored_ancestor(*id) {
+        if c.parent.is_some()
+            && !anchored.contains(id)
+            && let Some(root) = anchored_ancestor(*id)
+        {
             out.entry(root).or_default().push(*id);
         }
     }
