@@ -119,8 +119,33 @@ fn shortcuts_run_while_a_pane_title_bar_has_focus() {
     h.state_mut().nav_search_focus = true;
     h.run_steps(2);
     assert!(h.ctx.text_edit_focused());
-    press(&mut h, egui::Key::H, egui::Modifiers::COMMAND);
+    // Ctrl itself: on macOS ⌘H isn't the field's, and runs from it as other ⌘ shortcuts do.
+    press(&mut h, egui::Key::H, egui::Modifiers { ctrl: true, command: !cfg!(target_os = "macos"), ..Default::default() });
     assert!(h.state().dialog.is_none(), "the search field keeps Ctrl+H");
+}
+
+/// Word's search box doesn't swallow the window's shortcuts: with the Navigation pane's search
+/// focused, Mod+D opens the Font dialog, while Mod+A, the arrows and Mod+Z stay with the field.
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn shortcuts_run_from_the_navigation_search_box() {
+    let mut app = crate::WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::from_text("kept")), crate::Services::default());
+    app.run("view.navigationPane", serde_json::json!({"value": true})).unwrap();
+    let mut h = pane_harness(app);
+    h.state_mut().nav_search_focus = true;
+    h.run_steps(2);
+    assert!(h.ctx.text_edit_focused() && !h.state().canvas.focused, "the search box has the keyboard");
+    let sel = h.state().session.sel.clone();
+    for (key, m) in
+        [(egui::Key::A, egui::Modifiers::COMMAND), (egui::Key::ArrowLeft, egui::Modifiers::COMMAND), (egui::Key::Z, egui::Modifiers::COMMAND)]
+    {
+        press(&mut h, key, m);
+        assert!(h.state().dialog.is_none() && h.ctx.text_edit_focused(), "{key:?} stays with the field");
+        assert_eq!(h.state().session.sel, sel, "{key:?} left the document's selection alone");
+    }
+    assert_eq!(h.state().session.doc.plain_text(wordcraft_doc::StoryRef::Body).trim(), "kept", "Mod+Z left the document alone");
+    press(&mut h, egui::Key::D, egui::Modifiers::COMMAND);
+    assert_eq!(h.state().dialog.as_ref().map(|d| d.name()), Some("font"), "Mod+D opened Font from the search box");
 }
 
 /// A dialog button with the keyboard keeps Ctrl+Z away from the document behind the dialog.

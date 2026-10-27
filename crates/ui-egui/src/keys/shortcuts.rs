@@ -244,13 +244,36 @@ pub(super) fn is_global_shortcut(key: Key, m: Modifiers) -> bool {
     m.command || m.alt || is_function_key(key)
 }
 
-/// Command shortcuts when the canvas isn't focused and no text field is: nothing has the
-/// keyboard, or a button or a pane's title bar does. A focused widget in an open dialog or popup
-/// keeps the keys, so Ctrl+Z on a dialog button can't undo the document behind it.
+/// Whether a text field keeps a Mod key for itself: Select All, Copy, Cut, Paste, Undo and Redo,
+/// egui's Ctrl+H/K/U/W line editing, and moving or deleting by word or line.
+pub(super) fn text_field_keeps(key: Key, m: Modifiers) -> bool {
+    matches!(key, Key::A | Key::C | Key::V | Key::X | Key::Y | Key::Z)
+        || (m.ctrl && matches!(key, Key::H | Key::K | Key::U | Key::W))
+        || matches!(
+            key,
+            Key::ArrowLeft
+                | Key::ArrowRight
+                | Key::ArrowUp
+                | Key::ArrowDown
+                | Key::Home
+                | Key::End
+                | Key::Backspace
+                | Key::Delete
+                | Key::Enter
+                | Key::Tab
+        )
+}
+
+/// Command shortcuts when the canvas isn't focused: nothing has the keyboard, or a button, a
+/// pane's title bar or a text field outside dialogs does. A text field (the Navigation pane's
+/// search, say) keeps the keys it edits with and Alt (Option types characters on macOS); its
+/// other Mod and function-key shortcuts run, as Save As and Find do from Word's search box. A
+/// focused widget in an open dialog or popup keeps the keys, so Ctrl+Z on a dialog button can't
+/// undo the document behind it.
 pub fn global_shortcuts(app: &mut WordApp, ctx: &egui::Context) {
+    let field = ctx.text_edit_focused();
     // Customize Keyboard records the keys pressed; they never run commands meanwhile.
     if app.canvas.focused
-        || ctx.text_edit_focused()
         || (ctx.egui_wants_keyboard_input() && crate::panes::overlay_open(app, ctx))
         || matches!(app.dialog, Some(crate::dialogs::Dialog::CustomizeKeyboard { .. }))
     {
@@ -264,6 +287,12 @@ pub fn global_shortcuts(app: &mut WordApp, ctx: &egui::Context) {
             break;
         }
         if let egui::Event::Key { key, pressed: true, modifiers, .. } = e {
+            if field {
+                if (modifiers.command || is_function_key(key)) && !text_field_keeps(key, modifiers) {
+                    dispatch(app, key, modifiers);
+                }
+                continue;
+            }
             if leave_full_screen(app, ctx, key, modifiers, false) {
                 continue;
             }
