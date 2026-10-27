@@ -23,6 +23,8 @@ mod print;
 mod region;
 #[cfg(target_os = "macos")]
 mod traffic_lights;
+#[cfg(all(unix, not(target_os = "macos")))]
+mod x11_scale;
 
 use wordcraft_engine::Session;
 use wordcraft_ui_egui::{
@@ -391,6 +393,13 @@ fn main() -> eframe::Result {
         let _ = std::io::Write::write_fmt(&mut std::io::stderr(), format_args!("wordcraft: --control needs a port number from 1 to 65535{got}\n"));
         std::process::exit(2);
     }
+    // Apply after argument validation but before logging; a successful re-exec must not repeat
+    // log setup or rotate the user's log file.
+    #[cfg(all(unix, not(target_os = "macos")))]
+    x11_scale::apply();
+    // First, so the panic hook and every start-up warning are recorded (`logging`).
+    let logger = logging::install();
+    logging::install_panic_hook();
     // The log file lives in the settings directory, next to the preferences; opened after the
     // arguments, so `--version` leaves no file behind. Records logged until now are written to it
     // first. Runs without preferences (agents' test runs) log to standard error only, so they
