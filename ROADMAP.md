@@ -1197,3 +1197,4 @@ Imported Word 97–2003 `.doc`/`.dot` files now ask for a supported DOCX target 
 Default document zoom (#2080) is integrated with current main, retaining saved proofing preferences and user template folder controls. Translations are proposed separately in craft-i18n.
 
 Integrate default document zoom (#2080) with main 438775ce and egui 0.37.
+> 2026-10-27 · Port #3915 to split layout modules: ordinary LTR tab groups follow paragraph alignment. Positional tabs, lists, RTL and display math retain their alignment paths. Source port only; no test execution or new native measurements.
