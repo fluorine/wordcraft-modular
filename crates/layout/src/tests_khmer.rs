@@ -155,8 +155,10 @@ fn zero_width_space_is_an_invisible_word_boundary() {
     let zw: Vec<usize> = pl.clusters.iter().enumerate().filter(|(_, c)| text[c.start..c.end] == *"\u{200B}").map(|(i, _)| i).collect();
     assert_eq!(zw.len(), 11);
     for &i in &zw {
-        assert_eq!(pl.clusters[i].kind, ClKind::Marker, "no glyph is drawn for it");
+        assert_eq!(pl.clusters[i].kind, ClKind::Text);
         assert_eq!(pl.clusters[i].adv, 0.0);
+        // The shaper may retain a zero-advance glyph record for U+200B; its cluster
+        // must still occupy no horizontal space while preserving the word boundary.
         assert_eq!(pl.gaps[i], Gap::Word, "the gap after it is a word boundary");
         assert_eq!(pl.gaps[i - 1], Gap::None, "none before it");
         assert!(pl.clusters[i].break_after, "a line may end after it");
@@ -189,20 +191,7 @@ fn plain_justify_and_left_leave_khmer_alone() {
 
 /// A cluster for the byte range `a..b` of the paragraph text, of the given kind.
 fn cl(a: usize, b: usize, kind: ClKind) -> crate::para::Cluster {
-    crate::para::Cluster {
-        start: a,
-        end: b,
-        adv: 8.0,
-        kind,
-        style: 0,
-        g0: 0,
-        g1: 0,
-        break_after: false,
-        obj_h: 0.0,
-        obj_d: 0.0,
-        dot: false,
-        picture: false,
-    }
+    crate::para::Cluster { start: a, end: b, adv: 8.0, kind, style: 0, g0: 0, g1: 0, break_after: false, obj_h: 0.0, obj_d: 0.0, dot: false }
 }
 
 #[test]

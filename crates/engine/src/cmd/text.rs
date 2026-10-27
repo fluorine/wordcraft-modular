@@ -57,3 +57,16 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("text.ellipsis", "Ellipsis", "Insert › Symbols", |s, _| ins_char(s, '…')).key(non_mac("Mod+Alt+.")),
     ]
 }
+
+/// A line, page or column break. On a selected picture or shape, Word inserts the break before
+/// it and keeps the object selected (#4126).
+fn insert_break(s: &mut Session, c: char) -> CmdResult {
+    let Some(at) = super::objects::object_selection(s).map(|(p, _)| p) else { return ins_char(s, c) };
+    s.sel = Selection::caret(at.clone());
+    ins_char(s, c)?;
+    let after_break = Pos { off: at.off + c.len_utf8(), ..at };
+    if s.doc.para_at(&after_break).and_then(|para| para.object_at(after_break.off)).is_some_and(|o| o.is_drawing()) {
+        super::objects::select_object(s, &after_break);
+    }
+    sel_result(s)
+}

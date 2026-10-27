@@ -502,7 +502,11 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
         left_out: Vec::new(),
         enclosures,
         auto_space,
+        gaps: Vec::new(),
     };
+    if matches!(pl.rp.align, Align::ThaiDistribute | Align::KhmerJustify) {
+        pl.gaps = super::cluster_gaps(&p.text, &pl.clusters);
+    }
     let auto = env.doc.settings.auto_hyphenation && !pl.rp.suppress_hyphens;
     pl.hyph_after = hyphenation_points(&text, to_para, &pl, auto, env.doc.settings.hyphenate_caps, &runs);
     // A paragraph whose text and mark are all a deletion the layout leaves out (a deleted

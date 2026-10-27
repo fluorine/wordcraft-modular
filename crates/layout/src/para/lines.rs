@@ -551,11 +551,49 @@ pub(super) fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u32, l
         }
         // A line ending in a manual line break is stretched too, unless `doNotExpandShiftReturn` says not to.
         let stretch_end = end == LineEnd::Wrap || (end == LineEnd::LineBreak && expand_break);
-        let justify = display.is_none() && ((rp.align == Align::Justify && stretch_end) || rp.align == Align::Distribute);
+        let khmer_mode = matches!(rp.align, Align::ThaiDistribute | Align::KhmerJustify);
+        let justify = display.is_none() && (((rp.align == Align::Justify || khmer_mode) && stretch_end) || rp.align == Align::Distribute);
         // A line that only fits with shrunk spaces is shrunk, the last line of the paragraph too.
         let shrink = display.is_none() && shrink_spaces && slack < 0.0 && last_tab.is_none();
         if shrink {
             shrink_line_spaces(pl, &mut xs, c0, c1, content_end, slack);
+        } else if justify && slack > 0.0 && khmer_mode {
+            // Thai and Khmer text has no ordinary spaces to stretch. Spread slack between text
+            // clusters instead, excluding the line's leading blanks and trailing blanks.
+            let mode = if rp.align == Align::KhmerJustify { crate::khmer_just::Mode::Tiered } else { crate::khmer_just::Mode::Even };
+            let blank = |k: usize| {
+                pl.clusters.get(k).is_some_and(|c| {
+                    matches!(c.kind, ClKind::Space | ClKind::Marker | ClKind::LineBreak)
+                        || (matches!(c.kind, ClKind::Object(_)) && c.adv == 0.0 && c.obj_h == 0.0)
+                })
+            };
+            let first = (align_from..c1).find(|k| !blank(*k)).unwrap_or(c1);
+            let last = (align_from..c1).rev().find(|k| !blank(*k));
+            let slots: Vec<usize> = match last {
+                Some(last) if last > first => (first..last).collect(),
+                _ => Vec::new(),
+            };
+            let gaps: Vec<(wordcraft_doc::khmer::Gap, f32)> = slots
+                .iter()
+                .map(|&k| {
+                    let em = pl.clusters.get(k).and_then(|c| pl.styles.get(c.style as usize)).map_or(12.0, |style| style.size);
+                    (pl.gaps.get(k).copied().unwrap_or(wordcraft_doc::khmer::Gap::None), em)
+                })
+                .collect();
+            let adds = crate::khmer_just::distribute(mode, slack, &gaps);
+            let mut add = 0.0;
+            let mut slots = slots.iter().zip(adds.iter()).peekable();
+            for k in align_from..c1 {
+                if let Some(x) = xs.get_mut(k - c0) {
+                    *x += add;
+                }
+                if let Some((_, amount)) = slots.next_if(|(slot, _)| **slot == k) {
+                    add += *amount;
+                }
+            }
+            if let Some(x) = xs.last_mut() {
+                *x += add;
+            }
         } else if justify && slack > 0.0 {
             // Spaces inside the content (after the last tab).
             let spaces: Vec<usize> = (align_from..c1)

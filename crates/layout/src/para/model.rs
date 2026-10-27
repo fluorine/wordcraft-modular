@@ -67,6 +67,8 @@ pub(super) fn undrawable_bullet(text: &str, lvl: &Level, rc: &ResolvedChar) -> b
 #[derive(Clone, Debug)]
 pub struct StyleRun {
     pub face: FaceRef,
+    /// Primary font requested by the run, before a fallback face was chosen for a missing glyph.
+    pub requested_face: FaceRef,
     pub size: f32,
     pub synth_bold: bool,
     pub synth_italic: bool,

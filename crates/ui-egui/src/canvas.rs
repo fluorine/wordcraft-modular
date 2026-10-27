@@ -44,7 +44,7 @@ use geometry::{collapse_white_space, columns_for, place_pages};
 use geometry::{floating_comments, on_page_gap, on_visible_page, white_space_hidden};
 #[cfg(test)]
 use input::{EDGE_MARGIN, EDGE_MAX_DT, EDGE_SPEED_MAX};
-use input::{UnitDrag, clamped_scroll, edge_scroll, mouse, wheel_hovered};
+use input::{MultiDrag, UnitDrag, clamped_scroll, edge_scroll, mouse, wheel_hovered};
 pub(crate) use input::{hold_document_selection, press_count};
 #[cfg(test)]
 use links::{field_link, is_followable_link, is_generated_bookmark_link};
@@ -284,6 +284,14 @@ pub struct CanvasState {
 }
 
 type TablePreviewKey = ((usize, usize, u64, u64, wordcraft_engine::Selection), std::sync::Arc<DocLayout>);
+
+/// Whether page content is drawn dark. Read Mode uses its selected page color; other modes use
+/// the regular Switch Modes setting. Ink and drag previews follow the same choice.
+pub(crate) fn dark_page(app: &WordApp) -> bool {
+    use wordcraft_engine::cmd::view::ReadPageColor;
+    let view = &app.session.view;
+    if view.read_mode { view.read_page_color == ReadPageColor::Inverse } else { view.dark_mode }
+}
 
 impl CanvasState {
     /// Another document is shown in the window: everything about the page that was shown (drags,
