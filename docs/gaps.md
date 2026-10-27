@@ -150,6 +150,8 @@ The same gaps grouped the way the parity documents are, for agents working in on
 - **Localization gaps:** #8, #11, #16, #17; native-speaker review of every catalog (human).
 - **Stability and performance gaps:** #3, #20.
 
+Complete positive percentage rows rounded down by at most one fiftieth-percent unit keep their preferred widths. Shared boundaries retain horizontal spans and reject missing or conflicting preferences. Larger deficits and totals above 100% beyond floating-point roundoff retain the existing grid. Original native Word controls cover the rounding case; automatic widths and conflicting preferences remain separate parity gaps.
+
 The Language dialog reads effective character formatting, including document defaults, paragraph styles and character styles. Accepting it unchanged keeps inherited language and no-proof choices (#2717); explicit direct formatting still takes precedence. Other proofing and Windows-specific reports remain separate.
 
 Footer page-table height and body wrapping are corrected. Other pagination gaps remain open.
@@ -179,6 +181,7 @@ Small follow-ups from the 2026-10-25 field, table and AutoFormat batch (#4232):
 | 2026-10-26 | trivial | Thai layout review: mixed Thai/Latin paragraphs use Thai capped spacing only on lines containing Thai; Latin-only wrapped lines retain ordinary justification. Thai dictionary boundaries and runs now use one sorted pass to avoid quadratic rescans. |
 | 2026-10-26 | trivial | Consolidated the gap status header after merging main; readiness estimates unchanged |
 | 2026-10-22 | trivial | View windows: several open documents and Switch Windows in the engine |
+| 2026-10-19 | minor | Reject complete percentage rows above 100% beyond float roundoff before solving cell boundaries. |
 | 2026-10-25 | trivial | egui 0.37 migration: interface catalogs remain pinned by `craft-i18n.rev` (`9205108…`; 27 languages, English fallback); IME surrounding deletions and composition resets are implemented with regressions, but managed CI passed; native IME acceptance and native-speaker catalog review remain open; no gap or readiness change |
 | 2026-10-17 | trivial | Gap 9 narrowed: Standard (Word 2007, AES-ECB) encrypted packages open with a password under any Word extension; AES headers in Word 97-2003 files are outside the public spec and refused with a clear message; estimate 3–5 → 0 h, since the remaining AES-in-`.doc` case is refused by design |
 | 2026-10-25 | trivial | Small follow-ups from the field, table and AutoFormat batch (#4232) |
@@ -255,6 +258,7 @@ Small follow-ups from the 2026-10-25 field, table and AutoFormat batch (#4232):
 | 2026-10-15 | trivial | Numbered headings (#1793): heading-linked Multilevel List presets; numbering keeps heading styles. Not a ranked gap; style gallery previews without numbers remain |
 | 2026-10-16 | trivial | Hint-reliant CJK fonts execute TrueType contour assembly; Windows DFKai-SB no longer loses strokes. Synthetic local-font regression; no font binaries bundled. |
 | 2026-10-16 | trivial | #17: automatic space between Asian text and Latin text or digits laid out (#2358) |
+| 2026-10-17 | trivial | Complete rounded percentage rows replace stale table grids |
 | 2026-10-16 | trivial | Drawing dispatch uses the direct graphic-data child so nested pictures keep their text boxes. Synthetic regressions. |
 | 2026-10-16 | trivial | Turned text wraps at an at-least row height when its lines fit across the column; narrow cells still grow. |
 | 2026-10-14 | trivial | Gap 19: RTF export writes sections (ODT export landed too) |
