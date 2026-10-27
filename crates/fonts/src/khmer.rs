@@ -41,26 +41,30 @@ pub(crate) fn takes_u_form<'a>(prev: char, next: char, needs: impl FnOnce() -> &
 /// U+17BB, the character a triisap is shaped as when [`takes_u_form`].
 pub(crate) const U_FORM: char = SIGN_U;
 
-/// For each base, whether `face` needs the rewrite. It does when the face leaves the triisap
-/// as it draws it over a base that never takes the U-form (ប) *and* the rewritten sequence adds
-/// no width (a face that dotted-circles the invalid U + ិ pair, as Khmer Busra does, is not
-/// rewritten). A face that already does the U-form (Khmer OS System, Khmer Busra) shapes the
-/// triisap differently over these bases, so it is left alone. `shape` gives (glyph, advance).
+/// U+25CC, the dotted circle a shaper draws under a mark that has no valid base.
+const DOTTED_CIRCLE: char = '\u{25CC}';
+
+/// Does a face need the rewrite for one base, given its shaping of the base with a triisap (`tri`)
+/// and with U+17BB (`u`), the triisap glyph over a base that never takes the U-form (`above`) and
+/// its dotted-circle glyph (`circle`)? It does when the triisap stays as it is over that base, and
+/// the rewritten sequence neither adds width nor holds the dotted circle (the face rejects the
+/// invalid U + vowel pair). Each entry is (glyph, advance).
+fn needs_rewrite(tri: &[(u32, i32)], u: &[(u32, i32)], above: Option<u32>, circle: Option<u32>) -> bool {
+    let width = |g: &[(u32, i32)]| g.iter().map(|x| x.1).sum::<i32>();
+    above.is_some() && tri.get(1).map(|g| g.0) == above && width(tri) == width(u) && !circle.is_some_and(|c| u.iter().any(|g| g.0 == c))
+}
+
+/// For each base, whether `face` needs the rewrite (see [`needs_rewrite`]). A face that already
+/// does the U-form shapes the triisap differently over these bases, so it is left alone. `shape`
+/// gives (glyph, advance).
 pub(crate) fn probe(face: &FontFace, shape: impl Fn(&str) -> Vec<(u32, i32)>) -> [bool; 3] {
     if face.glyph_for(SIGN_U) == 0 || face.glyph_for(TRIISAP) == 0 || face.glyph_for(NEVER_U) == 0 {
         return [false; 3];
     }
     let seq = |b: char, m: char| -> String { [b, m, PROBE_VOWEL].iter().collect() };
-    let width = |g: &[(u32, i32)]| g.iter().map(|x| x.1).sum::<i32>();
     let above = shape(&seq(NEVER_U, TRIISAP)).get(1).map(|g| g.0);
-    BASES.map(|b| {
-        if face.glyph_for(b) == 0 {
-            return false;
-        }
-        let tri = shape(&seq(b, TRIISAP));
-        let u = shape(&seq(b, SIGN_U));
-        above.is_some() && tri.get(1).map(|g| g.0) == above && width(&tri) == width(&u)
-    })
+    let circle = Some(face.glyph_for(DOTTED_CIRCLE)).filter(|g| *g != 0);
+    BASES.map(|b| face.glyph_for(b) != 0 && needs_rewrite(&shape(&seq(b, TRIISAP)), &shape(&seq(b, SIGN_U)), above, circle))
 }
 
 #[cfg(test)]
@@ -96,5 +100,20 @@ mod tests {
         assert_eq!(run("ប៊ិ", [true; 3]), "ប៊ិ");
         assert_eq!(run("អ៊", [true; 3]), "អ៊");
         assert_eq!(run("៊ិ", [true; 3]), "៊ិ");
+    }
+
+    #[test]
+    fn rewrite_is_refused_when_the_replacement_has_the_dotted_circle() {
+        // (glyph, advance): base, triisap left above, vowel; the same base with U + vowel.
+        let tri = [(1, 1500), (7, 0), (9, 0)];
+        let above = Some(7);
+        assert!(needs_rewrite(&tri, &[(1, 1500), (8, 0), (9, 0)], above, Some(40)));
+        // No dotted-circle glyph in the face: as before.
+        assert!(needs_rewrite(&tri, &[(1, 1500), (8, 0), (9, 0)], above, None));
+        // A zero-width dotted circle among the glyphs: refused although the width matches.
+        assert!(!needs_rewrite(&tri, &[(1, 1500), (40, 0), (9, 0)], above, Some(40)));
+        // A wider result is still refused, and a triisap that is already below is left alone.
+        assert!(!needs_rewrite(&tri, &[(1, 1500), (8, 0), (9, 1393)], above, Some(40)));
+        assert!(!needs_rewrite(&[(1, 1500), (8, 0), (9, 0)], &[(1, 1500), (8, 0), (9, 0)], above, Some(40)));
     }
 }
