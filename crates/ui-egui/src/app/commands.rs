@@ -441,6 +441,9 @@ impl WordApp {
                 "exportPng" => self.export_dialog("png"),
                 "insertPicture" => self.pick_picture(),
                 "addFont" => self.pick_font(),
+                // Design › Themes › Save Current Theme… and Browse for Themes… (#1869).
+                "saveTheme" => self.pick_theme(true),
+                "browseTheme" => self.pick_theme(false),
                 "loadSystemFonts" => self.load_system_fonts(),
                 "print" => {
                     self.ui.backstage = true;
@@ -946,6 +949,9 @@ fn input_dialog(id: &str, params: &Value) -> Option<&'static str> {
         // Templates and Add-ins, and the Organizer without a file to list (#377).
         "tools.templates" => Some("templates"),
         "styles.organizer" if !has("path") => Some("organizer"),
+        // Design › Colors › Customize Colors… and Fonts › Customize Fonts… (#1869).
+        "design.customColors" if !has("colors") => Some("customizeColors"),
+        "design.customFonts" if !has("heading") => Some("customizeFonts"),
         // Language, Envelopes and Labels without settings show their dialogs (#407).
         "review.language" if params.as_object().is_none_or(|m| m.is_empty()) => Some("language"),
         "mailings.envelopes" if params.as_object().is_none_or(|m| m.is_empty()) => Some("envelopes"),
