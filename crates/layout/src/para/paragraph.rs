@@ -3,7 +3,7 @@ use super::builder::{Builder, left_out, overstrike};
 use super::chars::caps_char;
 use super::grid::{auto_space, snap_chars};
 use super::justify::hyphenation_points;
-use super::lines::break_lines;
+use super::lines::{break_lines, text_cluster_source};
 use super::model::{ClKind, Cluster, Glyph, Label, LabelRun, ParaEnv, undrawable_bullet};
 use super::proof::{ProofRun, is_list_item, proof_issues};
 use super::*;
@@ -109,6 +109,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
                     g0: g,
                     g1: g,
                     break_after: false,
+                    emergency_break_after: false,
                     obj_h: 0.0,
                     obj_d: 0.0,
                     dot: false,
@@ -160,7 +161,20 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
             let si = b.style(&rc, None, false);
             let g = b.glyphs.len() as u32;
             let push = |b: &mut Builder, kind: ClKind, adv: f32, h: f32| {
-                b.clusters.push(Cluster { start, end, adv, kind, style: si, g0: g, g1: g, break_after: false, obj_h: h, obj_d: 0.0, dot: false })
+                b.clusters.push(Cluster {
+                    start,
+                    end,
+                    adv,
+                    kind,
+                    style: si,
+                    g0: g,
+                    g1: g,
+                    break_after: false,
+                    emergency_break_after: false,
+                    obj_h: h,
+                    obj_d: 0.0,
+                    dot: false,
+                })
             };
             match c {
                 '\t' => push(&mut b, ClKind::Tab, 0.0, 0.0),
@@ -212,6 +226,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
                                     g0: g,
                                     g1: g,
                                     break_after: false,
+                                    emergency_break_after: false,
                                     obj_h: a.max(0.01),
                                     obj_d: d,
                                     dot: false,
@@ -276,6 +291,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
                                 g0: g,
                                 g1: g,
                                 break_after: false,
+                                emergency_break_after: false,
                                 obj_h: ml.ascent.max(a).max(0.01),
                                 obj_d: ml.descent.max(d),
                                 dot: false,
@@ -393,17 +409,74 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
         found.sort_unstable();
         found.dedup();
     }
+    // Thai has no spaces between most words. Segment the complete visible paragraph so ICU keeps
+    // context across formatting runs; only dictionary opportunities inside Thai text replace the
+    // Unicode line-break opportunities, leaving other scripts and punctuation to the old rules.
+    let thai_runs = crate::kinsoku::thai_text_runs(&text);
+    let has_thai = !thai_runs.is_empty();
+    if !thai_runs.is_empty() {
+        let segmenter = LineSegmenter::new_dictionary(Default::default());
+        let dictionary: Vec<usize> = segmenter.segment_str(&text).collect();
+        // Walk the sorted ICU boundaries and Thai runs together. Rescanning the paragraph-wide
+        // boundary list for each run makes paragraphs with many short Thai runs quadratic.
+        let mut boundaries = dictionary.into_iter().peekable();
+        let mut thai_breaks = Vec::new();
+        let mut replaced_runs = Vec::new();
+        for run in &thai_runs {
+            while boundaries.peek().is_some_and(|&i| i <= run.start) {
+                boundaries.next();
+            }
+            let breaks_before_run = thai_breaks.len();
+            while boundaries.peek().is_some_and(|&i| i < run.end) {
+                if let Some(i) = boundaries.next().filter(|&i| crate::kinsoku::is_safe_line_break(&text, i)) {
+                    thai_breaks.push(i);
+                }
+            }
+            if thai_breaks.len() > breaks_before_run {
+                replaced_runs.push(run.clone());
+            }
+        }
+        let mut run_index = 0;
+        found.retain(|&i| {
+            while replaced_runs.get(run_index).is_some_and(|run| i >= run.end) {
+                run_index += 1;
+            }
+            replaced_runs.get(run_index).is_none_or(|run| i <= run.start || i >= run.end)
+        });
+        found.extend(thai_breaks);
+    }
     // Myanmar has no spaces between words: it wraps between syllables.
     if text.chars().any(|c| matches!(u32::from(c), 0x1000..=0x109F | 0xA9E0..=0xA9FF | 0xAA60..=0xAA7F)) {
         found.extend(wordcraft_doc::cluster::myanmar_breaks(&text));
         found.sort_unstable();
         found.dedup();
     }
-    // Asian typography: kinsoku and breaking Latin words anywhere.
+    // Asian typography: kinsoku plus unwrapped Latin/Thai word breaks.
     crate::kinsoku::apply(&text, &mut found, rp.kinsoku, rp.word_wrap);
+    // ICU, Unicode line breaking and word-wrap-off may all suggest boundaries, but a Thai line
+    // break must still respect whole-paragraph graphemes and keep a preposed vowel with its base.
+    found.retain(|&i| !crate::kinsoku::is_thai_text_boundary(&text, i) || crate::kinsoku::is_safe_line_break(&text, i));
     let opps: std::collections::HashSet<usize> = found.into_iter().filter_map(to_para).collect();
+    // Emergency opportunities are every safe layout-cluster boundary. Resolve each cluster end
+    // through the visible-text map as well, so hidden text and tracked deletions cannot split a
+    // grapheme or Thai preposed-vowel sequence across formatting runs.
+    let to_visible = |i: usize| -> Option<usize> {
+        if skip.is_empty() { Some(i) } else { ends.binary_search_by_key(&i, |e| e.1).ok().and_then(|k| ends.get(k)).map(|e| e.0) }
+    };
+    let safe_breaks: std::collections::HashSet<usize> = b
+        .clusters
+        .iter()
+        .filter_map(|c| {
+            if !has_thai || !matches!(c.kind, ClKind::Text | ClKind::Space) {
+                return None;
+            }
+            let visible = to_visible(c.end)?;
+            crate::kinsoku::is_safe_line_break(&text, visible).then_some(c.end)
+        })
+        .collect();
     for c in &mut b.clusters {
         c.break_after = opps.contains(&c.end) || matches!(c.kind, ClKind::Object(_) | ClKind::Tab);
+        c.emergency_break_after = safe_breaks.contains(&c.end);
     }
 
     // Word hides a list label on a paragraph containing only a page break. The list counter
@@ -511,7 +584,6 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
     // it, not even its list number, though the number is counted (#3982).
     let mark_left_out = env.hide_deleted.hides(doc, mark_rc.del) || (mark_rc.hidden && !env.show_hidden);
     let gone = mark_left_out && (p.text.is_empty() || left.first() == Some(&(0..p.text.len())));
-    pl.left_out = left;
     // Neither ordinary nor hyphenated wrapping may split a drawing group inside a grapheme.
     for c in &mut pl.clusters {
         c.break_after &= pl.joined_cluster_starts.binary_search(&c.end).is_err();
@@ -522,7 +594,28 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
             c.break_after = true;
         }
     }
-    break_lines(&mut pl, env, mark_style, env.label.as_ref().map(|(_, l)| l));
+    let thai_justify_after: Vec<usize> = if has_thai {
+        pl.clusters
+            .windows(2)
+            .enumerate()
+            .filter_map(|(i, pair)| {
+                let (left, right) = (pair.first()?, pair.get(1)?);
+                let left_text = text_cluster_source(p, left)?;
+                let right_text = text_cluster_source(p, right)?;
+                let a = left_text.chars().next_back()?;
+                let b = right_text.chars().next()?;
+                if !crate::kinsoku::is_thai_text_char(a) || !crate::kinsoku::is_thai_text_char(b) {
+                    return None;
+                }
+                let visible = to_visible(left.end)?;
+                crate::kinsoku::is_safe_line_break(&text, visible).then_some(i)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    pl.left_out = left;
+    break_lines(&mut pl, p, env, mark_style, env.label.as_ref().map(|(_, l)| l), has_thai, &thai_justify_after);
     if gone {
         collapse(&mut pl);
     }
