@@ -10,6 +10,7 @@ use super::{
     Arc, COLUMN_BREAK, CharProps, Document, FIELD_SHADING, InlineObject, LINE_BREAK, NoteKind, OBJ, PAGE_BREAK, PTabAlign, PTabBase, ParaLayout,
     Paragraph, ResolvedChar, ResolvedPara, TabLeader, field_code_text, field_text_on, reference_link,
 };
+use wordcraft_doc::props::Align;
 
 /// A run's formatting resolved in the paragraph's style and table.
 struct Resolver<'a> {
