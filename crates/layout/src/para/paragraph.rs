@@ -341,6 +341,9 @@ impl<'a> Shaped<'a> {
             let [el, et, er, eb] = float.effect_extent();
             let (px, py) = float.spin_pad(w * s, h * s);
             self.push(slot, ClKind::Object(k), w * s + el + er + 2.0 * px, h * s + et + eb + 2.0 * py);
+            if let Some(cluster) = self.b.clusters.last_mut() {
+                cluster.picture = true;
+            }
         } else {
             self.push(slot, ClKind::Object(k), 0.0, 0.0);
         }
