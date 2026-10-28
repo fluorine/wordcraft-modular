@@ -781,7 +781,7 @@ fn alignment_buttons_mark_the_alignment_seen_on_the_page_in_a_right_to_left_para
                 }
                 egui::Area::new(egui::Id::unique("mini_align_probe")).fixed_pos(pos2(10.0, 10.0)).show(ui.ctx(), |ui| {
                     let t = Tokens::get(ui.ctx());
-                    content(app, ui, &t);
+                    content(app, ui, &t, true);
                 });
             },
             a,
