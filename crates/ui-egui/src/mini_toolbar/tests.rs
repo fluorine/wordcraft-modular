@@ -278,6 +278,37 @@ fn hovering_a_bar_button_previews_it_on_the_selection() {
     assert_eq!(h.state().canvas.mini_anchor, Some(anchor), "the alignment preview must not move the toolbar");
 }
 
+/// While a preview is shown the page holds its scroll position, though the previewed text
+/// reflows and the caret would be scrolled into view.
+#[test]
+fn the_page_holds_its_place_while_a_preview_is_shown() {
+    let mut h = bar_over("brown fox");
+    h.state_mut().run("caret.docStart", json!({})).unwrap();
+    h.state_mut().run("text.insert", json!({"text": "x\n".repeat(150)})).unwrap();
+    h.state_mut().run("select.text", json!({"text": "brown fox"})).unwrap();
+    steps(&mut h);
+    let page = h.state().canvas.viewport.unwrap();
+    h.event(egui::Event::PointerMoved(pos2(page.min.x + 20.0, page.center().y)));
+    h.event(egui::Event::MouseWheel {
+        unit: egui::MouseWheelUnit::Point,
+        delta: egui::vec2(0.0, -60.0),
+        phase: egui::TouchPhase::Start,
+        modifiers: Default::default(),
+        source: egui::MouseWheelSource::Unknown,
+    });
+    steps(&mut h);
+    let held = h.state().canvas.scroll_offset;
+    for _ in 0..4 {
+        h.state_mut().canvas.command_preview = Some(("format.size".to_string(), json!({"size": 72.0})));
+        h.state_mut().canvas.scroll_to_caret = true;
+        h.step();
+    }
+    assert!(h.state().canvas.command_previewed.is_some());
+    assert_eq!(h.state().canvas.scroll_offset, held, "the preview does not move the page");
+    steps(&mut h);
+    assert_eq!(h.state().canvas.preview_scroll, None, "the hold ends with the preview");
+}
+
 /// With no preview shown the bar's anchor follows the selection as the page scrolls.
 #[test]
 fn the_bar_anchor_follows_the_selection_as_the_page_scrolls() {
