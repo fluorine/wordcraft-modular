@@ -378,7 +378,10 @@ fn combo_impl(ui: &mut Ui, options: ComboOptions<'_>) -> Option<String> {
         let row = |k: usize| section_row(k, &menu_recent, &item);
         let total = section_rows(menu_recent.len(), items.len());
         let list = |ui: &mut Ui, range: std::ops::Range<usize>, ()| {
-            let picked = draw_rows(ui, RowDrawOptions { width, current, range, row: &row, highlight: None, preview, row_height: row_h });
+            let picked = draw_rows(
+                ui,
+                RowDrawOptions { width, current, range, row: &row, highlight: None, preview, row_height: row_h, recent_rows: menu_recent.len() },
+            );
             if picked.is_some() {
                 ui.close();
             }
@@ -433,7 +436,10 @@ fn combo_impl(ui: &mut Ui, options: ComboOptions<'_>) -> Option<String> {
                     .show(ui, |ui| {
                         let item = |k: usize| matches.get(k).and_then(|&i| items.get(i));
                         let row = |k: usize| section_row(k, recent_shown, &item);
-                        list_rows(ui, RowListOptions { width, current, n, row: &row, highlight: Some(lit), scroll, preview })
+                        list_rows(
+                            ui,
+                            RowListOptions { width, current, n, row: &row, highlight: Some(lit), scroll, preview, recent_rows: recent_shown.len() },
+                        )
                     })
                     .inner
             });
@@ -475,7 +481,20 @@ pub const COMBO_PREVIEW_ROW_H: f32 = 24.0;
 /// family and each preview loads that font, so building all rows loaded every font on the system
 /// (gigabytes on large font collections) and froze the app (#121).
 pub fn combo_list(ui: &mut Ui, width: f32, current: &str, items: &[String], preview: Option<&dyn Fn(&mut Ui, &str) -> Response>) -> Option<String> {
-    list_rows(ui, RowListOptions { width, current, n: items.len(), row: &|k| items.get(k).map(Row::Item), highlight: None, scroll: None, preview }).0
+    list_rows(
+        ui,
+        RowListOptions {
+            width,
+            current,
+            n: items.len(),
+            row: &|k| items.get(k).map(Row::Item),
+            highlight: None,
+            scroll: None,
+            preview,
+            recent_rows: 0,
+        },
+    )
+    .0
 }
 
 /// A row of a combo's list: a dim section heading nothing picks, or an entry.
@@ -544,14 +563,19 @@ struct RowDrawOptions<'rows, 'text> {
     highlight: Option<usize>,
     preview: Option<&'rows dyn Fn(&mut Ui, &str) -> Response>,
     row_height: f32,
+    /// How many recent families head the list (0 without the section).
+    recent_rows: usize,
 }
 
 fn draw_rows(ui: &mut Ui, options: RowDrawOptions<'_, '_>) -> Option<String> {
-    let RowDrawOptions { width, current, range, row, highlight, preview, row_height: row_h } = options;
+    let RowDrawOptions { width, current, range, row, highlight, preview, row_height: row_h, recent_rows } = options;
     let mut out = None;
     let tokens = Tokens::get(ui.ctx());
     let (fill, accent) = (tokens.checked, tokens.accent);
     ui.set_min_width(width + 60.0);
+    // A family in Recently Used is marked there only: marked again under All Fonts it would look as
+    // if two were chosen.
+    let current_is_recent = (1..=recent_rows).any(|k| matches!(row(k), Some(Row::Item(r)) if r == current));
     for k in range {
         let it = match row(k) {
             Some(Row::Item(it)) => it,
@@ -568,7 +592,8 @@ fn draw_rows(ui: &mut Ui, options: RowDrawOptions<'_, '_>) -> Option<String> {
                     let r = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), row_h));
                     ui.painter().rect_filled(r, 3.0, fill);
                 }
-                if it == current {
+                let in_all_fonts = recent_rows > 0 && k > recent_rows.saturating_add(1);
+                if it == current && !(in_all_fonts && current_is_recent) {
                     let r = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), row_h));
                     ui.painter().rect_filled(r, 3.0, fill);
                     ui.painter().rect_filled(Rect::from_min_size(r.min, vec2(3.0, row_h)), 1.5, accent);
@@ -605,10 +630,11 @@ struct RowListOptions<'rows, 'text> {
     highlight: Option<usize>,
     scroll: Option<(f32, f32)>,
     preview: Option<&'rows dyn Fn(&mut Ui, &str) -> Response>,
+    recent_rows: usize,
 }
 
 fn list_rows(ui: &mut Ui, options: RowListOptions<'_, '_>) -> (Option<String>, f32, f32) {
-    let RowListOptions { width, current, n, row, highlight, scroll, preview } = options;
+    let RowListOptions { width, current, n, row, highlight, scroll, preview, recent_rows } = options;
     let mut out = None;
     let row_h = if preview.is_some() { COMBO_PREVIEW_ROW_H } else { ui.spacing().interact_size.y };
     let desired_h = (n as f32 * (row_h + ui.spacing().item_spacing.y)).min(420.0);
@@ -631,7 +657,7 @@ fn list_rows(ui: &mut Ui, options: RowListOptions<'_, '_>) -> (Option<String>, f
         area = area.vertical_scroll_offset(offset.max(0.0));
     }
     let shown = area.show_rows(ui, row_h, n, |ui, range| {
-        if let Some(v) = draw_rows(ui, RowDrawOptions { width, current, range, row, highlight, preview, row_height: row_h }) {
+        if let Some(v) = draw_rows(ui, RowDrawOptions { width, current, range, row, highlight, preview, row_height: row_h, recent_rows }) {
             out = Some(v);
         }
     });
