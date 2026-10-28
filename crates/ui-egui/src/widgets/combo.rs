@@ -370,9 +370,13 @@ fn combo_impl(ui: &mut Ui, options: ComboOptions<'_>) -> Option<String> {
         menu_field.rect = resp.rect.union(ar);
         let menu = craft_ui::combo::Menu::new(ui, &menu_field).close_behavior(close).height(420.0);
         let row_h = if preview.is_some() { COMBO_PREVIEW_ROW_H } else { ui.spacing().interact_size.y };
+        // The recent section keeps its order while the list stays open: a pick moves the family to
+        // the top for the next time the list opens, not under the pointer.
+        let frozen_id = search_id.with("recent_frozen");
+        let menu_recent: Vec<String> = ui.data(|d| d.get_temp(frozen_id)).unwrap_or_else(|| recent.to_vec());
         let item = |k: usize| items.get(k);
-        let row = |k: usize| section_row(k, recent, &item);
-        let total = section_rows(recent.len(), items.len());
+        let row = |k: usize| section_row(k, &menu_recent, &item);
+        let total = section_rows(menu_recent.len(), items.len());
         let list = |ui: &mut Ui, range: std::ops::Range<usize>, ()| {
             draw_rows(ui, RowDrawOptions { width, current, range, row: &row, highlight: None, preview, row_height: row_h })
         };
@@ -395,6 +399,13 @@ fn combo_impl(ui: &mut Ui, options: ComboOptions<'_>) -> Option<String> {
         } else {
             menu.show_rows_with_header(|_| (), row_h, |()| total, list)
         };
+        ui.data_mut(|d| {
+            if picked.is_some() {
+                d.insert_temp(frozen_id, menu_recent.clone());
+            } else {
+                d.remove::<Vec<String>>(frozen_id);
+            }
+        });
         if let Some(v) = picked.flatten() {
             out = Some(v);
         }

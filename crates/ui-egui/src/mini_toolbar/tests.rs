@@ -248,6 +248,37 @@ fn hovering_and_clicking_a_font_in_the_bars_list() {
     assert_ne!(&h.state().session.doc, &doc, "clicking the family applies the font");
 }
 
+/// A picked family joins Recently Used Fonts when the list next opens, not in the frame after the
+/// pick, when the list is still on screen and would shift under the pointer.
+#[test]
+fn a_picked_font_joins_the_recent_section_on_the_next_open() {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let viewport = h.state().canvas.viewport.unwrap();
+    let font_box = h
+        .get_all_by_role(Role::TextInput)
+        .map(|n| n.rect())
+        .filter(|r| viewport.contains_rect(*r))
+        .min_by(|a, b| a.min.y.total_cmp(&b.min.y).then(a.min.x.total_cmp(&b.min.x)))
+        .expect("the bar has a font box");
+    let arrow = pos2(font_box.max.x + 8.0, font_box.center().y);
+    click_at(&mut h, arrow);
+    let family = h.state_mut().previews.families().into_iter().find(|f| f != "Aptos Display" && f != "Aptos").expect("another family is installed");
+    let at = h.get_all_by_label(&family).map(|n| n.rect().center()).find(|p| p.y > font_box.max.y).expect("the list shows the family");
+    h.event(egui::Event::PointerMoved(at));
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
+    h.step();
+    h.step();
+    h.step();
+    assert_eq!(h.query_all_by_label("Recently Used Fonts").count(), 0, "the list does not shift under the pointer");
+    steps(&mut h);
+    click_at(&mut h, arrow);
+    click_at(&mut h, arrow);
+    assert_eq!(h.query_all_by_label("Recently Used Fonts").count(), 1, "the next open lists the family first");
+}
+
 /// Hovering the highlight and font colour buttons previews their last colour.
 #[test]
 fn hovering_the_colour_buttons_previews_their_colour() {
