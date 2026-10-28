@@ -198,6 +198,55 @@ fn format_state(h: &mut egui_kittest::Harness<'static, WordApp>) -> Value {
     h.state_mut().session.run("format.state", &json!({})).unwrap()
 }
 
+/// Hovering an entry of the bar's size list previews that size; the pick is not made.
+#[test]
+fn hovering_a_size_in_the_bars_list_previews_it() {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let (doc, size) = (h.state().session.doc.clone(), format_state(&mut h).get("size").cloned());
+    let viewport = h.state().canvas.viewport.unwrap();
+    let size_box = h
+        .get_all_by_role(Role::TextInput)
+        .map(|n| n.rect())
+        .filter(|r| viewport.contains_rect(*r))
+        .max_by(|a, b| a.min.x.total_cmp(&b.min.x))
+        .expect("the bar has a size box");
+    click_at(&mut h, pos2(size_box.max.x + 8.0, size_box.center().y));
+    let twenty = h.get_by_label("20").rect().center();
+    h.event(egui::Event::PointerMoved(twenty));
+    steps(&mut h);
+    assert_eq!(h.state().canvas.command_previewed, Some(("format.size".to_string(), json!({"size": 20.0}))));
+    assert_ne!(crate::canvas::page_doc(h.state()), &doc, "the page shows the 20 pt text");
+    assert_eq!(&h.state().session.doc, &doc);
+    assert_eq!(format_state(&mut h).get("size").cloned(), size);
+}
+
+/// Hovering a colour of the bar's highlight list previews it on the selection.
+#[test]
+fn hovering_a_highlight_colour_previews_it() {
+    use egui_kittest::kittest::{By, Queryable};
+    let mut h = bar_over("brown fox");
+    let doc = h.state().session.doc.clone();
+    let [bar, _] = h.ctx.data(|d| d.get_temp::<[Rect; 2]>(shown_id())).expect("the bar is shown over a selection");
+    let arrow = h
+        .query_all(By::new().predicate(|n| n.raw_bounds().is_some_and(|r| ((r.x1 - r.x0) - 11.0).abs() < 0.5 && ((r.y1 - r.y0) - 22.0).abs() < 0.5)))
+        .map(|n| n.rect())
+        .filter(|r| bar.contains_rect(*r))
+        .min_by(|a, b| a.min.x.total_cmp(&b.min.x))
+        .expect("the bar has the Highlight split button");
+    click_at(&mut h, arrow.center());
+    let no_color = h.get_by_label("No Color").rect();
+    h.event(egui::Event::PointerMoved(pos2(no_color.min.x + 10.0, no_color.center().y - 30.0)));
+    steps(&mut h);
+    let previewed = h.state().canvas.command_previewed.clone();
+    assert!(previewed.is_some_and(|(id, _)| id == "format.highlight"), "a swatch previews the highlight");
+    assert_eq!(&h.state().session.doc, &doc);
+    h.event(egui::Event::PointerMoved(pos2(5.0, 5.0)));
+    steps(&mut h);
+    assert_eq!(h.state().canvas.command_previewed, None);
+}
+
 /// Hovering a bar button previews its command on the selection; leaving the bar restores the
 /// page. The document, its selection and its revision stay as they were.
 #[test]
@@ -227,8 +276,19 @@ fn hovering_a_bar_button_previews_it_on_the_selection() {
     steps(&mut h);
     assert_eq!(h.state().canvas.command_previewed, Some(("para.alignRight".to_string(), json!({}))));
     assert_eq!(h.state().canvas.mini_anchor, Some(anchor), "the alignment preview must not move the toolbar");
+}
 
+/// With no preview shown the bar's anchor follows the selection as the page scrolls.
+#[test]
+fn the_bar_anchor_follows_the_selection_as_the_page_scrolls() {
+    let mut h = bar_over("brown fox");
+    h.state_mut().run("caret.docStart", json!({})).unwrap();
+    h.state_mut().run("text.insert", json!({"text": "x\n".repeat(150)})).unwrap();
+    h.state_mut().run("select.text", json!({"text": "brown fox"})).unwrap();
+    steps(&mut h);
     let anchored = h.state().canvas.mini_anchor.unwrap();
+    let page = h.state().canvas.viewport.unwrap();
+    h.event(egui::Event::PointerMoved(pos2(page.min.x + 20.0, page.center().y)));
     h.event(egui::Event::MouseWheel {
         unit: egui::MouseWheelUnit::Point,
         delta: egui::vec2(0.0, 120.0),

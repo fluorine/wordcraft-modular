@@ -262,7 +262,16 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
         let fams = app.previews.families();
         let recent: Vec<String> = app.ui.recent_fonts.iter().map(|f| app.previews.font_shown(f)).collect();
         let prev = app.previews.font_preview_fn();
-        if let Some(f) = widgets::font_combo_with_recent(ui, "mini_font", COMBO_FONT_W, &font, &fams, &recent, Some(&*prev)) {
+        let _ = widgets::take_hover(ui.ctx());
+        let picked = widgets::font_combo_with_recent(ui, "mini_font", COMBO_FONT_W, &font, &fams, &recent, Some(&*prev));
+        if picked.is_none()
+            && let Some(f) = widgets::take_hover(ui.ctx())
+            && f != crate::widgets::ADD_FONT
+            && f != crate::widgets::LOAD_SYSTEM_FONTS
+        {
+            app.canvas.command_preview = Some(("format.font".to_string(), json!({"name": app.previews.font_stored(&f)})));
+        }
+        if let Some(f) = picked {
             let _ = if f == crate::widgets::ADD_FONT {
                 app.run("font.add", json!({}))
             } else if f == crate::widgets::LOAD_SYSTEM_FONTS {
@@ -276,7 +285,14 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             st.get("size").and_then(Value::as_f64).map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { s.to_string() }).unwrap_or_default();
         let sizes: Vec<String> =
             wordcraft_engine::cmd::format::SIZES.iter().map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { s.to_string() }).collect();
-        if let Some(v) = widgets::combo_hint(ui, "mini_size", COMBO_SIZE_W, &size, &sizes, None, tl!("Font Size"))
+        let _ = widgets::take_hover(ui.ctx());
+        let picked = widgets::combo_hint(ui, "mini_size", COMBO_SIZE_W, &size, &sizes, None, tl!("Font Size"));
+        if picked.is_none()
+            && let Some(x) = widgets::take_hover(ui.ctx()).and_then(|v| v.trim().parse::<f64>().ok())
+        {
+            app.canvas.command_preview = Some(("format.size".to_string(), json!({"size": x})));
+        }
+        if let Some(v) = picked
             && let Ok(x) = v.trim().parse::<f64>()
         {
             let _ = app.run("format.size", json!({"size": x}));
@@ -303,7 +319,11 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             crate::widgets::ButtonAction::new("format.highlight", json!({"color": color}), false),
             sw,
             |ui, app| {
+                let _ = widgets::take_hover(ui.ctx());
                 highlight_menu(ui, app);
+                if let Some(c) = widgets::take_hover(ui.ctx()) {
+                    app.canvas.command_preview = Some(("format.highlight".to_string(), json!({"color": c})));
+                }
             },
         );
         let fc = app.canvas.last_font_color.clone();
@@ -316,7 +336,11 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             crate::widgets::ButtonAction::new("format.color", json!({"color": fc}), false),
             sw,
             |ui, app| {
+                let _ = widgets::take_hover(ui.ctx());
                 font_color_menu(ui, app);
+                if let Some(c) = widgets::take_hover(ui.ctx()) {
+                    app.canvas.command_preview = Some(("format.color".to_string(), json!({"color": c})));
+                }
             },
         );
         sep(ui, t);
@@ -362,6 +386,9 @@ pub(crate) fn highlight_menu(ui: &mut egui::Ui, app: &mut WordApp) {
             let Some(c) = h.rgb() else { continue };
             let (r, resp) = ui.allocate_exact_size(Vec2::new(18.0, 18.0), Sense::click());
             ui.painter().rect_filled(r, 2.0, egui::Color32::from_rgb(c.0, c.1, c.2));
+            if resp.hovered() {
+                widgets::note_hover(ui.ctx(), h.ooxml().to_string());
+            }
             if resp.on_hover_text(h.name()).clicked() {
                 app.canvas.last_highlight = h.ooxml().to_string();
                 widgets::run_from_ribbon(app, "format.highlight", json!({"color": h.ooxml()}));
@@ -373,7 +400,11 @@ pub(crate) fn highlight_menu(ui: &mut egui::Ui, app: &mut WordApp) {
         }
     });
     let enabled = widgets::enabled(app, "format.highlight");
-    if ui.add_enabled(enabled, egui::Button::new(tl!("No Color")).min_size(Vec2::new(200.0, 0.0))).clicked() {
+    let no_color = ui.add_enabled(enabled, egui::Button::new(tl!("No Color")).min_size(Vec2::new(200.0, 0.0)));
+    if no_color.hovered() {
+        widgets::note_hover(ui.ctx(), "none".to_string());
+    }
+    if no_color.clicked() {
         app.canvas.last_highlight = "none".into();
         widgets::run_from_ribbon(app, "format.highlight", json!({"color": "none"}));
         ui.close();
@@ -383,7 +414,11 @@ pub(crate) fn highlight_menu(ui: &mut egui::Ui, app: &mut WordApp) {
 /// Font colour: Automatic, the colour grid, Recent Colors and More Colors… (#606).
 fn font_color_menu(ui: &mut egui::Ui, app: &mut WordApp) {
     egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
-        if ui.selectable_label(false, "Automatic").clicked() {
+        let automatic = ui.selectable_label(false, "Automatic");
+        if automatic.hovered() {
+            widgets::note_hover(ui.ctx(), "auto".to_string());
+        }
+        if automatic.clicked() {
             widgets::run_from_ribbon(app, "format.color", json!({"color": "auto"}));
             ui.close();
             return;

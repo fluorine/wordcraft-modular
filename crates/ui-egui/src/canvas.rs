@@ -1316,6 +1316,35 @@ fn finish_canvas_frame(finish: CanvasFinish<'_>, out: egui::scroll_area::ScrollA
 /// Lays out and paints the document pages for print, Read and Web views, settles viewports, draw
 /// rulers and overlays, anchors zoom and scrolling, and routes pointer, selection, IME and caret
 /// input.
+/// The live selection's rects on screen, from the document's own layout rather than a command
+/// preview's, which can move the lines (Align Right) from under the mini toolbar's pointer.
+fn live_selection_screen_rects(app: &mut WordApp, rects: &[Rect], scale: f32) -> Vec<Rect> {
+    let layout = app.session.layout();
+    let selected: Vec<_> = if crate::objects::selected(app).is_some() {
+        Vec::new()
+    } else if let Some(range) = app.session.cell_range() {
+        wordcraft_engine::cmd::table_mouse::cell_rects(&layout, &app.session.doc, range)
+    } else if !app.session.sel.is_collapsed() {
+        match app.session.column_segments() {
+            Some(segs) => segs.iter().flat_map(|(a, b)| layout.selection_rects(&app.session.doc, a, b, app.session.page_hint)).collect(),
+            None => {
+                let (a, b) = app.session.sel.ordered();
+                wordcraft_engine::cmd::table_mouse::selection_rects(&layout, &app.session.doc, &a, &b, app.session.page_hint)
+            }
+        }
+    } else {
+        Vec::new()
+    };
+    selected
+        .into_iter()
+        .filter_map(|(pi, r)| {
+            let pr = rects.get(pi)?;
+            let scale = layout.pages.get(pi).map_or(scale, |page| page_screen_scale(*pr, page, scale));
+            Some(Rect::from_min_size(pos2(pr.min.x + r.x * scale, pr.min.y + r.y * scale), vec2(r.w * scale, r.h * scale)))
+        })
+        .collect()
+}
+
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let full = ui.available_rect_before_wrap();
@@ -1440,34 +1469,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         // Alignment previews can move the selected text while the pointer is still over a mini
         // toolbar button. Keep the bar anchored to the live selection until the preview ends, or
         // it can move out from under the pointer and flicker between preview and live layouts.
-        let anchor_rects = if app.canvas.command_previewed.is_some() {
-            let live_layout = app.session.layout();
-            let live_selected: Vec<_> = if crate::objects::selected(app).is_some() {
-                Vec::new()
-            } else if let Some(range) = app.session.cell_range() {
-                wordcraft_engine::cmd::table_mouse::cell_rects(&live_layout, &app.session.doc, range)
-            } else if !app.session.sel.is_collapsed() {
-                match app.session.column_segments() {
-                    Some(segs) => segs.iter().flat_map(|(a, b)| live_layout.selection_rects(&app.session.doc, a, b, app.session.page_hint)).collect(),
-                    None => {
-                        let (a, b) = app.session.sel.ordered();
-                        wordcraft_engine::cmd::table_mouse::selection_rects(&live_layout, &app.session.doc, &a, &b, app.session.page_hint)
-                    }
-                }
-            } else {
-                Vec::new()
-            };
-            live_selected
-                .into_iter()
-                .filter_map(|(pi, r)| {
-                    let pr = rects.get(pi)?;
-                    let scale = live_layout.pages.get(pi).map_or(geo.scale, |page| page_screen_scale(*pr, page, geo.scale));
-                    Some(Rect::from_min_size(pos2(pr.min.x + r.x * scale, pr.min.y + r.y * scale), vec2(r.w * scale, r.h * scale)))
-                })
-                .collect()
-        } else {
-            screen_rects
-        };
+        let anchor_rects = if app.canvas.command_previewed.is_some() { live_selection_screen_rects(app, &rects, geo.scale) } else { screen_rects };
         app.canvas.mini_anchor = crate::mini_toolbar::visible_anchor(anchor_rects, visible_clip);
         // Content controls: the frame of the one the caret is in (all of them in Design Mode).
         crate::content_controls::paint(app, &painter, &t, &layout, &rects, geo.scale);
