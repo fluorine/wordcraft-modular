@@ -58,6 +58,25 @@ pub(crate) fn take_hover(ctx: &egui::Context) -> Option<String> {
     seen.filter(|(p, _)| *p == pass).map(|(_, v)| v)
 }
 
+fn current_key() -> egui::Id {
+    egui::Id::unique("wc_pick_current")
+}
+
+/// The colour (hex, or a name the menu uses) a palette marks as the one in effect; `None` marks
+/// nothing. The caller sets it before drawing a menu and clears it after.
+pub(crate) fn set_current_pick(ctx: &egui::Context, current: Option<String>) {
+    ctx.data_mut(|d| match current {
+        Some(c) => {
+            d.insert_temp(current_key(), c);
+        }
+        None => d.remove::<String>(current_key()),
+    });
+}
+
+pub(crate) fn current_pick(ctx: &egui::Context) -> Option<String> {
+    ctx.data(|d| d.get_temp::<String>(current_key()))
+}
+
 pub(crate) fn swatch(ui: &mut Ui, c: wordcraft_doc::Rgb) -> bool {
     let (r, resp) = ui.allocate_exact_size(vec2(15.0, 15.0), Sense::click());
     ui.painter().rect_filled(r, 0.0, Color32::from_rgb(c.0, c.1, c.2));
@@ -70,6 +89,9 @@ pub(crate) fn swatch(ui: &mut Ui, c: wordcraft_doc::Rgb) -> bool {
     );
     if resp.hovered() {
         note_hover(ui.ctx(), c.hex());
+    }
+    if current_pick(ui.ctx()).is_some_and(|cur| cur.eq_ignore_ascii_case(&c.hex())) {
+        ui.painter().rect_stroke(r.expand(1.0), 0.0, Stroke::new(2.0, t.accent), egui::StrokeKind::Outside);
     }
     resp.on_hover_text(format!("#{}", c.hex())).clicked()
 }
@@ -512,7 +534,8 @@ struct RowDrawOptions<'rows, 'text> {
 fn draw_rows(ui: &mut Ui, options: RowDrawOptions<'_, '_>) -> Option<String> {
     let RowDrawOptions { width, current, range, row, highlight, preview, row_height: row_h } = options;
     let mut out = None;
-    let fill = Tokens::get(ui.ctx()).checked;
+    let tokens = Tokens::get(ui.ctx());
+    let (fill, accent) = (tokens.checked, tokens.accent);
     ui.set_min_width(width + 60.0);
     for k in range {
         let it = match row(k) {
@@ -529,6 +552,11 @@ fn draw_rows(ui: &mut Ui, options: RowDrawOptions<'_, '_>) -> Option<String> {
                 if lit {
                     let r = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), row_h));
                     ui.painter().rect_filled(r, 3.0, fill);
+                }
+                if it == current {
+                    let r = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), row_h));
+                    ui.painter().rect_filled(r, 3.0, fill);
+                    ui.painter().rect_filled(Rect::from_min_size(r.min, vec2(3.0, row_h)), 1.5, accent);
                 }
                 let resp = p(ui, it);
                 if resp.hovered() {

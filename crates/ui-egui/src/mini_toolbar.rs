@@ -320,7 +320,10 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             sw,
             |ui, app| {
                 let _ = widgets::take_hover(ui.ctx());
+                let in_effect = st.get("highlight").and_then(Value::as_str).unwrap_or("none").to_string();
+                widgets::set_current_pick(ui.ctx(), Some(in_effect));
                 highlight_menu(ui, app);
+                widgets::set_current_pick(ui.ctx(), None);
                 if let Some(c) = widgets::take_hover(ui.ctx()) {
                     app.canvas.command_preview = Some(("format.highlight".to_string(), json!({"color": c})));
                 }
@@ -338,7 +341,9 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             sw,
             |ui, app| {
                 let _ = widgets::take_hover(ui.ctx());
+                widgets::set_current_pick(ui.ctx(), st.get("color").and_then(Value::as_str).map(str::to_string));
                 font_color_menu(ui, app);
+                widgets::set_current_pick(ui.ctx(), None);
                 if let Some(c) = widgets::take_hover(ui.ctx()) {
                     app.canvas.command_preview = Some(("format.color".to_string(), json!({"color": c})));
                 }
@@ -396,6 +401,10 @@ pub(crate) fn highlight_menu(ui: &mut egui::Ui, app: &mut WordApp) {
             if resp.hovered() {
                 widgets::note_hover(ui.ctx(), h.ooxml().to_string());
             }
+            if widgets::current_pick(ui.ctx()).is_some_and(|cur| cur.eq_ignore_ascii_case(&c.hex())) {
+                let accent = Tokens::get(ui.ctx()).accent;
+                ui.painter().rect_stroke(r.expand(1.0), 2.0, egui::Stroke::new(2.0, accent), egui::StrokeKind::Outside);
+            }
             if resp.on_hover_text(h.name()).clicked() {
                 app.canvas.last_highlight = h.ooxml().to_string();
                 widgets::run_from_ribbon(app, "format.highlight", json!({"color": h.ooxml()}));
@@ -407,7 +416,8 @@ pub(crate) fn highlight_menu(ui: &mut egui::Ui, app: &mut WordApp) {
         }
     });
     let enabled = widgets::enabled(app, "format.highlight");
-    let no_color = ui.add_enabled(enabled, egui::Button::new(tl!("No Color")).min_size(Vec2::new(200.0, 0.0)));
+    let none_in_effect = widgets::current_pick(ui.ctx()).is_some_and(|cur| cur == "none");
+    let no_color = ui.add_enabled(enabled, egui::Button::new(tl!("No Color")).selected(none_in_effect).min_size(Vec2::new(200.0, 0.0)));
     if no_color.hovered() {
         widgets::note_hover(ui.ctx(), "none".to_string());
     }
@@ -421,7 +431,8 @@ pub(crate) fn highlight_menu(ui: &mut egui::Ui, app: &mut WordApp) {
 /// Font colour: Automatic, the colour grid, Recent Colors and More Colors… (#606).
 fn font_color_menu(ui: &mut egui::Ui, app: &mut WordApp) {
     egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
-        let automatic = ui.selectable_label(false, "Automatic");
+        let auto_in_effect = widgets::current_pick(ui.ctx()).is_some_and(|cur| cur == "auto");
+        let automatic = ui.selectable_label(auto_in_effect, "Automatic");
         if automatic.hovered() {
             widgets::note_hover(ui.ctx(), "auto".to_string());
         }
