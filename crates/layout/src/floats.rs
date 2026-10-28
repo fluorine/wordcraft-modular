@@ -454,9 +454,6 @@ pub(crate) fn object_groups(ctx: &mut Ctx, req: &ObjectPlacement) -> Vec<ObjGrou
     // their order in the paragraph. Inline objects and objects without one keep their order.
     let mut placed: Vec<ObjGroup> = Vec::new();
     let mut pin_placed: Vec<ObjGroup> = Vec::new();
-    // The highest order so far: an object without one (inserted here) stacks above the objects
-    // before it, as the writer gives it the next order up on save.
-    let mut z_top = 0u32;
     let Some(fl) = pl.lines.get(l0) else { return Vec::new() };
     // Objects left out of the layout (hidden, or deleted in the final text) aren't placed.
     let left_out = left_out_objects(ctx.doc, p, at.table_chr, ctx.opts.show_hidden, ctx.hide_deleted);
@@ -542,17 +539,14 @@ pub(crate) fn object_groups(ctx: &mut Ctx, req: &ObjectPlacement) -> Vec<ObjGrou
                 if let Some(pin) = ctx.pin.as_mut()
                     && pin.seen.insert((path.to_vec(), c.start))
                 {
-                    pin_placed.push((floating.then(|| u64::from(float.z)), behind, front));
+                    pin_placed.push((floating.then(|| if float.z == 0 { u64::MAX } else { u64::from(float.z) }), behind, front));
                 }
                 continue;
             }
-            let z = if floating && float.z > 0 {
-                z_top = z_top.max(float.z);
-                float.z
-            } else {
-                z_top
-            };
-            placed.push((floating.then(|| u64::from(z)), behind, front));
+            // Zero means this object has no stored stacking order. It must be above every stored
+            // order, including u32::MAX, regardless of the order in which anchors are visited.
+            let z = if float.z == 0 { u64::MAX } else { u64::from(float.z) };
+            placed.push((floating.then_some(z), behind, front));
         }
     }
     if !pin_placed.is_empty()
