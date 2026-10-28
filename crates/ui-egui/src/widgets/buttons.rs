@@ -38,20 +38,21 @@ pub(crate) fn bg(ui: &Ui, r: Rect, resp: &Response, checked: bool, t: &Tokens) {
     bg_if(ui, r, resp, checked, t, true);
 }
 
-/// Paints a button background with an optional hover/press response. Disabled ribbon commands
-/// pass `false` so their visual state cannot imply that they are interactive.
+/// [`bg`] for a button that may be disabled: that one answers neither hover nor press.
 pub(crate) fn bg_if(ui: &Ui, r: Rect, resp: &Response, checked: bool, t: &Tokens, on: bool) {
-    let hover = ui.ctx().animate_bool_responsive(resp.id.with("hover"), resp.hovered() && on);
+    let over = resp.hovered() && on;
+    // The hover fades in and out; with animations off egui's animation time is zero.
+    let h = ui.ctx().animate_bool_responsive(resp.id.with("hover"), over);
     let fill = if resp.is_pointer_button_down_on() && on {
         t.pressed
     } else if checked {
         t.checked
-    } else if hover > 0.0 {
-        Color32::TRANSPARENT.lerp_to_gamma(t.hover, hover)
+    } else if h > 0.0 {
+        Color32::TRANSPARENT.lerp_to_gamma(t.hover, h)
     } else {
         return;
     };
-    ui.painter().rect_filled(r, CornerRadius::same(4), fill);
+    ui.painter().rect_filled(r, CornerRadius::same(4), crate::ribbon_blur::button_fill(ui.ctx(), fill));
     if checked {
         ui.painter().rect_stroke(r, CornerRadius::same(4), Stroke::new(1.0, t.accent.linear_multiply(0.5)), egui::StrokeKind::Inside);
     }

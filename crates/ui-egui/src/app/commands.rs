@@ -767,6 +767,15 @@ impl WordApp {
                 }
                 json!({"caretAnimation": self.ui.caret_animation})
             }
+            "ui.ribbonBlur" => {
+                // `value` true or false turns the blur under the ribbon on or off; no value reads it.
+                match p.get("value") {
+                    None => {}
+                    Some(Value::Bool(on)) => self.ui.ribbon_blur = *on,
+                    Some(_) => return Some(Err("`value` must be true or false".into())),
+                }
+                json!({"ribbonBlur": self.ui.ribbon_blur})
+            }
             "ui.alignmentGuides" => {
                 // File › Options › Advanced › Editing: `value` true or false turns snapping to
                 // alignment guides while moving pictures and shapes on or off; no value reads it.
@@ -1039,6 +1048,7 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.makeDefaultApp"
             | "ui.discord"
             | "ui.caretAnimation"
+            | "ui.ribbonBlur"
             | "ui.startScreen"
             | "ui.checkForUpdates"
     ) || id.starts_with("help.")

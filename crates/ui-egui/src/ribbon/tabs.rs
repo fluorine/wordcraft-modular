@@ -153,85 +153,17 @@ pub(super) fn ease_out_cubic(p: f32) -> f32 {
     1.0 - (1.0 - p.clamp(0.0, 1.0)).powi(3)
 }
 
-const UNDERLINE_SLIDE_SECS: f64 = 0.2;
-const CONTENT_SWITCH_SECS: f64 = 0.16;
-pub(super) const CONTENT_SWITCH_SLIDE: f32 = 14.0;
-
-#[derive(Clone, Debug, PartialEq)]
-struct Underline {
-    tab: String,
-    from: (f32, f32),
-    to: (f32, f32),
-    start: f64,
-}
-
-fn underline_at(u: &Underline, now: f64) -> (f32, f32) {
-    let e = ease_out_cubic(((now - u.start) / UNDERLINE_SLIDE_SECS) as f32);
-    (egui::lerp(u.from.0..=u.to.0, e), egui::lerp(u.from.1..=u.to.1, e))
-}
-
-pub(super) fn slide_underline(ui: &egui::Ui, tab: &str, target: egui::Rect, color: egui::Color32, now: f64, animate: bool) {
-    let id = egui::Id::unique("tab_underline");
-    let prev: Option<Underline> = ui.ctx().data(|d| d.get_temp(id));
-    let snap = Underline { tab: tab.to_owned(), from: (target.center().x, target.width()), to: (target.center().x, target.width()), start: now };
-    let next = match prev {
-        Some(p) if animate && p.tab != tab => Underline { from: underline_at(&p, now), ..snap },
-        Some(p) if animate && now - p.start < UNDERLINE_SLIDE_SECS => Underline { to: (target.center().x, target.width()), ..p },
-        _ => snap,
-    };
-    let (x, width) = underline_at(&next, now);
-    if next.from != next.to && now - next.start < UNDERLINE_SLIDE_SECS {
-        ui.ctx().request_repaint();
-    }
-    ui.ctx().data_mut(|d| d.insert_temp(id, next));
-    ui.painter().rect_filled(egui::Rect::from_center_size(egui::pos2(x, target.center().y), egui::vec2(width, target.height())), 2.0, color);
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct TabChange {
-    tab: String,
-    index: usize,
-    start: f64,
-    dir: f32,
-}
-
-pub(super) fn tab_content_entry(ctx: &egui::Context, tab: &str, index: usize, now: f64, animate: bool) -> (f32, f32) {
-    let id = egui::Id::unique("ribbon_tab_change");
-    let prev: Option<TabChange> = ctx.data(|d| d.get_temp(id));
-    let next = match prev {
-        Some(p) if p.tab != tab => TabChange {
-            tab: tab.to_owned(),
-            index,
-            start: now,
-            dir: if !animate || p.index == index {
-                0.0
-            } else if index > p.index {
-                1.0
-            } else {
-                -1.0
-            },
-        },
-        Some(p) => p,
-        None => TabChange { tab: tab.to_owned(), index, start: f64::MIN, dir: 0.0 },
-    };
-    let p = ((now - next.start) / CONTENT_SWITCH_SECS).clamp(0.0, 1.0) as f32;
-    let dir = next.dir;
-    ctx.data_mut(|d| d.insert_temp(id, next));
-    if p < 1.0 && dir != 0.0 {
-        ctx.request_repaint();
-        (ease_out_cubic(p), dir)
-    } else {
-        (1.0, 0.0)
-    }
-}
-
-/// Track contextual tabs between frames and return those still animating out.
+/// Notes the contextual tabs shown this frame (each with its place in the strip), starts the
+/// entry of those that were not shown the frame before, and returns the tabs that just left,
+/// each with its old place and the time it left, while they still fade away (none with
+/// animations off). The first frame starts nothing: tabs already there do not slide.
 pub(super) fn note_contextual_tabs(ctx: &egui::Context, shown: &[(&str, usize)], now: f64, animate: bool) -> Vec<(String, usize, f64)> {
     let (shown_id, leaving_id) = (egui::Id::unique("contextual_tabs_shown"), egui::Id::unique("contextual_tabs_leaving"));
     let prev: Option<Vec<(String, usize)>> = ctx.data(|d| d.get_temp(shown_id));
     let mut leaving: Vec<(String, usize, f64)> = ctx.data(|d| d.get_temp(leaving_id)).unwrap_or_default();
     leaving.retain(|(n, _, start)| animate && now - start < TAB_ENTRY_SECS && !shown.iter().any(|(s, _)| s == n));
-    // Count retained ghosts when storing positions, so exits from different frames share one layout.
+    // Positions in the stored shown list must count retained ghosts too, or tabs leaving on
+    // different frames are reinserted using indices from different layouts.
     let shown_with_ghosts: Vec<(&str, usize)> = shown
         .iter()
         .map(|(tab, at)| {
@@ -256,7 +188,8 @@ pub(super) fn note_contextual_tabs(ctx: &egui::Context, shown: &[(&str, usize)],
     leaving
 }
 
-/// Return a newly shown contextual tab's progress, requesting frames until it settles.
+/// How far a contextual tab's entry has come: 0 as it appears, 1 once settled (always 1 with
+/// animations off). Asks for repaints while it moves.
 pub(super) fn tab_entry(ctx: &egui::Context, tab: &str, now: f64, animate: bool) -> f32 {
     let start: Option<f64> = ctx.data(|d| d.get_temp(egui::Id::unique(("contextual_tab_entry", tab))));
     let Some(start) = start.filter(|_| animate) else { return 1.0 };
@@ -265,6 +198,97 @@ pub(super) fn tab_entry(ctx: &egui::Context, tab: &str, now: f64, animate: bool)
         ctx.request_repaint();
     }
     ease_out_cubic(p)
+}
+
+/// How long the underline takes to slide to a newly chosen tab, seconds.
+pub(super) const UNDERLINE_SLIDE_SECS: f64 = 0.2;
+/// How long the ribbon's content takes to fade and slide in after a tab change, seconds.
+pub(super) const CONTENT_SWITCH_SECS: f64 = 0.16;
+/// How far, in points, the new content starts to the side of its place.
+pub(super) const CONTENT_SWITCH_SLIDE: f32 = 14.0;
+
+/// The tab underline: its centre and width (`from`, `to`) and when it set off.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct Underline {
+    pub(super) tab: String,
+    pub(super) from: (f32, f32),
+    pub(super) to: (f32, f32),
+    pub(super) start: f64,
+}
+
+/// The underline once the active tab is at `target` (centre, width): a new tab starts a slide from
+/// where the underline is now, the same tab only follows its tab (a resized window).
+pub(super) fn next_underline(prev: Option<&Underline>, tab: &str, target: (f32, f32), now: f64, animate: bool) -> Underline {
+    let snap = Underline { tab: tab.to_string(), from: target, to: target, start: now };
+    match prev {
+        Some(p) if animate && p.tab != tab => Underline { from: underline_at(p, now), ..snap },
+        Some(p) if animate && now - p.start < UNDERLINE_SLIDE_SECS => Underline { to: target, ..p.clone() },
+        _ => snap,
+    }
+}
+
+/// Where the underline is `now`: sliding from its old place to its new one, fast at first.
+pub(super) fn underline_at(u: &Underline, now: f64) -> (f32, f32) {
+    let e = ease_out_cubic(((now - u.start) / UNDERLINE_SLIDE_SECS) as f32);
+    (egui::lerp(u.from.0..=u.to.0, e), egui::lerp(u.from.1..=u.to.1, e))
+}
+
+/// Draws the underline under the active tab, sliding it from the tab chosen before.
+pub(super) fn slide_underline(ui: &Ui, tab: &str, target: Rect, color: egui::Color32, now: f64, animate: bool) {
+    let id = egui::Id::unique("tab_underline");
+    let prev: Option<Underline> = ui.ctx().data(|d| d.get_temp(id));
+    let next = next_underline(prev.as_ref(), tab, (target.center().x, target.width()), now, animate);
+    if next.from != next.to && now - next.start < UNDERLINE_SLIDE_SECS {
+        ui.ctx().request_repaint();
+    }
+    let (x, w) = underline_at(&next, now);
+    ui.ctx().data_mut(|d| d.insert_temp(id, next));
+    ui.painter().rect_filled(Rect::from_center_size(pos2(x, target.center().y), vec2(w, target.height())), 2.0, color);
+}
+
+/// The last tab change: when it happened and which way it went (+1 towards the end of the strip,
+/// -1 towards the start, 0 for none).
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct TabChange {
+    pub(super) tab: String,
+    pub(super) index: usize,
+    pub(super) start: f64,
+    pub(super) dir: f32,
+}
+
+pub(super) fn next_tab_change(prev: Option<&TabChange>, tab: &str, index: usize, now: f64, animate: bool) -> TabChange {
+    let same = TabChange { tab: tab.to_string(), index, start: prev.map_or(f64::MIN, |p| p.start), dir: prev.map_or(0.0, |p| p.dir) };
+    match prev {
+        Some(p) if p.tab != tab => {
+            let dir = if !animate || index == p.index {
+                0.0
+            } else if index > p.index {
+                1.0
+            } else {
+                -1.0
+            };
+            TabChange { start: now, dir, ..same }
+        }
+        Some(_) => same,
+        None => TabChange { start: f64::MIN, dir: 0.0, ..same },
+    }
+}
+
+/// How far the ribbon's content has come after a tab change, eased: 0 as the tab changes, 1 once
+/// settled, with the side it comes from (+1 from the right, -1 from the left).
+pub(super) fn tab_content_entry(ctx: &egui::Context, tab: &str, index: usize, now: f64, animate: bool) -> (f32, f32) {
+    let id = egui::Id::unique("ribbon_tab_change");
+    let prev: Option<TabChange> = ctx.data(|d| d.get_temp(id));
+    let next = next_tab_change(prev.as_ref(), tab, index, now, animate);
+    let p = ((now - next.start) / CONTENT_SWITCH_SECS).clamp(0.0, 1.0) as f32;
+    let dir = next.dir;
+    ctx.data_mut(|d| d.insert_temp(id, next));
+    if p < 1.0 && dir != 0.0 {
+        ctx.request_repaint();
+        (ease_out_cubic(p), dir)
+    } else {
+        (1.0, 0.0)
+    }
 }
 
 /// Which tabs fit on a strip `avail` points wide (#897), from each tab's width and whether it must
@@ -373,80 +397,4 @@ pub fn plan_strip(tabs: &[TabSpec], buttons: [f32; 3], avail: f32, more: f32) ->
 /// Whether the caret is inside a table (so the contextual tabs and their badges are shown).
 pub fn in_table_public(app: &WordApp) -> bool {
     app.session.sel.focus.path.cell().is_some()
-}
-
-#[cfg(test)]
-mod transition_tests {
-    use super::*;
-
-    /// Contextual tabs absent on the first frame do not animate; a newly shown one eases to rest.
-    #[test]
-    fn a_new_contextual_tab_eases_in() {
-        let ctx = egui::Context::default();
-        note_contextual_tabs(&ctx, &[("Table Design", 1)], 1.0, true);
-        assert_eq!(tab_entry(&ctx, "Table Design", 1.0, true), 1.0, "tabs already there do not slide");
-        note_contextual_tabs(&ctx, &[("Table Design", 1), ("Picture Format", 2)], 2.0, true);
-        let at = |secs: f64| tab_entry(&ctx, "Picture Format", 2.0 + secs, true);
-        assert_eq!(at(0.0), 0.0);
-        let (a, b, c) = (at(0.1), at(0.2), at(TAB_ENTRY_SECS));
-        assert!(0.0 < a && a < b && b < c && c == 1.0, "{a} {b} {c}");
-        assert!(a > 0.1 / TAB_ENTRY_SECS as f32, "faster than linear at the start: {a}");
-        assert!(c - b < b - a, "slower at the end: {a} {b} {c}");
-        assert_eq!(tab_entry(&ctx, "Picture Format", 2.0, false), 1.0, "animations off");
-        note_contextual_tabs(&ctx, &[("Table Design", 1), ("Picture Format", 2)], 3.0, true);
-        assert_eq!(tab_entry(&ctx, "Picture Format", 3.0, true), 1.0, "staying shown does not restart it");
-    }
-
-    /// A departing contextual tab remains for one exit and stops when motion is disabled.
-    #[test]
-    fn a_contextual_tab_that_goes_away_leaves_gently() {
-        let ctx = egui::Context::default();
-        let both = [("Table Design", 1), ("Picture Format", 2)];
-        assert!(note_contextual_tabs(&ctx, &both, 1.0, true).is_empty());
-        let leaving = note_contextual_tabs(&ctx, &both[..1], 2.0, true);
-        assert_eq!(leaving, vec![("Picture Format".to_string(), 2, 2.0)]);
-        assert_eq!(note_contextual_tabs(&ctx, &both[..1], 2.2, true).len(), 1, "still leaving");
-        assert!(note_contextual_tabs(&ctx, &both[..1], 2.0 + TAB_ENTRY_SECS + 0.01, true).is_empty(), "gone");
-        assert!(note_contextual_tabs(&ctx, &both, 4.0, true).is_empty());
-        assert!(note_contextual_tabs(&ctx, &both[..1], 5.0, false).is_empty(), "animations off");
-        note_contextual_tabs(&ctx, &both, 6.0, true);
-        note_contextual_tabs(&ctx, &both[..1], 7.0, true);
-        assert!(note_contextual_tabs(&ctx, &both, 7.1, true).is_empty(), "back again");
-    }
-
-    #[test]
-    fn tab_underline_slides_and_can_reverse_mid_motion() {
-        let ctx = egui::Context::default();
-        let draw = |tab: &str, x: f32, now: f64| {
-            ctx.run_ui(egui::RawInput { time: Some(now), ..Default::default() }, |ui| {
-                slide_underline(
-                    ui,
-                    tab,
-                    egui::Rect::from_min_size(egui::pos2(x - 25.0, 10.0), egui::vec2(50.0, 3.0)),
-                    egui::Color32::WHITE,
-                    now,
-                    true,
-                );
-            })
-            .drop_without_applying_deltas();
-        };
-        draw("Home", 40.0, 1.0);
-        draw("Insert", 140.0, 2.0);
-        let frame = ctx.run_ui(egui::RawInput { time: Some(2.1), ..Default::default() }, |ui| {
-            slide_underline(ui, "Draw", egui::Rect::from_min_size(egui::pos2(215.0, 10.0), egui::vec2(50.0, 3.0)), egui::Color32::WHITE, 2.1, true);
-        });
-        assert!(!frame.shapes.is_empty());
-    }
-
-    #[test]
-    fn tab_content_motion_comes_from_the_new_tab_side() {
-        let ctx = egui::Context::default();
-        assert_eq!(tab_content_entry(&ctx, "Home", 1, 1.0, true), (1.0, 0.0));
-        let (p, dir) = tab_content_entry(&ctx, "Insert", 2, 2.0, true);
-        assert_eq!((p, dir), (0.0, 1.0));
-        let (p, dir) = tab_content_entry(&ctx, "Home", 1, 2.05, true);
-        assert!(p < 1.0);
-        assert_eq!(dir, -1.0);
-        assert_eq!(tab_content_entry(&ctx, "Draw", 3, 3.0, false), (1.0, 0.0));
-    }
 }
