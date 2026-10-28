@@ -282,6 +282,32 @@ pub struct CanvasState {
     table_preview_layout: Option<(TablePreviewKey, wordcraft_doc::Document, wordcraft_engine::Selection, std::sync::Arc<DocLayout>)>,
 }
 
+fn prepare_ime_preedit(app: &mut WordApp, ui: &Ui, layout: &DocLayout, cursor_width: f32) -> Option<(wordcraft_layout::StyleRun, f32)> {
+    if !app.want_system_cjk && app.canvas.ime_preedit.chars().any(wordcraft_fonts::is_cjk) {
+        app.want_system_cjk = true;
+        ui.ctx().request_repaint();
+    }
+    let new = crate::theme::faces_for_preedit(&app.canvas.ime_preedit, &app.canvas.ime_faces, crate::theme::caption_char_covered, |c| {
+        wordcraft_fonts::FontDb::global().fallback_for(c, u32::MAX)
+    });
+    let typing = if cursor_width == 0.0 { layout.typing_style(&app.session.sel.focus, app.session.page_hint) } else { None };
+    let face = typing.as_ref().map(|(run, _)| run.requested_face);
+    if !new.is_empty() || face != app.canvas.ime_face {
+        app.canvas.ime_faces.extend(new);
+        app.canvas.ime_face = face;
+        crate::theme::install_fonts_language_extra(
+            ui.ctx(),
+            app.fonts_hans,
+            app.fonts_korean,
+            app.fonts_system_cjk,
+            &app.canvas.ime_faces,
+            app.canvas.ime_face,
+        );
+        ui.ctx().request_repaint();
+    }
+    typing
+}
+
 type TablePreviewKey = ((usize, usize, u64, u64, wordcraft_engine::Selection), std::sync::Arc<DocLayout>);
 /// Whether page content is drawn dark: Read Mode uses its page color; other views use Switch Modes.
 pub(crate) fn dark_page(app: &WordApp) -> bool {
@@ -1544,28 +1570,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             let mut preedit_color = None;
             let mut ime_dx = 0.0;
             if focused && !app.canvas.ime_preedit.is_empty() {
-                if !app.want_system_cjk && app.canvas.ime_preedit.chars().any(wordcraft_fonts::is_cjk) {
-                    app.want_system_cjk = true;
-                    ui.ctx().request_repaint();
-                }
-                let new = crate::theme::faces_for_preedit(&app.canvas.ime_preedit, &app.canvas.ime_faces, crate::theme::caption_char_covered, |c| {
-                    wordcraft_fonts::FontDb::global().fallback_for(c, u32::MAX)
-                });
-                let typing = if c.width == 0.0 { layout.typing_style(&app.session.sel.focus, app.session.page_hint) } else { None };
-                let face = typing.as_ref().map(|(run, _)| run.requested_face);
-                if !new.is_empty() || face != app.canvas.ime_face {
-                    app.canvas.ime_faces.extend(new);
-                    app.canvas.ime_face = face;
-                    crate::theme::install_fonts_language_extra(
-                        ui.ctx(),
-                        app.fonts_hans,
-                        app.fonts_korean,
-                        app.fonts_system_cjk,
-                        &app.canvas.ime_faces,
-                        app.canvas.ime_face,
-                    );
-                    ui.ctx().request_repaint();
-                }
+                let typing = prepare_ime_preedit(app, ui, &layout, c.width);
                 let color = caret_color(app);
                 let family = crate::theme::composition_family();
                 let bound = ui.ctx().fonts(|f| f.definitions().families.contains_key(&family));
