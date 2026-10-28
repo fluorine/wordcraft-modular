@@ -227,6 +227,17 @@ fn hovering_a_bar_button_previews_it_on_the_selection() {
     steps(&mut h);
     assert_eq!(h.state().canvas.command_previewed, Some(("para.alignRight".to_string(), json!({}))));
     assert_eq!(h.state().canvas.mini_anchor, Some(anchor), "the alignment preview must not move the toolbar");
+
+    let anchored = h.state().canvas.mini_anchor.unwrap();
+    h.event(egui::Event::MouseWheel {
+        unit: egui::MouseWheelUnit::Point,
+        delta: egui::vec2(0.0, 120.0),
+        phase: egui::TouchPhase::Start,
+        modifiers: Default::default(),
+        source: egui::MouseWheelSource::Unknown,
+    });
+    steps(&mut h);
+    assert_ne!(h.state().canvas.mini_anchor, Some(anchored), "the toolbar anchor follows the live selection as the viewport scrolls");
 }
 
 /// #2959: formatting must be available alongside the text's right-click menu, using the

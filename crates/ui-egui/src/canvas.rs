@@ -1440,9 +1440,35 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         // Alignment previews can move the selected text while the pointer is still over a mini
         // toolbar button. Keep the bar anchored to the live selection until the preview ends, or
         // it can move out from under the pointer and flicker between preview and live layouts.
-        if app.canvas.command_previewed.is_none() {
-            app.canvas.mini_anchor = crate::mini_toolbar::visible_anchor(screen_rects, visible_clip);
-        }
+        let anchor_rects = if app.canvas.command_previewed.is_some() {
+            let live_layout = app.session.layout();
+            let live_selected: Vec<_> = if crate::objects::selected(app).is_some() {
+                Vec::new()
+            } else if let Some(range) = app.session.cell_range() {
+                wordcraft_engine::cmd::table_mouse::cell_rects(&live_layout, &app.session.doc, range)
+            } else if !app.session.sel.is_collapsed() {
+                match app.session.column_segments() {
+                    Some(segs) => segs.iter().flat_map(|(a, b)| live_layout.selection_rects(&app.session.doc, a, b, app.session.page_hint)).collect(),
+                    None => {
+                        let (a, b) = app.session.sel.ordered();
+                        wordcraft_engine::cmd::table_mouse::selection_rects(&live_layout, &app.session.doc, &a, &b, app.session.page_hint)
+                    }
+                }
+            } else {
+                Vec::new()
+            };
+            live_selected
+                .into_iter()
+                .filter_map(|(pi, r)| {
+                    let pr = rects.get(pi)?;
+                    let scale = live_layout.pages.get(pi).map_or(geo.scale, |page| page_screen_scale(*pr, page, geo.scale));
+                    Some(Rect::from_min_size(pos2(pr.min.x + r.x * scale, pr.min.y + r.y * scale), vec2(r.w * scale, r.h * scale)))
+                })
+                .collect()
+        } else {
+            screen_rects
+        };
+        app.canvas.mini_anchor = crate::mini_toolbar::visible_anchor(anchor_rects, visible_clip);
         // Content controls: the frame of the one the caret is in (all of them in Design Mode).
         crate::content_controls::paint(app, &painter, &t, &layout, &rects, geo.scale);
         paint_read_aloud_highlight(app, &painter, &layout, &rects, &geo, &t);
