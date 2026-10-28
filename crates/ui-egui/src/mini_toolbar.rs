@@ -165,6 +165,9 @@ pub fn track_dismissal(app: &mut WordApp, ctx: &egui::Context, viewport: Rect) {
 /// canvas area it must stay inside.
 pub fn show(app: &mut WordApp, ctx: &egui::Context, selection: Rect, viewport: Rect) {
     if !visible(app) {
+        if app.canvas.command_previewed.is_some() {
+            ctx.request_repaint();
+        }
         return;
     }
     let Some(bar) = anchor_rect(selection.min.y, selection.min.x, viewport) else { return };
@@ -193,6 +196,10 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context, selection: Rect, viewport: R
         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(inner).layout(Layout::top_down(Align::Min)));
         child.spacing_mut().item_spacing = Vec2::new(SPACING, ROW_GAP);
         content(app, &mut child, &t);
+        // The page was drawn before the bar this frame: another frame shows or clears the preview.
+        if app.canvas.command_preview != app.canvas.command_previewed {
+            ctx.request_repaint();
+        }
         let used = child.min_rect();
         ctx.data_mut(|d| d.insert_temp(shown_id(), [bar, used]));
     });
@@ -255,7 +262,16 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
         let fams = app.previews.families();
         let recent: Vec<String> = app.ui.recent_fonts.iter().map(|f| app.previews.font_shown(f)).collect();
         let prev = app.previews.font_preview_fn();
-        if let Some(f) = widgets::font_combo_with_recent(ui, "mini_font", COMBO_FONT_W, &font, &fams, &recent, Some(&*prev)) {
+        let _ = widgets::take_hover(ui.ctx());
+        let picked = widgets::font_combo_with_recent(ui, "mini_font", COMBO_FONT_W, &font, &fams, &recent, Some(&*prev));
+        if picked.is_none()
+            && let Some(f) = widgets::take_hover(ui.ctx())
+            && f != crate::widgets::ADD_FONT
+            && f != crate::widgets::LOAD_SYSTEM_FONTS
+        {
+            app.canvas.command_preview = Some(("format.font".to_string(), json!({"name": app.previews.font_stored(&f)})));
+        }
+        if let Some(f) = picked {
             let _ = if f == crate::widgets::ADD_FONT {
                 app.run("font.add", json!({}))
             } else if f == crate::widgets::LOAD_SYSTEM_FONTS {
@@ -269,28 +285,28 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             st.get("size").and_then(Value::as_f64).map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { s.to_string() }).unwrap_or_default();
         let sizes: Vec<String> =
             wordcraft_engine::cmd::format::SIZES.iter().map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { s.to_string() }).collect();
-        if let Some(v) = widgets::combo_hint(ui, "mini_size", COMBO_SIZE_W, &size, &sizes, None, tl!("Font Size"))
+        let _ = widgets::take_hover(ui.ctx());
+        let picked = widgets::combo_hint(ui, "mini_size", COMBO_SIZE_W, &size, &sizes, None, tl!("Font Size"));
+        if picked.is_none()
+            && let Some(x) = widgets::take_hover(ui.ctx()).and_then(|v| v.trim().parse::<f64>().ok())
+        {
+            app.canvas.command_preview = Some(("format.size".to_string(), json!({"size": x})));
+        }
+        if let Some(v) = picked
             && let Ok(x) = v.trim().parse::<f64>()
         {
             let _ = app.run("format.size", json!({"size": x}));
         }
         ui.add_space(GAP);
-        widgets::small(ui, app, "grow", None, "Increase Font Size", crate::widgets::ButtonAction::new("format.growFont", json!({}), false));
-        widgets::small(ui, app, "shrink", None, "Decrease Font Size", crate::widgets::ButtonAction::new("format.shrinkFont", json!({}), false));
+        hover_small(ui, app, "grow", "Increase Font Size", "format.growFont", false);
+        hover_small(ui, app, "shrink", "Decrease Font Size", "format.shrinkFont", false);
     });
 
     row(ui, app, &|ui, app| {
-        widgets::small(ui, app, "bold", None, "Bold", crate::widgets::ButtonAction::new("format.bold", json!({}), flag("bold")));
-        widgets::small(ui, app, "italic", None, "Italic", crate::widgets::ButtonAction::new("format.italic", json!({}), flag("italic")));
-        widgets::small(ui, app, "underline", None, "Underline", crate::widgets::ButtonAction::new("format.underline", json!({}), flag("underline")));
-        widgets::small(
-            ui,
-            app,
-            "strike",
-            None,
-            "Strikethrough",
-            crate::widgets::ButtonAction::new("format.strikethrough", json!({}), flag("strike")),
-        );
+        hover_small(ui, app, "bold", "Bold", "format.bold", flag("bold"));
+        hover_small(ui, app, "italic", "Italic", "format.italic", flag("italic"));
+        hover_small(ui, app, "underline", "Underline", "format.underline", flag("underline"));
+        hover_small(ui, app, "strike", "Strikethrough", "format.strikethrough", flag("strike"));
         sep(ui, t);
 
         let hl = app.canvas.last_highlight.clone();
@@ -303,7 +319,11 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             crate::widgets::ButtonAction::new("format.highlight", json!({"color": color}), false),
             sw,
             |ui, app| {
+                let _ = widgets::take_hover(ui.ctx());
                 highlight_menu(ui, app);
+                if let Some(c) = widgets::take_hover(ui.ctx()) {
+                    app.canvas.command_preview = Some(("format.highlight".to_string(), json!({"color": c})));
+                }
             },
         );
         let fc = app.canvas.last_font_color.clone();
@@ -316,24 +336,31 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             crate::widgets::ButtonAction::new("format.color", json!({"color": fc}), false),
             sw,
             |ui, app| {
+                let _ = widgets::take_hover(ui.ctx());
                 font_color_menu(ui, app);
+                if let Some(c) = widgets::take_hover(ui.ctx()) {
+                    app.canvas.command_preview = Some(("format.color".to_string(), json!({"color": c})));
+                }
             },
         );
         sep(ui, t);
 
         use wordcraft_doc::Align as A;
-        widgets::small(ui, app, "alignLeft", None, "Align Left", crate::widgets::ButtonAction::new("para.alignLeft", json!({}), align == A::Left));
-        widgets::small(ui, app, "alignCenter", None, "Center", crate::widgets::ButtonAction::new("para.alignCenter", json!({}), align == A::Center));
-        widgets::small(
-            ui,
-            app,
-            "alignRight",
-            None,
-            "Align Right",
-            crate::widgets::ButtonAction::new("para.alignRight", json!({}), align == A::Right),
-        );
-        widgets::small(ui, app, "justify", None, "Justify", crate::widgets::ButtonAction::new("para.justify", json!({}), align == A::Justify));
+        hover_small(ui, app, "alignLeft", "Align Left", "para.alignLeft", align == A::Left);
+        hover_small(ui, app, "alignCenter", "Center", "para.alignCenter", align == A::Center);
+        hover_small(ui, app, "alignRight", "Align Right", "para.alignRight", align == A::Right);
+        hover_small(ui, app, "justify", "Justify", "para.justify", align == A::Justify);
     });
+}
+
+/// A bar button that, while hovered, makes the page show its command run on the selection. The
+/// preview runs on a copy, so the document, its undo history and the selection stay as they are.
+fn hover_small(ui: &mut egui::Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, checked: bool) {
+    let action = crate::widgets::ButtonAction::new(id, json!({}), checked);
+    let r = widgets::small(ui, app, icon, None, tip, action);
+    if r.hovered() && !r.is_pointer_button_down_on() && !r.clicked() && widgets::enabled(app, id) {
+        app.canvas.command_preview = Some((id.to_string(), json!({})));
+    }
 }
 
 /// A hairline divider between the bar's groups.
@@ -359,6 +386,9 @@ pub(crate) fn highlight_menu(ui: &mut egui::Ui, app: &mut WordApp) {
             let Some(c) = h.rgb() else { continue };
             let (r, resp) = ui.allocate_exact_size(Vec2::new(18.0, 18.0), Sense::click());
             ui.painter().rect_filled(r, 2.0, egui::Color32::from_rgb(c.0, c.1, c.2));
+            if resp.hovered() {
+                widgets::note_hover(ui.ctx(), h.ooxml().to_string());
+            }
             if resp.on_hover_text(h.name()).clicked() {
                 app.canvas.last_highlight = h.ooxml().to_string();
                 widgets::run_from_ribbon(app, "format.highlight", json!({"color": h.ooxml()}));
@@ -370,7 +400,11 @@ pub(crate) fn highlight_menu(ui: &mut egui::Ui, app: &mut WordApp) {
         }
     });
     let enabled = widgets::enabled(app, "format.highlight");
-    if ui.add_enabled(enabled, egui::Button::new(tl!("No Color")).min_size(Vec2::new(200.0, 0.0))).clicked() {
+    let no_color = ui.add_enabled(enabled, egui::Button::new(tl!("No Color")).min_size(Vec2::new(200.0, 0.0)));
+    if no_color.hovered() {
+        widgets::note_hover(ui.ctx(), "none".to_string());
+    }
+    if no_color.clicked() {
         app.canvas.last_highlight = "none".into();
         widgets::run_from_ribbon(app, "format.highlight", json!({"color": "none"}));
         ui.close();
@@ -380,7 +414,11 @@ pub(crate) fn highlight_menu(ui: &mut egui::Ui, app: &mut WordApp) {
 /// Font colour: Automatic, the colour grid, Recent Colors and More Colors… (#606).
 fn font_color_menu(ui: &mut egui::Ui, app: &mut WordApp) {
     egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
-        if ui.selectable_label(false, "Automatic").clicked() {
+        let automatic = ui.selectable_label(false, "Automatic");
+        if automatic.hovered() {
+            widgets::note_hover(ui.ctx(), "auto".to_string());
+        }
+        if automatic.clicked() {
             widgets::run_from_ribbon(app, "format.color", json!({"color": "auto"}));
             ui.close();
             return;

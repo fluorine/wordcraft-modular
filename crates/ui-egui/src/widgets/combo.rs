@@ -39,6 +39,25 @@ pub fn color_grid(ui: &mut Ui, theme: &[wordcraft_doc::Rgb]) -> Option<String> {
     picked
 }
 
+fn hover_key() -> egui::Id {
+    egui::Id::unique("wc_pick_hover")
+}
+
+/// Records the list entry or colour the pointer is over in this pass (one per pass; the last
+/// drawn wins). [`take_hover`] reads it.
+pub(crate) fn note_hover(ctx: &egui::Context, value: String) {
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data_mut(|d| d.insert_temp(hover_key(), (pass, value)));
+}
+
+/// The entry noted by [`note_hover`] in this pass, if any; it is read once. Callers take before
+/// drawing a list too, to drop what another widget noted.
+pub(crate) fn take_hover(ctx: &egui::Context) -> Option<String> {
+    let pass = ctx.cumulative_pass_nr();
+    let seen = ctx.data_mut(|d| d.remove_temp::<(u64, String)>(hover_key()));
+    seen.filter(|(p, _)| *p == pass).map(|(_, v)| v)
+}
+
 pub(crate) fn swatch(ui: &mut Ui, c: wordcraft_doc::Rgb) -> bool {
     let (r, resp) = ui.allocate_exact_size(vec2(15.0, 15.0), Sense::click());
     ui.painter().rect_filled(r, 0.0, Color32::from_rgb(c.0, c.1, c.2));
@@ -49,6 +68,9 @@ pub(crate) fn swatch(ui: &mut Ui, c: wordcraft_doc::Rgb) -> bool {
         Stroke::new(if resp.hovered() { 1.5 } else { 0.5 }, if resp.hovered() { t.accent } else { t.border_strong }),
         egui::StrokeKind::Inside,
     );
+    if resp.hovered() {
+        note_hover(ui.ctx(), c.hex());
+    }
     resp.on_hover_text(format!("#{}", c.hex())).clicked()
 }
 
@@ -508,9 +530,19 @@ fn draw_rows(ui: &mut Ui, options: RowDrawOptions<'_, '_>) -> Option<String> {
                     let r = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), row_h));
                     ui.painter().rect_filled(r, 3.0, fill);
                 }
-                p(ui, it).clicked()
+                let resp = p(ui, it);
+                if resp.hovered() {
+                    note_hover(ui.ctx(), it.clone());
+                }
+                resp.clicked()
             }
-            None => ui.selectable_label(if highlight.is_some() { lit } else { it == current }, it.as_str()).clicked(),
+            None => {
+                let resp = ui.selectable_label(if highlight.is_some() { lit } else { it == current }, it.as_str());
+                if resp.hovered() {
+                    note_hover(ui.ctx(), it.clone());
+                }
+                resp.clicked()
+            }
         };
         if clicked {
             out = Some(it.clone());
