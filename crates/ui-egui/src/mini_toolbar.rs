@@ -244,8 +244,8 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens, preview_on_hover: b
         .session
         .doc
         .para_at(&app.session.sel.focus)
-        .map(|p| {
-            let r = app.session.doc.styles.resolve_para(&p.props);
+        .map(|_| {
+            let r = wordcraft_engine::cmd::para::selection_para(&app.session);
             r.align.visual(r.bidi)
         })
         .unwrap_or_default();
@@ -364,11 +364,10 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens, preview_on_hover: b
 
 /// A bar button that, while hovered, makes the page show its command run on the selection. The
 /// preview runs on a copy, so the document, its undo history and the selection stay as they are.
-/// A button already on does not preview: its command would show the state it is leaving.
 fn hover_small(ui: &mut egui::Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, checked: bool, preview: bool) {
     let action = crate::widgets::ButtonAction::new(id, json!({}), checked);
     let r = widgets::small(ui, app, icon, None, tip, action);
-    preview_on_hover_if(app, &r, id, json!({}), preview && !checked);
+    preview_on_hover_if(app, &r, id, json!({}), preview);
 }
 
 /// Previews command `id` with `params` while its button `r` is hovered and not pressed. After a

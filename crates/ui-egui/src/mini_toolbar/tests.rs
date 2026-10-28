@@ -875,21 +875,42 @@ fn a_clicked_button_holds_its_preview_until_the_pointer_leaves() {
     assert!(h.state().canvas.command_previewed.is_some(), "coming back previews again");
 }
 
-/// A button for a state already in effect does not preview: hovering Bold over bold text would
-/// show the text unbolded.
+/// After a click the preview stays still while the pointer is on the button. Leaving and coming
+/// back previews the undo: Bold over bold text shows it unbolded.
 #[test]
-fn a_button_already_on_does_not_preview() {
+fn coming_back_to_a_toggle_previews_its_undo() {
     use egui_kittest::kittest::Queryable;
     let mut h = bar_over("brown fox");
-    h.state_mut().run("format.bold", json!({})).unwrap();
-    steps(&mut h);
     let viewport = h.state().canvas.viewport.unwrap();
     let bold = h.get_all_by_label("Bold").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Bold").center();
+    click_at(&mut h, bold);
+    steps(&mut h);
+    assert_eq!(format_state(&mut h).get("bold"), Some(&json!(true)));
+    assert_eq!(h.state().canvas.command_previewed, None, "the page holds still after the click");
+    h.event(egui::Event::PointerMoved(pos2(5.0, 5.0)));
+    steps(&mut h);
     h.event(egui::Event::PointerMoved(bold));
     steps(&mut h);
-    assert_eq!(h.state().canvas.command_previewed, None, "no unbold preview over bold text");
-    let italic = h.get_all_by_label("Italic").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Italic").center();
-    h.event(egui::Event::PointerMoved(italic));
+    assert_eq!(h.state().canvas.command_previewed, Some(("format.bold".to_string(), json!({}))), "coming back previews the undo");
+    let doc = h.state().session.doc.clone();
+    assert_ne!(crate::canvas::page_doc(h.state()), &doc, "the page shows the text unbolded");
+}
+
+/// A selection that ends at the next paragraph's start (Select Paragraph, a triple-click) shows
+/// the alignment of the paragraph it covers, not the next one's.
+#[test]
+fn a_selected_paragraph_shows_its_own_alignment() {
+    let mut h = bar_over("brown fox");
+    h.state_mut().session = wordcraft_engine::Session::new(wordcraft_doc::Document::from_text("First paragraph\nSecond paragraph"));
+    h.state_mut().session.sel.anchor = wordcraft_doc::Pos::body(0, 2);
+    h.state_mut().session.sel.focus = wordcraft_doc::Pos::body(0, 2);
+    h.state_mut().run("para.alignRight", json!({})).unwrap();
+    h.state_mut().session.sel.anchor = wordcraft_doc::Pos::body(0, 0);
+    h.state_mut().session.sel.focus = wordcraft_doc::Pos::body(1, 0);
     steps(&mut h);
-    assert!(h.state().canvas.command_previewed.is_some(), "a button that is off still previews");
+    let s = &h.state().session;
+    let focus_align = s.doc.para_at(&s.sel.focus).map(|p| s.doc.styles.resolve_para(&p.props).align);
+    assert_eq!(focus_align, Some(wordcraft_doc::Align::Left), "the next paragraph is left aligned");
+    let r = wordcraft_engine::cmd::para::selection_para(s);
+    assert_eq!(r.align, wordcraft_doc::Align::Right, "the buttons read the selected paragraph");
 }
