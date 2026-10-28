@@ -311,7 +311,7 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
 
         let hl = app.canvas.last_highlight.clone();
         let (icon, sw, color) = highlight_button_appearance(&hl);
-        widgets::split(
+        let main = widgets::split(
             ui,
             app,
             icon,
@@ -326,9 +326,10 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
                 }
             },
         );
+        preview_on_hover(app, &main, "format.highlight", json!({"color": color}));
         let fc = app.canvas.last_font_color.clone();
         let sw = wordcraft_doc::Rgb::parse(&fc).map(crate::theme::c32);
-        widgets::split(
+        let main = widgets::split(
             ui,
             app,
             "fontcolor",
@@ -343,6 +344,7 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
                 }
             },
         );
+        preview_on_hover(app, &main, "format.color", json!({"color": fc}));
         sep(ui, t);
 
         use wordcraft_doc::Align as A;
@@ -358,8 +360,13 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
 fn hover_small(ui: &mut egui::Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, checked: bool) {
     let action = crate::widgets::ButtonAction::new(id, json!({}), checked);
     let r = widgets::small(ui, app, icon, None, tip, action);
+    preview_on_hover(app, &r, id, json!({}));
+}
+
+/// Previews command `id` with `params` while its button `r` is hovered and not pressed.
+fn preview_on_hover(app: &mut WordApp, r: &egui::Response, id: &str, params: Value) {
     if r.hovered() && !r.is_pointer_button_down_on() && !r.clicked() && widgets::enabled(app, id) {
-        app.canvas.command_preview = Some((id.to_string(), json!({})));
+        app.canvas.command_preview = Some((id.to_string(), params));
     }
 }
 

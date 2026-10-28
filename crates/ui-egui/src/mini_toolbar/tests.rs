@@ -222,6 +222,47 @@ fn hovering_a_size_in_the_bars_list_previews_it() {
     assert_eq!(format_state(&mut h).get("size").cloned(), size);
 }
 
+/// Hovering a family of the bar's font list previews it; clicking it applies it.
+#[test]
+fn hovering_and_clicking_a_font_in_the_bars_list() {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let doc = h.state().session.doc.clone();
+    let viewport = h.state().canvas.viewport.unwrap();
+    let font_box = h
+        .get_all_by_role(Role::TextInput)
+        .map(|n| n.rect())
+        .filter(|r| viewport.contains_rect(*r))
+        .min_by(|a, b| a.min.y.total_cmp(&b.min.y).then(a.min.x.total_cmp(&b.min.x)))
+        .expect("the bar has a font box");
+    click_at(&mut h, pos2(font_box.max.x + 8.0, font_box.center().y));
+    let family = h.state_mut().previews.families().into_iter().find(|f| f != "Aptos Display" && f != "Aptos").expect("another family is installed");
+    let at = h.get_all_by_label(&family).map(|n| n.rect().center()).find(|p| p.y > font_box.max.y).expect("the list shows the family");
+    h.event(egui::Event::PointerMoved(at));
+    steps(&mut h);
+    let previewed = h.state().canvas.command_previewed.clone();
+    assert!(previewed.is_some_and(|(id, _)| id == "format.font"), "hovering a family previews the font");
+    assert_eq!(&h.state().session.doc, &doc);
+    click_at(&mut h, at);
+    assert_ne!(&h.state().session.doc, &doc, "clicking the family applies the font");
+}
+
+/// Hovering the highlight and font colour buttons previews their last colour.
+#[test]
+fn hovering_the_colour_buttons_previews_their_colour() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let viewport = h.state().canvas.viewport.unwrap();
+    for (label, id) in [("Text Highlight Color", "format.highlight"), ("Font Color", "format.color")] {
+        let r = h.get_all_by_label(label).map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has the button");
+        h.event(egui::Event::PointerMoved(r.center()));
+        steps(&mut h);
+        let previewed = h.state().canvas.command_previewed.clone();
+        assert!(previewed.is_some_and(|(p, _)| p == id), "{label} previews {id}");
+    }
+}
+
 /// Hovering a colour of the bar's highlight list previews it on the selection.
 #[test]
 fn hovering_a_highlight_colour_previews_it() {
