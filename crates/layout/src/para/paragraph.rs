@@ -344,13 +344,7 @@ impl<'a> Shaped<'a> {
             if let Some(cluster) = self.b.clusters.last_mut() {
                 // A text box carries text as well as a drawing frame. Unlike picture-only
                 // lines, its line must retain the anchor font's descent below the box.
-                cluster.picture = !matches!(
-                    o,
-                    InlineObject::Shape {
-                        kind: wordcraft_doc::para::ShapeKind::TextBox,
-                        ..
-                    }
-                );
+                cluster.picture = !matches!(o, InlineObject::Shape { kind: wordcraft_doc::para::ShapeKind::TextBox, .. });
             }
         } else {
             self.push(slot, ClKind::Object(k), 0.0, 0.0);
