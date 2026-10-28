@@ -859,17 +859,37 @@ fn a_clicked_button_holds_its_preview_until_the_pointer_leaves() {
     use egui_kittest::kittest::Queryable;
     let mut h = bar_over("brown fox");
     let viewport = h.state().canvas.viewport.unwrap();
+    let size = format_state(&mut h).get("size").cloned();
+    let grow = h.get_all_by_label("Increase Font Size").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Grow").center();
+    h.event(egui::Event::PointerMoved(grow));
+    steps(&mut h);
+    assert!(h.state().canvas.command_previewed.is_some(), "hovering previews");
+    click_at(&mut h, grow);
+    steps(&mut h);
+    assert_ne!(format_state(&mut h).get("size").cloned(), size, "the click grew the text");
+    assert_eq!(h.state().canvas.command_previewed, None, "no preview of the next step under the pointer");
+    h.event(egui::Event::PointerMoved(pos2(5.0, 5.0)));
+    steps(&mut h);
+    h.event(egui::Event::PointerMoved(grow));
+    steps(&mut h);
+    assert!(h.state().canvas.command_previewed.is_some(), "coming back previews again");
+}
+
+/// A button for a state already in effect does not preview: hovering Bold over bold text would
+/// show the text unbolded.
+#[test]
+fn a_button_already_on_does_not_preview() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    h.state_mut().run("format.bold", json!({})).unwrap();
+    steps(&mut h);
+    let viewport = h.state().canvas.viewport.unwrap();
     let bold = h.get_all_by_label("Bold").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Bold").center();
     h.event(egui::Event::PointerMoved(bold));
     steps(&mut h);
-    assert!(h.state().canvas.command_previewed.is_some(), "hovering previews");
-    click_at(&mut h, bold);
+    assert_eq!(h.state().canvas.command_previewed, None, "no unbold preview over bold text");
+    let italic = h.get_all_by_label("Italic").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Italic").center();
+    h.event(egui::Event::PointerMoved(italic));
     steps(&mut h);
-    assert_eq!(format_state(&mut h).get("bold"), Some(&json!(true)));
-    assert_eq!(h.state().canvas.command_previewed, None, "no preview of the other state under the pointer");
-    h.event(egui::Event::PointerMoved(pos2(5.0, 5.0)));
-    steps(&mut h);
-    h.event(egui::Event::PointerMoved(bold));
-    steps(&mut h);
-    assert!(h.state().canvas.command_previewed.is_some(), "coming back previews again");
+    assert!(h.state().canvas.command_previewed.is_some(), "a button that is off still previews");
 }
