@@ -218,6 +218,15 @@ fn hovering_a_bar_button_previews_it_on_the_selection() {
     steps(&mut h);
     assert_eq!(h.state().canvas.command_previewed, None);
     assert_eq!(crate::canvas::page_doc(h.state()), &doc, "off the bar the page is as it was");
+
+    // Alignment moves the previewed selection. The toolbar must stay anchored to the live
+    // selection so the hovered button remains under the pointer until the pointer leaves.
+    let anchor = h.state().canvas.mini_anchor.unwrap();
+    let align_right = h.get_all_by_label("Align Right").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Align Right");
+    h.event(egui::Event::PointerMoved(align_right.center()));
+    steps(&mut h);
+    assert_eq!(h.state().canvas.command_previewed, Some(("para.alignRight".to_string(), json!({}))));
+    assert_eq!(h.state().canvas.mini_anchor, Some(anchor), "the alignment preview must not move the toolbar");
 }
 
 /// #2959: formatting must be available alongside the text's right-click menu, using the
