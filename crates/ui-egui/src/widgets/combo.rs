@@ -378,7 +378,11 @@ fn combo_impl(ui: &mut Ui, options: ComboOptions<'_>) -> Option<String> {
         let row = |k: usize| section_row(k, &menu_recent, &item);
         let total = section_rows(menu_recent.len(), items.len());
         let list = |ui: &mut Ui, range: std::ops::Range<usize>, ()| {
-            draw_rows(ui, RowDrawOptions { width, current, range, row: &row, highlight: None, preview, row_height: row_h })
+            let picked = draw_rows(ui, RowDrawOptions { width, current, range, row: &row, highlight: None, preview, row_height: row_h });
+            if picked.is_some() {
+                ui.close();
+            }
+            picked
         };
         let footer = |ui: &mut Ui| {
             let mut picked = None;

@@ -273,8 +273,8 @@ fn a_picked_font_joins_the_recent_section_on_the_next_open() {
     h.step();
     h.step();
     assert_eq!(h.query_all_by_label("Recently Used Fonts").count(), 0, "the list does not shift under the pointer");
+    assert_eq!(h.query_all_by_label("Add Font…").count(), 0, "picking a family closes the list");
     steps(&mut h);
-    click_at(&mut h, arrow);
     click_at(&mut h, arrow);
     assert_eq!(h.query_all_by_label("Recently Used Fonts").count(), 1, "the next open lists the family first");
 }
