@@ -195,7 +195,7 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context, selection: Rect, viewport: R
         let inner = bar.shrink2(Vec2::new(PAD_X, PAD_Y));
         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(inner).layout(Layout::top_down(Align::Min)));
         child.spacing_mut().item_spacing = Vec2::new(SPACING, ROW_GAP);
-        content(app, &mut child, &t);
+        content(app, &mut child, &t, true);
         // The page was drawn before the bar this frame: another frame shows or clears the preview.
         if app.canvas.command_preview != app.canvas.command_previewed {
             ctx.request_repaint();
@@ -226,7 +226,7 @@ pub fn show_in_context_menu(app: &mut WordApp, ui: &mut egui::Ui) {
             ui.set_style(ui.ctx().global_style());
             ui.set_width(ROW2_W);
             ui.spacing_mut().item_spacing = Vec2::new(SPACING, ROW_GAP);
-            content(app, ui, &t);
+            content(app, ui, &t, false);
             if app.dialog.is_some() || app.colors.is_some() {
                 ui.close();
             }
@@ -236,7 +236,7 @@ pub fn show_in_context_menu(app: &mut WordApp, ui: &mut egui::Ui) {
 
 /// The controls in two rows like Word's mini toolbar, reusing the ribbon's widgets so the bar
 /// matches the ribbon exactly.
-fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
+fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens, preview_on_hover: bool) {
     let st: Value = app.session.run("format.state", &json!({})).unwrap_or_default();
     let flag = |k: &str| st.get(k).and_then(Value::as_bool).unwrap_or(false);
     // As on the ribbon, the buttons show alignment as seen on the page (#3579).
@@ -264,7 +264,8 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
         let prev = app.previews.font_preview_fn();
         let _ = widgets::take_hover(ui.ctx());
         let picked = widgets::font_combo_with_recent(ui, "mini_font", COMBO_FONT_W, &font, &fams, &recent, Some(&*prev));
-        if picked.is_none()
+        if preview_on_hover
+            && picked.is_none()
             && let Some(f) = widgets::take_hover(ui.ctx())
             && f != crate::widgets::ADD_FONT
             && f != crate::widgets::LOAD_SYSTEM_FONTS
@@ -287,7 +288,8 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             wordcraft_engine::cmd::format::SIZES.iter().map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { s.to_string() }).collect();
         let _ = widgets::take_hover(ui.ctx());
         let picked = widgets::combo_hint(ui, "mini_size", COMBO_SIZE_W, &size, &sizes, None, tl!("Font Size"));
-        if picked.is_none()
+        if preview_on_hover
+            && picked.is_none()
             && let Some(x) = widgets::take_hover(ui.ctx()).and_then(|v| v.trim().parse::<f64>().ok())
         {
             app.canvas.command_preview = Some(("format.size".to_string(), json!({"size": x})));
@@ -298,15 +300,15 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             let _ = app.run("format.size", json!({"size": x}));
         }
         ui.add_space(GAP);
-        hover_small(ui, app, "grow", "Increase Font Size", "format.growFont", false);
-        hover_small(ui, app, "shrink", "Decrease Font Size", "format.shrinkFont", false);
+        hover_small(ui, app, "grow", "Increase Font Size", "format.growFont", false, preview_on_hover);
+        hover_small(ui, app, "shrink", "Decrease Font Size", "format.shrinkFont", false, preview_on_hover);
     });
 
     row(ui, app, &|ui, app| {
-        hover_small(ui, app, "bold", "Bold", "format.bold", flag("bold"));
-        hover_small(ui, app, "italic", "Italic", "format.italic", flag("italic"));
-        hover_small(ui, app, "underline", "Underline", "format.underline", flag("underline"));
-        hover_small(ui, app, "strike", "Strikethrough", "format.strikethrough", flag("strike"));
+        hover_small(ui, app, "bold", "Bold", "format.bold", flag("bold"), preview_on_hover);
+        hover_small(ui, app, "italic", "Italic", "format.italic", flag("italic"), preview_on_hover);
+        hover_small(ui, app, "underline", "Underline", "format.underline", flag("underline"), preview_on_hover);
+        hover_small(ui, app, "strike", "Strikethrough", "format.strikethrough", flag("strike"), preview_on_hover);
         sep(ui, t);
 
         let hl = app.canvas.last_highlight.clone();
@@ -324,12 +326,12 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
                 widgets::set_current_pick(ui.ctx(), Some(in_effect));
                 highlight_menu(ui, app);
                 widgets::set_current_pick(ui.ctx(), None);
-                if let Some(c) = widgets::take_hover(ui.ctx()) {
+                if preview_on_hover && let Some(c) = widgets::take_hover(ui.ctx()) {
                     app.canvas.command_preview = Some(("format.highlight".to_string(), json!({"color": c})));
                 }
             },
         );
-        preview_on_hover(app, &main, "format.highlight", json!({"color": color}));
+        preview_on_hover_if(app, &main, "format.highlight", json!({"color": color}), preview_on_hover);
         let fc = app.canvas.last_font_color.clone();
         let sw = wordcraft_doc::Rgb::parse(&fc).map(crate::theme::c32);
         let main = widgets::split(
@@ -344,33 +346,33 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
                 widgets::set_current_pick(ui.ctx(), st.get("color").and_then(Value::as_str).map(str::to_string));
                 font_color_menu(ui, app);
                 widgets::set_current_pick(ui.ctx(), None);
-                if let Some(c) = widgets::take_hover(ui.ctx()) {
+                if preview_on_hover && let Some(c) = widgets::take_hover(ui.ctx()) {
                     app.canvas.command_preview = Some(("format.color".to_string(), json!({"color": c})));
                 }
             },
         );
-        preview_on_hover(app, &main, "format.color", json!({"color": fc}));
+        preview_on_hover_if(app, &main, "format.color", json!({"color": fc}), preview_on_hover);
         sep(ui, t);
 
         use wordcraft_doc::Align as A;
-        hover_small(ui, app, "alignLeft", "Align Left", "para.alignLeft", align == A::Left);
-        hover_small(ui, app, "alignCenter", "Center", "para.alignCenter", align == A::Center);
-        hover_small(ui, app, "alignRight", "Align Right", "para.alignRight", align == A::Right);
-        hover_small(ui, app, "justify", "Justify", "para.justify", align == A::Justify);
+        hover_small(ui, app, "alignLeft", "Align Left", "para.alignLeft", align == A::Left, preview_on_hover);
+        hover_small(ui, app, "alignCenter", "Center", "para.alignCenter", align == A::Center, preview_on_hover);
+        hover_small(ui, app, "alignRight", "Align Right", "para.alignRight", align == A::Right, preview_on_hover);
+        hover_small(ui, app, "justify", "Justify", "para.justify", align == A::Justify, preview_on_hover);
     });
 }
 
 /// A bar button that, while hovered, makes the page show its command run on the selection. The
 /// preview runs on a copy, so the document, its undo history and the selection stay as they are.
-fn hover_small(ui: &mut egui::Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, checked: bool) {
+fn hover_small(ui: &mut egui::Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, checked: bool, preview: bool) {
     let action = crate::widgets::ButtonAction::new(id, json!({}), checked);
     let r = widgets::small(ui, app, icon, None, tip, action);
-    preview_on_hover(app, &r, id, json!({}));
+    preview_on_hover_if(app, &r, id, json!({}), preview);
 }
 
 /// Previews command `id` with `params` while its button `r` is hovered and not pressed.
-fn preview_on_hover(app: &mut WordApp, r: &egui::Response, id: &str, params: Value) {
-    if r.hovered() && !r.is_pointer_button_down_on() && !r.clicked() && widgets::enabled(app, id) {
+fn preview_on_hover_if(app: &mut WordApp, r: &egui::Response, id: &str, params: Value, preview: bool) {
+    if preview && r.hovered() && !r.is_pointer_button_down_on() && !r.clicked() && widgets::enabled(app, id) {
         app.canvas.command_preview = Some((id.to_string(), params));
     }
 }

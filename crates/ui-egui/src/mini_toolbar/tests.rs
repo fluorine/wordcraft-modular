@@ -393,6 +393,11 @@ fn context_menu_toolbar_formats_the_selection_and_opens_its_size_list() {
     assert!(bar_layer(&h).is_none(), "the standalone selection toolbar must not double up");
     let viewport = h.state().canvas.viewport.unwrap();
     let bold = h.get_all_by_label("Bold").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the context menu has Bold");
+    let doc = h.state().session.doc.clone();
+    h.event(egui::Event::PointerMoved(bold.center()));
+    steps(&mut h);
+    assert_eq!(h.state().canvas.command_previewed, None, "the context toolbar does not start the hidden floating bar's preview repaint loop");
+    assert_eq!(&h.state().session.doc, &doc, "hovering a context-menu control does not preview a document change");
     click_at(&mut h, bold.center());
     assert_eq!(format_state(&mut h).get("bold"), Some(&json!(true)));
     assert_eq!(h.state().session.sel, selection);
