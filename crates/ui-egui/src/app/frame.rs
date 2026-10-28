@@ -4,6 +4,7 @@ use super::{
     WordApp, backstage, canvas, chrome, colors, content_controls, dialogs, documents, keys, now_ms, panes, read_aloud, ribbon, theme, updates_ui,
     zotero,
 };
+use crate::ribbon_blur;
 
 impl WordApp {
     pub fn status(&mut self, s: impl Into<String>) {

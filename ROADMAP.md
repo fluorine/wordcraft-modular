@@ -644,6 +644,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 > 2026-10-23 · cu20we review follow-up: Only paragraph-relative box floats use the pre-spacing origin. Line-relative floats and page/margin fallbacks in cells and text boxes keep the text-top origin. Synthetic controls compare zero and 24 pt space-before across all four box contexts. New cap conversion helpers and regression tests document their contracts; readiness estimates unchanged.
 
 | Date | Change | Summary |
+| 2026-10-26 | trivial | Progress log: dialog sections across 13 dialogs; conditional scrolling for tall dialogs (#4035, #4038) |
 |---|---|---|
 | 2026-10-26 | trivial | Contextual KeyTips (#3854): WordCraft-assigned letters for six contextual tabs; four tabs have control badges, Equation and Outlining do not |
 | 2026-10-22 | trivial | Progress log: one native window per open document |

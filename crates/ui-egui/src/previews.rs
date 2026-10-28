@@ -434,7 +434,11 @@ pub fn font_sample(
     p.props.space_before = Some(0.0);
     p.props.space_after = Some(0.0);
     p.props.line_spacing = Some(wordcraft_doc::props::LineSpacing::Multiple(1.0));
-    snippet_blocks(&Document::new(), vec![Block::Para(p)], w, h, ppp, 2.0, Some(paper), dark)
+    snippet_blocks(
+        &Document::new(),
+        vec![Block::Para(p)],
+        SnippetOptions { width: w, height: h, pixels_per_point: ppp, margin: 2.0, paper: Some(paper), dark },
+    )
 }
 
 /// Lay out `para` (with `base`'s styles) in a `w`×`h` pt box and rasterise it.

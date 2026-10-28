@@ -154,6 +154,7 @@ Small follow-ups from the 2026-10-25 field, table and AutoFormat batch (#4232):
 > 2026-10-23 · cu20we: Paragraph-relative floats in headers, footers, cells and text boxes now start above effective space before; synthetic layout regressions cover all four contexts. Framed paragraphs already used the pre-spacing position. No new native Word comparison; broader object-position parity remains open.
 
 | Date | Change | Summary |
+| 2026-10-26 | trivial | Dialog sections improve readability across 13 dialogs; conditional scrolling keeps tall dialogs usable. Ranked gaps and estimates unchanged (#4035, #4038) |
 |---|---|---|
 | 2026-10-26 | trivial | Contextual KeyTips (#3854) add app-assigned letters for six contextual tabs; this does not change the default-shortcut count in gap 24 |
 | 2026-10-22 | trivial | View windows: several open documents and Switch Windows in the engine |
