@@ -460,7 +460,7 @@ impl<'e> Breaker<'e> {
         let (text_asc, text_desc) = (asc.max(obj_asc), desc);
         let text_pictures = if obj_asc > asc { obj_asc + desc } else { 0.0 };
         let mut label_extra = 0.0;
-        if self.first
+        if label_here
             && let Some(lab) = &pl.label
         {
             if !matches!(rp.line_spacing, LineSpacing::Exactly(_)) {
