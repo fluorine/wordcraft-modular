@@ -270,15 +270,20 @@ pub struct CanvasState {
     /// The rows and columns hovered in Insert › Table's grid this frame: the page shows that
     /// table where it would go (#3931). Set by the grid each frame, taken by [`show`].
     pub(crate) table_preview: Option<(usize, usize)>,
+    /// A command (id, params) the page shows run on the selection, without running it: the
+    /// formatting button the floating mini toolbar is hovered over. Set each frame, taken by [`show`].
+    pub(crate) command_preview: Option<(String, serde_json::Value)>,
+    /// The command preview the page last drew, so the bar repaints only when its hover changes.
+    pub(crate) command_previewed: Option<(String, serde_json::Value)>,
     /// The last previewed table's layout, the copy of the document it was laid out from and the
     /// copy's selection, with
-    /// what it was laid out for (rows, columns, document id, revision, selection, and the
+    /// what it was laid out for (command, params, document id, revision, selection, and the
     /// document's own layout, which a view change replaces), so a still pointer doesn't lay the
     /// document out every frame. Set only while the page shows the preview.
     table_preview_layout: Option<(TablePreviewKey, wordcraft_doc::Document, wordcraft_engine::Selection, std::sync::Arc<DocLayout>)>,
 }
 
-type TablePreviewKey = ((usize, usize, u64, u64, wordcraft_engine::Selection), std::sync::Arc<DocLayout>);
+type TablePreviewKey = ((String, serde_json::Value, u64, u64, wordcraft_engine::Selection), std::sync::Arc<DocLayout>);
 
 impl CanvasState {
     /// Another document is shown in the window: everything about the page that was shown (drags,
@@ -423,6 +428,8 @@ impl Default for CanvasState {
             tab_drag: None,
             drawn_ibeam: crate::ibeam::DRAWN,
             table_preview: None,
+            command_preview: None,
+            command_previewed: None,
             table_preview_layout: None,
         }
     }

@@ -198,6 +198,28 @@ fn format_state(h: &mut egui_kittest::Harness<'static, WordApp>) -> Value {
     h.state_mut().session.run("format.state", &json!({})).unwrap()
 }
 
+/// Hovering a bar button previews its command on the selection; leaving the bar restores the
+/// page. The document, its selection and its revision stay as they were.
+#[test]
+fn hovering_a_bar_button_previews_it_on_the_selection() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let (doc, sel, rev) = (h.state().session.doc.clone(), h.state().session.sel.clone(), h.state().session.rev());
+    let viewport = h.state().canvas.viewport.unwrap();
+    let bold = h.get_all_by_label("Bold").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Bold");
+    h.event(egui::Event::PointerMoved(bold.center()));
+    steps(&mut h);
+    assert_eq!(h.state().canvas.command_previewed, Some(("format.bold".to_string(), json!({}))));
+    assert_ne!(crate::canvas::page_doc(h.state()), &doc, "the page shows the bold text");
+    assert_eq!((&h.state().session.doc, &h.state().session.sel, h.state().session.rev()), (&doc, &sel, rev));
+    assert_eq!(format_state(&mut h).get("bold"), Some(&json!(false)));
+
+    h.event(egui::Event::PointerMoved(pos2(5.0, 5.0)));
+    steps(&mut h);
+    assert_eq!(h.state().canvas.command_previewed, None);
+    assert_eq!(crate::canvas::page_doc(h.state()), &doc, "off the bar the page is as it was");
+}
+
 /// #2959: formatting must be available alongside the text's right-click menu, using the
 /// selection that was clicked. Its lists must remain usable inside the context popup.
 #[test]

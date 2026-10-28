@@ -165,6 +165,9 @@ pub fn track_dismissal(app: &mut WordApp, ctx: &egui::Context, viewport: Rect) {
 /// canvas area it must stay inside.
 pub fn show(app: &mut WordApp, ctx: &egui::Context, selection: Rect, viewport: Rect) {
     if !visible(app) {
+        if app.canvas.command_previewed.is_some() {
+            ctx.request_repaint();
+        }
         return;
     }
     let Some(bar) = anchor_rect(selection.min.y, selection.min.x, viewport) else { return };
@@ -193,6 +196,10 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context, selection: Rect, viewport: R
         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(inner).layout(Layout::top_down(Align::Min)));
         child.spacing_mut().item_spacing = Vec2::new(SPACING, ROW_GAP);
         content(app, &mut child, &t);
+        // The page was drawn before the bar this frame: another frame shows or clears the preview.
+        if app.canvas.command_preview != app.canvas.command_previewed {
+            ctx.request_repaint();
+        }
         let used = child.min_rect();
         ctx.data_mut(|d| d.insert_temp(shown_id(), [bar, used]));
     });
@@ -275,22 +282,15 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
             let _ = app.run("format.size", json!({"size": x}));
         }
         ui.add_space(GAP);
-        widgets::small(ui, app, "grow", None, "Increase Font Size", crate::widgets::ButtonAction::new("format.growFont", json!({}), false));
-        widgets::small(ui, app, "shrink", None, "Decrease Font Size", crate::widgets::ButtonAction::new("format.shrinkFont", json!({}), false));
+        hover_small(ui, app, "grow", "Increase Font Size", "format.growFont", false);
+        hover_small(ui, app, "shrink", "Decrease Font Size", "format.shrinkFont", false);
     });
 
     row(ui, app, &|ui, app| {
-        widgets::small(ui, app, "bold", None, "Bold", crate::widgets::ButtonAction::new("format.bold", json!({}), flag("bold")));
-        widgets::small(ui, app, "italic", None, "Italic", crate::widgets::ButtonAction::new("format.italic", json!({}), flag("italic")));
-        widgets::small(ui, app, "underline", None, "Underline", crate::widgets::ButtonAction::new("format.underline", json!({}), flag("underline")));
-        widgets::small(
-            ui,
-            app,
-            "strike",
-            None,
-            "Strikethrough",
-            crate::widgets::ButtonAction::new("format.strikethrough", json!({}), flag("strike")),
-        );
+        hover_small(ui, app, "bold", "Bold", "format.bold", flag("bold"));
+        hover_small(ui, app, "italic", "Italic", "format.italic", flag("italic"));
+        hover_small(ui, app, "underline", "Underline", "format.underline", flag("underline"));
+        hover_small(ui, app, "strike", "Strikethrough", "format.strikethrough", flag("strike"));
         sep(ui, t);
 
         let hl = app.canvas.last_highlight.clone();
@@ -322,18 +322,21 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
         sep(ui, t);
 
         use wordcraft_doc::Align as A;
-        widgets::small(ui, app, "alignLeft", None, "Align Left", crate::widgets::ButtonAction::new("para.alignLeft", json!({}), align == A::Left));
-        widgets::small(ui, app, "alignCenter", None, "Center", crate::widgets::ButtonAction::new("para.alignCenter", json!({}), align == A::Center));
-        widgets::small(
-            ui,
-            app,
-            "alignRight",
-            None,
-            "Align Right",
-            crate::widgets::ButtonAction::new("para.alignRight", json!({}), align == A::Right),
-        );
-        widgets::small(ui, app, "justify", None, "Justify", crate::widgets::ButtonAction::new("para.justify", json!({}), align == A::Justify));
+        hover_small(ui, app, "alignLeft", "Align Left", "para.alignLeft", align == A::Left);
+        hover_small(ui, app, "alignCenter", "Center", "para.alignCenter", align == A::Center);
+        hover_small(ui, app, "alignRight", "Align Right", "para.alignRight", align == A::Right);
+        hover_small(ui, app, "justify", "Justify", "para.justify", align == A::Justify);
     });
+}
+
+/// A bar button that, while hovered, makes the page show its command run on the selection. The
+/// preview runs on a copy, so the document, its undo history and the selection stay as they are.
+fn hover_small(ui: &mut egui::Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, checked: bool) {
+    let action = crate::widgets::ButtonAction::new(id, json!({}), checked);
+    let r = widgets::small(ui, app, icon, None, tip, action);
+    if r.hovered() && !r.is_pointer_button_down_on() && !r.clicked() && widgets::enabled(app, id) {
+        app.canvas.command_preview = Some((id.to_string(), json!({})));
+    }
 }
 
 /// A hairline divider between the bar's groups.
