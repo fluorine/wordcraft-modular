@@ -138,6 +138,7 @@ Ranked, to beta (detail and remaining milestones in [docs/roadmap.md](docs/roadm
    (20–30 h).
 
 ## Progress log
+- 2026-10-26: Contextual ribbon tabs receive stable WordCraft-assigned single-letter KeyTips; the four object-design tabs also expose control badges, while Equation and Outlining do not yet have control badges (#3854).
 
 - 2026-10-28: A window restored to a place no monitor covers now opens centred on the primary monitor. Before, a monitor replaced by one of the same size left the window off screen, and the app seemed to close as soon as it started.
 - 2026-10-22: View › Window › New Window opens a second window on the document (desktop). The windows are titled `Name:1` and `Name:2` and each keeps its own caret, scroll position, zoom and view; edits and Undo are the document's and show in both. Closing one of them asks nothing; the last one asks about unsaved changes, and quitting asks once per document.
@@ -644,6 +645,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-26 | trivial | Contextual KeyTips (#3854): WordCraft-assigned letters for six contextual tabs; four tabs have control badges, Equation and Outlining do not |
 | 2026-10-22 | trivial | Progress log: one native window per open document |
 | 2026-10-22 | trivial | Progress log: every open document keeps its own recovery copy |
 | 2026-10-22 | trivial | Progress log: several open documents in the desktop window |
