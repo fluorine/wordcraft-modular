@@ -282,7 +282,7 @@ pub struct CanvasState {
     table_preview_layout: Option<(TablePreviewKey, wordcraft_doc::Document, wordcraft_engine::Selection, std::sync::Arc<DocLayout>)>,
 }
 
-fn prepare_ime_preedit(app: &mut WordApp, ui: &Ui, layout: &DocLayout, cursor_width: f32) -> Option<(wordcraft_layout::StyleRun, f32)> {
+fn prepare_ime_preedit(app: &mut WordApp, ui: &Ui, layout: &DocLayout, cursor_width: f32) -> Option<(wordcraft_layout::para::StyleRun, f32)> {
     if !app.want_system_cjk && app.canvas.ime_preedit.chars().any(wordcraft_fonts::is_cjk) {
         app.want_system_cjk = true;
         ui.ctx().request_repaint();
