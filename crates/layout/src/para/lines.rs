@@ -450,8 +450,7 @@ impl<'e> Breaker<'e> {
     fn measure(&self, pl: &ParaLayout, range: (usize, usize)) -> Measure {
         let rp = &self.rp;
         let Extents { mut asc, mut desc, obj_asc } = self.extents(pl, range);
-        let label_here = pl.label.is_some()
-            && (self.first || (self.lines.len() == 1 && self.lines[0].end == LineEnd::PageBreak));
+        let label_here = pl.label.is_some() && (self.first || (self.lines.len() == 1 && self.lines[0].end == LineEnd::PageBreak));
         let picture_only = matches!(rp.line_spacing, LineSpacing::Multiple(m) if m >= 1.0)
             && self.grid.is_none()
             && obj_asc > asc
