@@ -58,6 +58,7 @@ impl Slot {
             obj_h,
             obj_d,
             dot: false,
+            picture: false,
         }
     }
 }
@@ -584,6 +585,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
     let label = list_label(&cx, &mut sh.b, mark_style);
     let joined_cluster_starts = joined_cluster_starts(p, &sh.b.clusters);
     let Shaped { b, has_page_fields, notes, drop_cap, drop_cap_w, maths, enclosures, rubies, displays, ptabs, left, runs, .. } = sh;
+    let gaps = if matches!(rp.align, Align::ThaiDistribute | Align::KhmerJustify) { super::cluster_gaps(&p.text, &b.clusters) } else { Vec::new() };
     let mut pl = ParaLayout {
         rp,
         styles: b.styles,
@@ -609,6 +611,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
         left_out: Vec::new(),
         enclosures,
         auto_space,
+        gaps,
     };
     let auto = env.doc.settings.auto_hyphenation && !pl.rp.suppress_hyphens;
     pl.hyph_after = hyphenation_points(&bt.text, |i| bt.to_para(i), &pl, auto, env.doc.settings.hyphenate_caps, &runs);

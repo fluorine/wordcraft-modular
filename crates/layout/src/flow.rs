@@ -1,7 +1,9 @@
 use super::boxes::{BoxInput, BoxLayout, Edges, joined, layout_box, push_para};
 use super::cache::has_page_number_fields;
 use super::ctx::Ctx;
-use super::floats::{FloatAnchor, ObjFrame, ObjectPlacement, PageStacks, StackSpan, anchor_floats, body_wraps, continued_exclusions, object_groups};
+use super::floats::{
+    FloatAnchor, ObjFrame, ObjectPlacement, PageStacks, StackSpan, anchor_floats, body_wraps, continued_exclusions, object_groups, place_objects,
+};
 use super::notes::{DECOR_STORY, NoteBox, para_notes};
 use super::page::{PageBuilder, PageFrame, item_bottom};
 use super::placed::Placed;
