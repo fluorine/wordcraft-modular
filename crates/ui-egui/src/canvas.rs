@@ -1557,7 +1557,12 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     app.canvas.ime_faces.extend(new);
                     app.canvas.ime_face = face;
                     crate::theme::install_fonts_language_extra(
-                        ui.ctx(), app.fonts_hans, app.fonts_korean, app.fonts_system_cjk, &app.canvas.ime_faces, app.canvas.ime_face,
+                        ui.ctx(),
+                        app.fonts_hans,
+                        app.fonts_korean,
+                        app.fonts_system_cjk,
+                        &app.canvas.ime_faces,
+                        app.canvas.ime_face,
                     );
                     ui.ctx().request_repaint();
                 }

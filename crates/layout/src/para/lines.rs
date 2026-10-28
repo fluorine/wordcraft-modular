@@ -523,10 +523,7 @@ impl<'e> Breaker<'e> {
         if shift > 0.0 && slack > 0.0 {
             // Ordinary tabs move with paragraph alignment; positional tabs, labels and RTL text
             // keep their measured start edge.
-            let whole_line = display.is_none()
-                && pl.label.is_none()
-                && !self.rtl_para
-                && !pl.ptabs.iter().any(|(ci, ..)| *ci >= c0 && *ci < c1);
+            let whole_line = display.is_none() && pl.label.is_none() && !self.rtl_para && !pl.ptabs.iter().any(|(ci, ..)| *ci >= c0 && *ci < c1);
             let shift_from = if whole_line { c0 } else { align_from };
             for v in sc.xs.iter_mut().skip(shift_from - c0) {
                 *v += shift;
@@ -558,7 +555,10 @@ impl<'e> Breaker<'e> {
             };
             let first = (align_from..c1).find(|k| !blank(*k)).unwrap_or(c1);
             let last = (align_from..c1).rev().find(|k| !blank(*k));
-            let slots: Vec<usize> = match last { Some(last) if last > first => (first..last).collect(), _ => Vec::new() };
+            let slots: Vec<usize> = match last {
+                Some(last) if last > first => (first..last).collect(),
+                _ => Vec::new(),
+            };
             let gaps: Vec<(wordcraft_doc::khmer::Gap, f32)> = slots
                 .iter()
                 .map(|&k| {
@@ -570,10 +570,16 @@ impl<'e> Breaker<'e> {
             let mut add = 0.0;
             let mut slots = slots.iter().zip(adds.iter()).peekable();
             for k in align_from..c1 {
-                if let Some(x) = sc.xs.get_mut(k - c0) { *x += add; }
-                if let Some((_, amount)) = slots.next_if(|(slot, _)| **slot == k) { add += *amount; }
+                if let Some(x) = sc.xs.get_mut(k - c0) {
+                    *x += add;
+                }
+                if let Some((_, amount)) = slots.next_if(|(slot, _)| **slot == k) {
+                    add += *amount;
+                }
             }
-            if let Some(x) = sc.xs.last_mut() { *x += add; }
+            if let Some(x) = sc.xs.last_mut() {
+                *x += add;
+            }
         } else if justify && slack > 0.0 {
             justify_line(pl, &mut sc.xs, (c0, c1, align_from), (content_end, slack), rp.align == Align::Distribute);
         }
@@ -614,7 +620,11 @@ impl<'e> Breaker<'e> {
         let (width, x0) = (self.width, rp.indent_left);
         let (x0, left, right) = if self.rtl_para { (width - x0, width - self.base_right, width - x0) } else { (x0, x0, self.base_right) };
         let slack = (self.base_right - rp.indent_left).max(0.0);
-        let shift = match rp.align { Align::Center => slack / 2.0, Align::Right => slack, _ => 0.0 };
+        let shift = match rp.align {
+            Align::Center => slack / 2.0,
+            Align::Right => slack,
+            _ => 0.0,
+        };
         self.lines.push(Line {
             top: self.top,
             height: h,

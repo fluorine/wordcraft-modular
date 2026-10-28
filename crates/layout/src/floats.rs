@@ -555,7 +555,9 @@ pub(crate) fn object_groups(ctx: &mut Ctx, req: &ObjectPlacement) -> Vec<ObjGrou
             placed.push((floating.then(|| u64::from(z)), behind, front));
         }
     }
-    if !pin_placed.is_empty() && let Some(pin) = ctx.pin.as_mut() {
+    if !pin_placed.is_empty()
+        && let Some(pin) = ctx.pin.as_mut()
+    {
         let (behind, front) = stack_objects(pin_placed);
         pin.behind.extend(behind);
         pin.front.extend(front);
@@ -599,19 +601,21 @@ pub(crate) struct PageStacks {
 impl PageStacks {
     pub(crate) fn forget(&mut self, behind: usize, front: usize) {
         let mut gone = 0usize;
-        let k = self.behind.iter().take_while(|s| {
-            gone = gone.saturating_add(s.len);
-            gone <= behind
-        }).count();
+        let k = self
+            .behind
+            .iter()
+            .take_while(|s| {
+                gone = gone.saturating_add(s.len);
+                gone <= behind
+            })
+            .count();
         self.behind.drain(..k);
         self.front.retain(|s| s.at.saturating_add(s.len) <= front);
     }
 }
 
 pub(crate) fn stack_page(pg: &mut Page, behind: usize, st: PageStacks) {
-    if behind > 0 && behind <= pg.items.len()
-        && st.behind.iter().try_fold(0usize, |n, s| n.checked_add(s.len)) == Some(behind)
-    {
+    if behind > 0 && behind <= pg.items.len() && st.behind.iter().try_fold(0usize, |n, s| n.checked_add(s.len)) == Some(behind) {
         let mut rest = pg.items.split_off(behind);
         let mut items = std::mem::take(&mut pg.items).into_iter();
         let mut groups: Vec<(StackSpan, Vec<Placed>)> = st.behind.iter().map(|s| (*s, items.by_ref().take(s.len).collect())).collect();
@@ -624,17 +628,26 @@ pub(crate) fn stack_page(pg: &mut Page, behind: usize, st: PageStacks) {
     let end = pg.items.len().saturating_sub(behind);
     let fits = spans.windows(2).all(|w| matches!(w, [a, b] if a.at.saturating_add(a.len) <= b.at))
         && spans.last().is_none_or(|s| s.at.saturating_add(s.len) <= end);
-    if spans.len() < 2 || behind > pg.items.len() || !fits { return; }
+    if spans.len() < 2 || behind > pg.items.len() || !fits {
+        return;
+    }
     let mut rest: Vec<Option<Placed>> = pg.items.split_off(behind).into_iter().map(Some).collect();
-    let mut groups: Vec<((u64, usize), Vec<Placed>)> = spans.iter().map(|s| {
-        let g = rest.get_mut(s.at..s.at.saturating_add(s.len)).map(|r| r.iter_mut().filter_map(Option::take).collect());
-        ((s.key, s.seq), g.unwrap_or_default())
-    }).collect();
+    let mut groups: Vec<((u64, usize), Vec<Placed>)> = spans
+        .iter()
+        .map(|s| {
+            let g = rest.get_mut(s.at..s.at.saturating_add(s.len)).map(|r| r.iter_mut().filter_map(Option::take).collect());
+            ((s.key, s.seq), g.unwrap_or_default())
+        })
+        .collect();
     groups.sort_by_key(|g| g.0);
     let mut groups = groups.into_iter();
     let mut starts = spans.iter().map(|s| s.at).peekable();
     for (i, it) in rest.into_iter().enumerate() {
-        if starts.next_if_eq(&i).is_some() && let Some((_, g)) = groups.next() { pg.items.extend(g); }
+        if starts.next_if_eq(&i).is_some()
+            && let Some((_, g)) = groups.next()
+        {
+            pg.items.extend(g);
+        }
         pg.items.extend(it);
     }
 }

@@ -384,7 +384,9 @@ fn handle_primary_press(
     // With an existing selection, Ctrl/⌘+drag adds a disjoint range. A click alone selects
     // a sentence; Ctrl/⌘+double-click adds a word and preserves the previous selection.
     if mods.command && !mods.shift && !mods.alt && !hf_switch {
-        if clicks == 2 && let Some(mut drag) = prev_multi {
+        if clicks == 2
+            && let Some(mut drag) = prev_multi
+        {
             drag.restore(&mut app.session);
             let _ = app.run("select.add", json!({"word": pj}));
             drag.clicks = 2;
@@ -402,7 +404,7 @@ fn handle_primary_press(
             app.canvas.dragging = true;
             return;
         }
-    }    // Alt+drag selects a column (block) of text.
+    } // Alt+drag selects a column (block) of text.
     if mods.alt && !mods.shift && !mods.command {
         let _ = app.run("caret.set", json!({"pos": pj}));
         app.session.page_hint = page;
@@ -466,7 +468,7 @@ fn handle_completed_click(app: &mut WordApp, pointer: &PagePointer<'_>) -> bool 
         app.canvas.multi_drag = None;
         app.canvas.dragging = false;
         return true;
-    }    // Double-click in the header/footer area edits it (creating it when the page has none, #960);
+    } // Double-click in the header/footer area edits it (creating it when the page has none, #960);
     // double-click in the body leaves it. Print Layout only: the other views show no margins.
     let hf_zone = if app.session.view.mode == wordcraft_layout::ViewMode::Print && !app.session.view.read_mode {
         layout.header_footer_zone(page, y)

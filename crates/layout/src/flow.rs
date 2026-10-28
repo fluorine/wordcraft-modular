@@ -532,8 +532,12 @@ impl<'a> Flow<'a> {
             if let Some(key) = key {
                 pb.stack_seq = pb.stack_seq.saturating_add(1);
                 let span = |at, len| StackSpan { key, seq: pb.stack_seq, at, len };
-                if !b.is_empty() { spans.behind.push(span(0, b.len())); }
-                if !f.is_empty() { spans.front.push(span(items.len(), f.len())); }
+                if !b.is_empty() {
+                    spans.behind.push(span(0, b.len()));
+                }
+                if !f.is_empty() {
+                    spans.front.push(span(items.len(), f.len()));
+                }
             }
             behind.extend(b);
             items.extend(f);
@@ -551,7 +555,9 @@ impl<'a> Flow<'a> {
             }
             pg.items.extend(items);
         }
-        if let Some(count) = pb.behind.last_mut() { *count += n_behind; }
+        if let Some(count) = pb.behind.last_mut() {
+            *count += n_behind;
+        }
         if let (Some(f), Some(l)) = (self.pl.lines.get(l0), self.pl.lines.get(l1 - 1)) {
             pb.y = y + (l.top + l.height - f.top);
             pb.content_bottom = pb.content_bottom.max(pb.y);
