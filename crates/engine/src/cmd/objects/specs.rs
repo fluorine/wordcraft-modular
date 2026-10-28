@@ -6,7 +6,7 @@ use super::select::{
     has_sizable, obj_size, objects_list, selected, with_float, with_obj,
 };
 use super::shape::{NO_TEXT_BOX, can_link, has_text_box, link_text_box, set_text_body, shape_effects, text_box_target};
-use super::*;
+use super::{CmdError, CommandSpec, InlineObject, Pos, Rgb, Selection, Spin, TextVert, VAlign, Wrap, WrapText, json, p, sel_result};
 
 /// Apply one axis from the Layout dialog's Position tab. `relativeTo` names match its form model.
 fn position_axis(v: &Value, horizontal: bool) -> Result<(wordcraft_doc::para::Anchor, Option<wordcraft_doc::para::FloatAlign>, f32), CmdError> {

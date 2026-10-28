@@ -2,7 +2,10 @@ use super::ctx::Ctx;
 use super::page::{PageBuilder, PageFrame};
 use super::placed::Placed;
 use super::table_flow::footer_table_wraps;
-use super::*;
+use super::{
+    Anchor, Arc, CharProps, Document, Float, FloatAlign, HashMap, HideDeleted, InlineObject, Level, Page, ParaLayout, Paragraph, Path, Point, Rect,
+    SectionProps, Spin, StoryRef, Wrap, WrapText, contour, display, para, textbox,
+};
 
 /// Which of `p`'s objects (by index) the layout leaves out ([`para::left_out`]): anchored in hidden
 /// text unless `show_hidden`, in a tracked deletion with `hide_deleted`, or a hidden drawing
@@ -326,18 +329,12 @@ fn group_members(o: &InlineObject, rect: Rect) -> Vec<(Rect, &InlineObject)> {
 /// broken again for another column) the floats stay where its first piece placed and drew them:
 /// they aren't placed again in the new column, and their record for the page they are drawn on
 /// ([`EarlyFloats`]) stands.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn anchor_floats(
     ctx: &mut Ctx,
     pb: &mut PageBuilder,
-    p: &Paragraph,
-    block: usize,
-    y0: f32,
-    before: f32,
-    excl_mark: usize,
-    label: &Option<(String, Level)>,
-    place: bool,
+    anchor: FloatAnchor,
 ) -> (HashMap<usize, Rect>, Arc<ParaLayout>, Vec<para::Exclusion>) {
+    let FloatAnchor { p, block, y0, before, excl_mark, label, place } = anchor;
     ctx.fields.page = pb.number;
     let (col_x, width) = (pb.col_x(), pb.col_w());
     let mut rects = HashMap::new();
@@ -410,50 +407,56 @@ pub(crate) struct ObjFrame<'a> {
     pub(crate) pinned: Option<&'a HashMap<usize, Rect>>,
 }
 
+/// What [`anchor_floats`] anchors: paragraph `p` (body block `block`) starting at `y0` with
+/// `before` of space above it, its list `label`, the wrap areas to keep from `excl_mark` on, and
+/// whether to `place` its floats.
+#[derive(Clone, Copy)]
+pub(crate) struct FloatAnchor<'a> {
+    pub p: &'a Paragraph,
+    pub block: usize,
+    pub y0: f32,
+    pub before: f32,
+    pub excl_mark: usize,
+    pub label: &'a Option<(String, Level)>,
+    pub place: bool,
+}
+
+/// What [`place_objects`] places: the objects of paragraph `p` (layout `pl`, story `story` at
+/// `path`) in `lines`, whose lines start at `origin`, in frame `at`; `depth` is the nesting.
+#[derive(Clone, Copy)]
+pub(crate) struct ObjectPlacement<'a> {
+    pub story: StoryRef,
+    pub path: &'a [u32],
+    pub p: &'a Paragraph,
+    pub pl: &'a ParaLayout,
+    pub lines: (usize, usize),
+    pub origin: (f32, f32),
+    pub at: &'a ObjFrame<'a>,
+    pub floats: &'a HashMap<usize, Rect>,
+    pub depth: usize,
+}
+
 /// The pictures, shapes and text boxes in lines `l0..l1` of paragraph `p` (story `story`, at
 /// `path`), whose lines start at (x, y): floating ones drawn, every one's area (hit testing,
 /// selection) and text boxes' text. Floating rects come from `floats` (by object index) or are
 /// worked out from `at`. Returns what goes behind the text, and what goes in front.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn place_objects(
-    ctx: &mut Ctx,
-    story: StoryRef,
-    path: &[u32],
-    p: &Paragraph,
-    pl: &ParaLayout,
-    lines: (usize, usize),
-    xy: (f32, f32),
-    at: &ObjFrame,
-    floats: &HashMap<usize, Rect>,
-    depth: usize,
-) -> (Vec<Placed>, Vec<Placed>) {
-    stack_objects(object_groups(ctx, story, path, p, pl, lines, xy, at, floats, depth))
-}
-
-/// One object's items behind and in front of the text, with its stacking order
-/// ([`Float::stack`]) if it floats.
 pub(crate) type ObjGroup = (Option<u64>, Vec<Placed>, Vec<Placed>);
 
-/// [`place_objects`], each object's items apart and in text order, so the body can put the
-/// floating objects of a whole page in stacking order ([`PageStacks`]).
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn object_groups(
-    ctx: &mut Ctx,
-    story: StoryRef,
-    path: &[u32],
-    p: &Paragraph,
-    pl: &ParaLayout,
-    (l0, l1): (usize, usize),
-    (x, y): (f32, f32),
-    at: &ObjFrame,
-    floats: &HashMap<usize, Rect>,
-    depth: usize,
-) -> Vec<ObjGroup> {
-    // Each object's items, drawn lowest stacking order first once all are placed, as Word
-    // stacks floating objects by `relativeHeight`, not by their order in the paragraph.
+pub(crate) fn place_objects(ctx: &mut Ctx, req: &ObjectPlacement) -> (Vec<Placed>, Vec<Placed>) {
+    stack_objects(object_groups(ctx, req))
+}
+
+/// Place each object's items in text order so body pages can sort floating objects globally.
+pub(crate) fn object_groups(ctx: &mut Ctx, req: &ObjectPlacement) -> Vec<ObjGroup> {
+    let ObjectPlacement { story, path, p, pl, lines: (l0, l1), origin: (x, y), at, floats, depth } = *req;
+    // Each object's items (behind the text, in front), with its stacking order: drawn lowest
+    // first once all are placed, as Word stacks floating objects by `relativeHeight`, not by
+    // their order in the paragraph. Inline objects and objects without one keep their order.
     let mut placed: Vec<ObjGroup> = Vec::new();
-    // The same for the objects a header or footer cell places on the page (see `Ctx::pin`).
     let mut pin_placed: Vec<ObjGroup> = Vec::new();
+    // The highest order so far: an object without one (inserted here) stacks above the objects
+    // before it, as the writer gives it the next order up on save.
+    let mut z_top = 0u32;
     let Some(fl) = pl.lines.get(l0) else { return Vec::new() };
     // Objects left out of the layout (hidden, or deleted in the final text) aren't placed.
     let left_out = left_out_objects(ctx.doc, p, at.table_chr, ctx.opts.show_hidden, ctx.hide_deleted);
@@ -539,17 +542,20 @@ pub(crate) fn object_groups(
                 if let Some(pin) = ctx.pin.as_mut()
                     && pin.seen.insert((path.to_vec(), c.start))
                 {
-                    pin_placed.push((floating.then(|| float.stack()), behind, front));
+                    pin_placed.push((floating.then(|| u64::from(float.z)), behind, front));
                 }
                 continue;
             }
-            placed.push((floating.then(|| float.stack()), behind, front));
+            let z = if floating && float.z > 0 {
+                z_top = z_top.max(float.z);
+                float.z
+            } else {
+                z_top
+            };
+            placed.push((floating.then(|| u64::from(z)), behind, front));
         }
     }
-    // Put on the page in their stacking order too.
-    if !pin_placed.is_empty()
-        && let Some(pin) = ctx.pin.as_mut()
-    {
+    if !pin_placed.is_empty() && let Some(pin) = ctx.pin.as_mut() {
         let (behind, front) = stack_objects(pin_placed);
         pin.behind.extend(behind);
         pin.front.extend(front);
@@ -557,17 +563,15 @@ pub(crate) fn object_groups(
     placed
 }
 
-/// The items of objects placed in text order (each with its stacking order if floating), the
-/// floating ones put in stacking order (a stable sort: equal ones keep text order). Inline
-/// objects keep their places.
+/// Floating objects are drawn in stacking order; inline objects keep their text-order slots.
 pub(crate) fn stack_objects(mut placed: Vec<ObjGroup>) -> (Vec<Placed>, Vec<Placed>) {
     let floating: Vec<bool> = placed.iter().map(|o| o.0.is_some()).collect();
     let mut stacked: Vec<_> = placed.iter_mut().filter(|o| o.0.is_some()).map(std::mem::take).collect();
     stacked.sort_by_key(|o| o.0);
     let mut stacked = stacked.into_iter();
-    for (o, _) in placed.iter_mut().zip(floating).filter(|(_, f)| *f) {
-        if let Some(s) = stacked.next() {
-            *o = s;
+    for (object, is_floating) in placed.iter_mut().zip(floating) {
+        if is_floating && let Some(sorted) = stacked.next() {
+            *object = sorted;
         }
     }
     let (mut behind, mut front) = (Vec::new(), Vec::new());
@@ -578,8 +582,6 @@ pub(crate) fn stack_objects(mut placed: Vec<ObjGroup>) -> (Vec<Placed>, Vec<Plac
     (behind, front)
 }
 
-/// A floating object's items on a body page: `len` items from `at`, its stacking order and
-/// its place in the text (`seq`, which breaks ties).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct StackSpan {
     pub(crate) key: u64,
@@ -588,9 +590,6 @@ pub(crate) struct StackSpan {
     pub(crate) len: usize,
 }
 
-/// Where a body page's floating objects are among its items: `behind`, the items in front of
-/// the page's list (behind the text), in list order; `front`, the rest, `at` counted from the
-/// end of the items behind the text.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct PageStacks {
     pub(crate) behind: Vec<StackSpan>,
@@ -598,27 +597,21 @@ pub(crate) struct PageStacks {
 }
 
 impl PageStacks {
-    /// A snapshot restore took the first `behind` items off the page's list and cut what
-    /// follows the items behind the text at `front`: forget the objects those were.
     pub(crate) fn forget(&mut self, behind: usize, front: usize) {
         let mut gone = 0usize;
         let k = self.behind.iter().take_while(|s| {
             gone = gone.saturating_add(s.len);
             gone <= behind
-        });
-        let k = k.count();
+        }).count();
         self.behind.drain(..k);
         self.front.retain(|s| s.at.saturating_add(s.len) <= front);
     }
 }
 
-/// Puts the floating objects of a finished body page in stacking order: those behind the text
-/// (the first `behind` items) among themselves, and those in front of it in the places floating
-/// objects had among the text. Equal orders keep text order. A page whose record doesn't match
-/// its items is left as it is.
 pub(crate) fn stack_page(pg: &mut Page, behind: usize, st: PageStacks) {
-    // Behind the text: the first `behind` items are these objects' and nothing else.
-    if behind > 0 && behind <= pg.items.len() && st.behind.iter().try_fold(0usize, |n, s| n.checked_add(s.len)) == Some(behind) {
+    if behind > 0 && behind <= pg.items.len()
+        && st.behind.iter().try_fold(0usize, |n, s| n.checked_add(s.len)) == Some(behind)
+    {
         let mut rest = pg.items.split_off(behind);
         let mut items = std::mem::take(&mut pg.items).into_iter();
         let mut groups: Vec<(StackSpan, Vec<Placed>)> = st.behind.iter().map(|s| (*s, items.by_ref().take(s.len).collect())).collect();
@@ -626,32 +619,22 @@ pub(crate) fn stack_page(pg: &mut Page, behind: usize, st: PageStacks) {
         pg.items = groups.into_iter().flat_map(|(_, g)| g).collect();
         pg.items.append(&mut rest);
     }
-    // In front: each object keeps a place, the objects change places.
     let mut spans = st.front;
     spans.sort_by_key(|s| s.at);
     let end = pg.items.len().saturating_sub(behind);
     let fits = spans.windows(2).all(|w| matches!(w, [a, b] if a.at.saturating_add(a.len) <= b.at))
         && spans.last().is_none_or(|s| s.at.saturating_add(s.len) <= end);
-    if spans.len() < 2 || behind > pg.items.len() || !fits {
-        return;
-    }
+    if spans.len() < 2 || behind > pg.items.len() || !fits { return; }
     let mut rest: Vec<Option<Placed>> = pg.items.split_off(behind).into_iter().map(Some).collect();
-    let mut groups: Vec<((u64, usize), Vec<Placed>)> = spans
-        .iter()
-        .map(|s| {
-            let g = rest.get_mut(s.at..s.at.saturating_add(s.len)).map(|r| r.iter_mut().filter_map(Option::take).collect());
-            ((s.key, s.seq), g.unwrap_or_default())
-        })
-        .collect();
+    let mut groups: Vec<((u64, usize), Vec<Placed>)> = spans.iter().map(|s| {
+        let g = rest.get_mut(s.at..s.at.saturating_add(s.len)).map(|r| r.iter_mut().filter_map(Option::take).collect());
+        ((s.key, s.seq), g.unwrap_or_default())
+    }).collect();
     groups.sort_by_key(|g| g.0);
     let mut groups = groups.into_iter();
     let mut starts = spans.iter().map(|s| s.at).peekable();
     for (i, it) in rest.into_iter().enumerate() {
-        if starts.next_if_eq(&i).is_some()
-            && let Some((_, g)) = groups.next()
-        {
-            pg.items.extend(g);
-        }
+        if starts.next_if_eq(&i).is_some() && let Some((_, g)) = groups.next() { pg.items.extend(g); }
         pg.items.extend(it);
     }
 }
