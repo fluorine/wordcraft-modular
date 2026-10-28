@@ -222,6 +222,78 @@ fn hovering_a_size_in_the_bars_list_previews_it() {
     assert_eq!(format_state(&mut h).get("size").cloned(), size);
 }
 
+/// Hovering a family of the bar's font list previews it; clicking it applies it.
+#[test]
+fn hovering_and_clicking_a_font_in_the_bars_list() {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let doc = h.state().session.doc.clone();
+    let viewport = h.state().canvas.viewport.unwrap();
+    let font_box = h
+        .get_all_by_role(Role::TextInput)
+        .map(|n| n.rect())
+        .filter(|r| viewport.contains_rect(*r))
+        .min_by(|a, b| a.min.y.total_cmp(&b.min.y).then(a.min.x.total_cmp(&b.min.x)))
+        .expect("the bar has a font box");
+    click_at(&mut h, pos2(font_box.max.x + 8.0, font_box.center().y));
+    let family = h.state_mut().previews.families().into_iter().find(|f| f != "Aptos Display" && f != "Aptos").expect("another family is installed");
+    let at = h.get_all_by_label(&family).map(|n| n.rect().center()).find(|p| p.y > font_box.max.y).expect("the list shows the family");
+    h.event(egui::Event::PointerMoved(at));
+    steps(&mut h);
+    let previewed = h.state().canvas.command_previewed.clone();
+    assert!(previewed.is_some_and(|(id, _)| id == "format.font"), "hovering a family previews the font");
+    assert_eq!(&h.state().session.doc, &doc);
+    click_at(&mut h, at);
+    assert_ne!(&h.state().session.doc, &doc, "clicking the family applies the font");
+}
+
+/// A picked family joins Recently Used Fonts when the list next opens, not in the frame after the
+/// pick, when the list is still on screen and would shift under the pointer.
+#[test]
+fn a_picked_font_joins_the_recent_section_on_the_next_open() {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let viewport = h.state().canvas.viewport.unwrap();
+    let font_box = h
+        .get_all_by_role(Role::TextInput)
+        .map(|n| n.rect())
+        .filter(|r| viewport.contains_rect(*r))
+        .min_by(|a, b| a.min.y.total_cmp(&b.min.y).then(a.min.x.total_cmp(&b.min.x)))
+        .expect("the bar has a font box");
+    let arrow = pos2(font_box.max.x + 8.0, font_box.center().y);
+    click_at(&mut h, arrow);
+    let family = h.state_mut().previews.families().into_iter().find(|f| f != "Aptos Display" && f != "Aptos").expect("another family is installed");
+    let at = h.get_all_by_label(&family).map(|n| n.rect().center()).find(|p| p.y > font_box.max.y).expect("the list shows the family");
+    h.event(egui::Event::PointerMoved(at));
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
+    h.step();
+    h.step();
+    h.step();
+    assert_eq!(h.query_all_by_label("Recently Used Fonts").count(), 0, "the list does not shift under the pointer");
+    assert_eq!(h.query_all_by_label("Add Font…").count(), 0, "picking a family closes the list");
+    steps(&mut h);
+    click_at(&mut h, arrow);
+    assert_eq!(h.query_all_by_label("Recently Used Fonts").count(), 1, "the next open lists the family first");
+}
+
+/// Hovering the highlight and font colour buttons previews their last colour.
+#[test]
+fn hovering_the_colour_buttons_previews_their_colour() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let viewport = h.state().canvas.viewport.unwrap();
+    for (label, id) in [("Text Highlight Color", "format.highlight"), ("Font Color", "format.color")] {
+        let r = h.get_all_by_label(label).map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has the button");
+        h.event(egui::Event::PointerMoved(r.center()));
+        steps(&mut h);
+        let previewed = h.state().canvas.command_previewed.clone();
+        assert!(previewed.is_some_and(|(p, _)| p == id), "{label} previews {id}");
+    }
+}
+
 /// Hovering a colour of the bar's highlight list previews it on the selection.
 #[test]
 fn hovering_a_highlight_colour_previews_it() {
@@ -352,6 +424,11 @@ fn context_menu_toolbar_formats_the_selection_and_opens_its_size_list() {
     assert!(bar_layer(&h).is_none(), "the standalone selection toolbar must not double up");
     let viewport = h.state().canvas.viewport.unwrap();
     let bold = h.get_all_by_label("Bold").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the context menu has Bold");
+    let doc = h.state().session.doc.clone();
+    h.event(egui::Event::PointerMoved(bold.center()));
+    steps(&mut h);
+    assert_eq!(h.state().canvas.command_previewed, None, "the context toolbar does not start the hidden floating bar's preview repaint loop");
+    assert_eq!(&h.state().session.doc, &doc, "hovering a context-menu control does not preview a document change");
     click_at(&mut h, bold.center());
     assert_eq!(format_state(&mut h).get("bold"), Some(&json!(true)));
     assert_eq!(h.state().session.sel, selection);
@@ -735,7 +812,7 @@ fn alignment_buttons_mark_the_alignment_seen_on_the_page_in_a_right_to_left_para
                 }
                 egui::Area::new(egui::Id::unique("mini_align_probe")).fixed_pos(pos2(10.0, 10.0)).show(ui.ctx(), |ui| {
                     let t = Tokens::get(ui.ctx());
-                    content(app, ui, &t);
+                    content(app, ui, &t, true);
                 });
             },
             a,
@@ -758,4 +835,82 @@ fn alignment_buttons_mark_the_alignment_seen_on_the_page_in_a_right_to_left_para
         assert!(is_marked(lit), "rtl={rtl} {cmd:?}: {lit} is marked");
         assert!(!is_marked(unlit), "rtl={rtl} {cmd:?}: {unlit} is not marked");
     }
+}
+
+#[test]
+fn the_alignment_buttons_align_the_paragraph() {
+    use egui_kittest::kittest::Queryable;
+    for (label, align) in [("Center", "center"), ("Align Right", "right"), ("Justify", "both"), ("Align Left", "left")] {
+        let mut h = bar_over("brown fox");
+        let viewport = h.state().canvas.viewport.unwrap();
+        let b = h.get_all_by_label(label).map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has the button");
+        h.event(egui::Event::PointerMoved(b.center()));
+        steps(&mut h);
+        click_at(&mut h, b.center());
+        let got = h.state().session.doc.para_at(&h.state().session.sel.focus).map(|p| format!("{:?}", p.props.align)).unwrap_or_default();
+        assert!(got.to_lowercase().contains(align) || (align == "both" && got.to_lowercase().contains("justif")), "{label}: {got}");
+    }
+}
+
+/// After a click the button's preview stays off while the pointer is on it, so a toggle does not
+/// flash its other state; leaving and coming back previews again.
+#[test]
+fn a_clicked_button_holds_its_preview_until_the_pointer_leaves() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let viewport = h.state().canvas.viewport.unwrap();
+    let size = format_state(&mut h).get("size").cloned();
+    let grow = h.get_all_by_label("Increase Font Size").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Grow").center();
+    h.event(egui::Event::PointerMoved(grow));
+    steps(&mut h);
+    assert!(h.state().canvas.command_previewed.is_some(), "hovering previews");
+    click_at(&mut h, grow);
+    steps(&mut h);
+    assert_ne!(format_state(&mut h).get("size").cloned(), size, "the click grew the text");
+    assert_eq!(h.state().canvas.command_previewed, None, "no preview of the next step under the pointer");
+    h.event(egui::Event::PointerMoved(pos2(5.0, 5.0)));
+    steps(&mut h);
+    h.event(egui::Event::PointerMoved(grow));
+    steps(&mut h);
+    assert!(h.state().canvas.command_previewed.is_some(), "coming back previews again");
+}
+
+/// After a click the preview stays still while the pointer is on the button. Leaving and coming
+/// back previews the undo: Bold over bold text shows it unbolded.
+#[test]
+fn coming_back_to_a_toggle_previews_its_undo() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let viewport = h.state().canvas.viewport.unwrap();
+    let bold = h.get_all_by_label("Bold").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Bold").center();
+    click_at(&mut h, bold);
+    steps(&mut h);
+    assert_eq!(format_state(&mut h).get("bold"), Some(&json!(true)));
+    assert_eq!(h.state().canvas.command_previewed, None, "the page holds still after the click");
+    h.event(egui::Event::PointerMoved(pos2(5.0, 5.0)));
+    steps(&mut h);
+    h.event(egui::Event::PointerMoved(bold));
+    steps(&mut h);
+    assert_eq!(h.state().canvas.command_previewed, Some(("format.bold".to_string(), json!({}))), "coming back previews the undo");
+    let doc = h.state().session.doc.clone();
+    assert_ne!(crate::canvas::page_doc(h.state()), &doc, "the page shows the text unbolded");
+}
+
+/// A selection that ends at the next paragraph's start (Select Paragraph, a triple-click) shows
+/// the alignment of the paragraph it covers, not the next one's.
+#[test]
+fn a_selected_paragraph_shows_its_own_alignment() {
+    let mut h = bar_over("brown fox");
+    h.state_mut().session = wordcraft_engine::Session::new(wordcraft_doc::Document::from_text("First paragraph\nSecond paragraph"));
+    h.state_mut().session.sel.anchor = wordcraft_doc::Pos::body(0, 2);
+    h.state_mut().session.sel.focus = wordcraft_doc::Pos::body(0, 2);
+    h.state_mut().run("para.alignRight", json!({})).unwrap();
+    h.state_mut().session.sel.anchor = wordcraft_doc::Pos::body(0, 0);
+    h.state_mut().session.sel.focus = wordcraft_doc::Pos::body(1, 0);
+    steps(&mut h);
+    let s = &h.state().session;
+    let focus_align = s.doc.para_at(&s.sel.focus).map(|p| s.doc.styles.resolve_para(&p.props).align);
+    assert_eq!(focus_align, Some(wordcraft_doc::Align::Left), "the next paragraph is left aligned");
+    let r = wordcraft_engine::cmd::para::selection_para(s);
+    assert_eq!(r.align, wordcraft_doc::Align::Right, "the buttons read the selected paragraph");
 }
