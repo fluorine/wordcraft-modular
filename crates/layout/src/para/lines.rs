@@ -735,7 +735,11 @@ fn justify_line(pl: &ParaLayout, xs: &mut [f32], (c0, c1, align_from): (usize, u
         .filter(|k| pl.clusters.get(*k).is_some_and(|c| c.kind == ClKind::Space) && xs.get(k - c0).copied().unwrap_or(f32::MAX) < content_end - 0.01)
         .collect();
     if distribute || spaces.is_empty() {
-        let cnt = (c1 - content_from).saturating_sub(1).max(1) as f32;
+        // A trailing manual break is part of the line's source range, but is not a
+        // character gap. Count only the gaps between visible content clusters so
+        // the last character reaches the margin in a distributed line.
+        let content_to = (content_from..c1).rev().find(|k| !blank(*k)).map_or(content_from, |k| k + 1);
+        let cnt = (content_to - content_from).saturating_sub(1).max(1) as f32;
         if distribute {
             let per = slack / cnt;
             for (q, v) in xs.iter_mut().enumerate().skip(content_from - c0) {
