@@ -370,9 +370,18 @@ fn hover_small(ui: &mut egui::Ui, app: &mut WordApp, icon: &str, tip: &str, id: 
     preview_on_hover_if(app, &r, id, json!({}), preview);
 }
 
-/// Previews command `id` with `params` while its button `r` is hovered and not pressed.
+/// Previews command `id` with `params` while its button `r` is hovered and not pressed. After a
+/// click the preview stays off until the pointer leaves the button: a toggle would otherwise
+/// preview its other state under the pointer and look as if it flashed.
 fn preview_on_hover_if(app: &mut WordApp, r: &egui::Response, id: &str, params: Value, preview: bool) {
-    if preview && r.hovered() && !r.is_pointer_button_down_on() && !r.clicked() && widgets::enabled(app, id) {
+    let hold = r.id.with("hold_preview");
+    if r.clicked() {
+        r.ctx.data_mut(|d| d.insert_temp(hold, true));
+    } else if !r.hovered() {
+        r.ctx.data_mut(|d| d.remove::<bool>(hold));
+    }
+    let held = r.ctx.data(|d| d.get_temp::<bool>(hold)).unwrap_or(false);
+    if preview && !held && r.hovered() && !r.is_pointer_button_down_on() && !r.clicked() && widgets::enabled(app, id) {
         app.canvas.command_preview = Some((id.to_string(), params));
     }
 }

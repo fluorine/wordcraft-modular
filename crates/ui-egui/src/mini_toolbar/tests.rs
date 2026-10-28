@@ -836,3 +836,40 @@ fn alignment_buttons_mark_the_alignment_seen_on_the_page_in_a_right_to_left_para
         assert!(!is_marked(unlit), "rtl={rtl} {cmd:?}: {unlit} is not marked");
     }
 }
+
+#[test]
+fn the_alignment_buttons_align_the_paragraph() {
+    use egui_kittest::kittest::Queryable;
+    for (label, align) in [("Center", "center"), ("Align Right", "right"), ("Justify", "both"), ("Align Left", "left")] {
+        let mut h = bar_over("brown fox");
+        let viewport = h.state().canvas.viewport.unwrap();
+        let b = h.get_all_by_label(label).map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has the button");
+        h.event(egui::Event::PointerMoved(b.center()));
+        steps(&mut h);
+        click_at(&mut h, b.center());
+        let got = h.state().session.doc.para_at(&h.state().session.sel.focus).map(|p| format!("{:?}", p.props.align)).unwrap_or_default();
+        assert!(got.to_lowercase().contains(align) || (align == "both" && got.to_lowercase().contains("justif")), "{label}: {got}");
+    }
+}
+
+/// After a click the button's preview stays off while the pointer is on it, so a toggle does not
+/// flash its other state; leaving and coming back previews again.
+#[test]
+fn a_clicked_button_holds_its_preview_until_the_pointer_leaves() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = bar_over("brown fox");
+    let viewport = h.state().canvas.viewport.unwrap();
+    let bold = h.get_all_by_label("Bold").map(|n| n.rect()).find(|r| viewport.contains_rect(*r)).expect("the bar has Bold").center();
+    h.event(egui::Event::PointerMoved(bold));
+    steps(&mut h);
+    assert!(h.state().canvas.command_previewed.is_some(), "hovering previews");
+    click_at(&mut h, bold);
+    steps(&mut h);
+    assert_eq!(format_state(&mut h).get("bold"), Some(&json!(true)));
+    assert_eq!(h.state().canvas.command_previewed, None, "no preview of the other state under the pointer");
+    h.event(egui::Event::PointerMoved(pos2(5.0, 5.0)));
+    steps(&mut h);
+    h.event(egui::Event::PointerMoved(bold));
+    steps(&mut h);
+    assert!(h.state().canvas.command_previewed.is_some(), "coming back previews again");
+}
