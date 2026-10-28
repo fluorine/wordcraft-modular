@@ -275,6 +275,9 @@ pub struct CanvasState {
     pub(crate) command_preview: Option<(String, serde_json::Value)>,
     /// The command preview the page last drew, so the bar repaints only when its hover changes.
     pub(crate) command_previewed: Option<(String, serde_json::Value)>,
+    /// The scroll offset held while a command preview is shown, so the page does not move as
+    /// the previewed text reflows.
+    pub(crate) preview_scroll: Option<egui::Vec2>,
     /// The last previewed table's layout, the copy of the document it was laid out from and the
     /// copy's selection, with
     /// what it was laid out for (command, params, document id, revision, selection, and the
@@ -430,6 +433,7 @@ impl Default for CanvasState {
             table_preview: None,
             command_preview: None,
             command_previewed: None,
+            preview_scroll: None,
             table_preview_layout: None,
         }
     }
@@ -1316,6 +1320,18 @@ fn finish_canvas_frame(finish: CanvasFinish<'_>, out: egui::scroll_area::ScrollA
 /// Lays out and paints the document pages for print, Read and Web views, settles viewports, draw
 /// rulers and overlays, anchors zoom and scrolling, and routes pointer, selection, IME and caret
 /// input.
+/// While the page shows a command preview the view stays where it was when the preview began:
+/// no scrolling to the caret, and the offset is held against the previewed text's reflow.
+fn hold_scroll_for_preview(app: &mut WordApp) -> bool {
+    if app.canvas.command_previewed.is_none() {
+        app.canvas.preview_scroll = None;
+        return false;
+    }
+    let at = *app.canvas.preview_scroll.get_or_insert(app.canvas.scroll_offset);
+    app.canvas.scroll_request = Some(at);
+    true
+}
+
 /// The live selection's rects on screen, from the document's own layout rather than a command
 /// preview's, which can move the lines (Align Right) from under the mini toolbar's pointer.
 fn live_selection_screen_rects(app: &mut WordApp, rects: &[Rect], scale: f32) -> Vec<Rect> {
@@ -1350,7 +1366,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     let full = ui.available_rect_before_wrap();
     let layout = prepare_layout(app, ui, full);
     let view = prepare_view(app, ui, full, &layout);
-    let scroll_target = update_caret_scroll(app, &view);
+    let scroll_target = if hold_scroll_for_preview(app) { None } else { update_caret_scroll(app, &view) };
     let motion = scroll_motion(app, ui, full, &view);
     let scroll_area = configure_scroll_area(app, ui, &view, motion);
     let CanvasView { area, hruler, vruler, dark_page, sepia_page, geo, dim_body, grid_story, caret, .. } = view;
