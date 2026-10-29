@@ -1,3 +1,4 @@
+use crate::DamagedSaveContinuation;
 use super::{
     AutoSaveBlock, AwaitingSave, PromptSave, SaveChoice, Value, WordApp, async_saves, dialogs, file_dialogs, i18n, json, keeps_everything, panes,
     printing,
