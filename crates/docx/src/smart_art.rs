@@ -1270,3 +1270,20 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod opacity_tests {
+    use super::*;
+
+    #[test]
+    fn an_items_opacity_is_drawn_and_read_back() {
+        let mut spec = SmartArtSpec::sample(SmartArtLayout::Venn);
+        spec.items[0].color = Some(Rgb(0x12, 0x34, 0x56));
+        spec.items[0].opacity = Some(12);
+        let drawing = drawing_xml(&spec, 400.0, 250.0);
+        assert!(drawing.contains("<a:alpha val=\"12000\""), "{drawing}");
+        let items = smart_art_items(&spec, &[], 400.0, 250.0);
+        let GraphicItem::Shape { alpha, .. } = &items[0] else { panic!("shape first") };
+        assert!((alpha - 0.12).abs() < 0.01, "{alpha}");
+    }
+}
