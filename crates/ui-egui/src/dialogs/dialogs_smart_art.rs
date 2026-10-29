@@ -393,8 +393,9 @@ fn color_button(app: &mut WordApp, ui: &mut Ui, g: &SmartArtSpec, i: usize) {
     let theme = app.session.doc.settings.theme_colors.clone();
     let own = g.items.get(i).and_then(|it| it.color);
     let solid = own.map_or_else(|| accent(&theme, accent_n), c32);
+    let style_opacity = if g.layout == SmartArtLayout::Venn { 60 } else { 100 };
     let opacity = g.items.get(i).and_then(|it| it.opacity);
-    let fill = solid.gamma_multiply(f32::from(opacity.unwrap_or(100)) / 100.0);
+    let fill = solid.gamma_multiply(f32::from(opacity.unwrap_or(style_opacity)) / 100.0);
     ui.painter().rect_filled(rect, 3.0, t.panel);
     ui.painter().rect_filled(rect, 3.0, fill);
     let line = if resp.hovered() { t.accent } else { t.border_strong };
@@ -404,7 +405,7 @@ fn color_button(app: &mut WordApp, ui: &mut Ui, g: &SmartArtSpec, i: usize) {
         let mut pick = widgets::color_grid(ui, &theme).map(|hex| json!({"index": i, "color": hex, "opacity": opacity}));
         ui.add_space(2.0);
         ui.separator();
-        let mut pct = opacity.unwrap_or(100);
+        let mut pct = opacity.unwrap_or(style_opacity);
         let slider = ui.add(egui::Slider::new(&mut pct, 0..=100).suffix("%").text(tl!("Opacity")));
         if slider.changed() {
             if !slider.drag_started() {

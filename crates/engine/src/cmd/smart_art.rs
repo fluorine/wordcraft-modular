@@ -161,7 +161,7 @@ pub fn specs() -> Vec<CommandSpec> {
                         if it.color.is_none() {
                             return Err(CmdError::Failed("give the item a colour before its opacity".into()));
                         }
-                        it.opacity = opacity.filter(|o| *o < 100);
+                        it.opacity = opacity;
                     }
                 }
                 Ok(())
@@ -292,7 +292,7 @@ fn items_of(v: &Value) -> Result<Vec<SmartArtItem>, CmdError> {
                     Some(Value::String(c)) => Some(Rgb::parse(c).ok_or_else(|| CmdError::Params("`color`: RRGGBB".into()))?),
                     Some(_) => return Err(CmdError::Params("`color`: RRGGBB or null".into())),
                 };
-                item.opacity = p::u64(it, "opacity").and_then(|o| u8::try_from(o).ok()).filter(|o| *o < 100 && item.color.is_some());
+                item.opacity = p::u64(it, "opacity").and_then(|o| u8::try_from(o).ok()).filter(|o| *o <= 100 && item.color.is_some());
                 Ok(item)
             }
             _ => Err(CmdError::Params(format!("`items`: {ITEMS}"))),

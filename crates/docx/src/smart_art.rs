@@ -156,7 +156,7 @@ impl Sh {
     /// keep the theme's background colour so adjacent nodes remain separated.
     fn recolor(&mut self, spec: &SmartArtSpec, i: usize) {
         let Some(c) = spec.items.get(i).and_then(|it| it.color) else { return };
-        if let Some(o) = spec.items.get(i).and_then(|it| it.opacity).filter(|o| *o < 100) {
+        if let Some(o) = spec.items.get(i).and_then(|it| it.opacity) {
             self.alpha = Some(u32::from(o) * 1000);
         }
         for p in [&mut self.fill, &mut self.line] {
@@ -791,7 +791,7 @@ pub fn data_xml(spec: &SmartArtSpec, drawing_rel: &str) -> String {
             Some(c) => {
                 w.open("dgm:spPr", &[]);
                 w.open("a:solidFill", &[]);
-                match it.opacity.filter(|o| *o < 100) {
+                match it.opacity {
                     Some(o) => {
                         w.open("a:srgbClr", &[("val", &c.hex())]);
                         w.empty("a:alpha", &[("val", &(u32::from(o) * 1000).to_string())]);
@@ -1126,7 +1126,7 @@ pub(crate) fn spec_of(data: &El) -> Option<SmartArtSpec> {
                 p.child("dgm:spPr").and_then(|s| s.child("a:solidFill")).and_then(|f| f.child("a:srgbClr")).and_then(|c| Rgb::parse(c.attr("val")?));
             let opacity = color.and_then(|_| {
                 let a = p.child("dgm:spPr")?.child("a:solidFill")?.child("a:srgbClr")?.child("a:alpha")?;
-                u8::try_from(a.attr("val")?.parse::<u32>().ok()? / 1000).ok().filter(|o| *o < 100)
+                u8::try_from(a.attr("val")?.parse::<u32>().ok()? / 1000).ok()
             });
             Some(SmartArtItem { text, level: (*l)?, color, opacity })
         })
