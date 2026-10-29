@@ -156,6 +156,9 @@ impl Sh {
     /// keep the theme's background colour so adjacent nodes remain separated.
     fn recolor(&mut self, spec: &SmartArtSpec, i: usize) {
         let Some(c) = spec.items.get(i).and_then(|it| it.color) else { return };
+        if let Some(o) = spec.items.get(i).and_then(|it| it.opacity).filter(|o| *o < 100) {
+            self.alpha = Some(u32::from(o) * 1000);
+        }
         for p in [&mut self.fill, &mut self.line] {
             if let Paint::Accent(_, tint) = *p {
                 *p = Paint::Rgb(c, tint);
@@ -788,7 +791,14 @@ pub fn data_xml(spec: &SmartArtSpec, drawing_rel: &str) -> String {
             Some(c) => {
                 w.open("dgm:spPr", &[]);
                 w.open("a:solidFill", &[]);
-                w.empty("a:srgbClr", &[("val", &c.hex())]);
+                match it.opacity.filter(|o| *o < 100) {
+                    Some(o) => {
+                        w.open("a:srgbClr", &[("val", &c.hex())]);
+                        w.empty("a:alpha", &[("val", &(u32::from(o) * 1000).to_string())]);
+                        w.close("a:srgbClr");
+                    }
+                    None => w.empty("a:srgbClr", &[("val", &c.hex())]),
+                }
                 w.close("a:solidFill");
                 w.close("dgm:spPr");
             }
@@ -1114,7 +1124,11 @@ pub(crate) fn spec_of(data: &El) -> Option<SmartArtSpec> {
             let text: String = p.child("dgm:t")?.child("a:p")?.children("a:r").filter_map(|r| r.child("a:t")).map(|t| t.text()).collect();
             let color =
                 p.child("dgm:spPr").and_then(|s| s.child("a:solidFill")).and_then(|f| f.child("a:srgbClr")).and_then(|c| Rgb::parse(c.attr("val")?));
-            Some(SmartArtItem { text, level: (*l)?, color })
+            let opacity = color.and_then(|_| {
+                let a = p.child("dgm:spPr")?.child("a:solidFill")?.child("a:srgbClr")?.child("a:alpha")?;
+                u8::try_from(a.attr("val")?.parse::<u32>().ok()? / 1000).ok().filter(|o| *o < 100)
+            });
+            Some(SmartArtItem { text, level: (*l)?, color, opacity })
         })
         .collect::<Option<Vec<_>>>()?;
     let spec = SmartArtSpec { layout, items, colors }.sanitized();

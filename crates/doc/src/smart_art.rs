@@ -203,11 +203,14 @@ pub struct SmartArtItem {
     /// Fill of the item's shape in place of the style's colour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<Rgb>,
+    /// Percent of `color` that shows (100 or none: solid). Needs `color`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opacity: Option<u8>,
 }
 
 impl SmartArtItem {
     pub fn new(text: impl Into<String>, level: u8) -> SmartArtItem {
-        SmartArtItem { text: text.into(), level, color: None }
+        SmartArtItem { text: text.into(), level, color: None, opacity: None }
     }
 }
 
@@ -271,7 +274,24 @@ impl SmartArtSpec {
     pub fn clear_custom_colors(&mut self) {
         for it in &mut self.items {
             it.color = None;
+            it.opacity = None;
         }
+    }
+
+    /// Move item `i` with the items under it to follow the first `slot` of the other items,
+    /// with `i` at `level`. False when there is no item `i`.
+    pub fn move_block(&mut self, i: usize, slot: usize, level: u8) -> bool {
+        let end = self.descendants(i).end;
+        let Some(first) = self.items.get(i).map(|it| it.level) else { return false };
+        let block: Vec<SmartArtItem> = self.items.drain(i..end).collect();
+        let at = slot.min(self.items.len());
+        let moved = block.into_iter().map(|mut it| {
+            it.level = it.level.saturating_sub(first).saturating_add(level).min(MAX_LEVEL);
+            it
+        });
+        self.items.splice(at..at, moved);
+        self.sanitize();
+        true
     }
 
     /// The theme accent (1–6) the style gives item `i`; `None` when the item has no shape of
@@ -364,5 +384,24 @@ mod tests {
         assert_eq!(SmartArtColors::from_id("Accent 2"), Some(SmartArtColors::Accent2));
         assert_eq!(SmartArtColors::from_id("accent-4"), Some(SmartArtColors::Accent4));
         assert_eq!(clean_text(&format!("{}Valid Text", " ".repeat(1500))), "Valid Text");
+    }
+}
+
+#[cfg(test)]
+mod move_tests {
+    use super::*;
+
+    fn texts(g: &SmartArtSpec) -> Vec<(&str, u8)> {
+        g.items.iter().map(|i| (i.text.as_str(), i.level)).collect()
+    }
+
+    #[test]
+    fn moving_a_block_takes_its_children_and_sets_the_level() {
+        let mut g = SmartArtSpec::sample(SmartArtLayout::Hierarchy);
+        assert!(g.move_block(1, 5, 1));
+        assert_eq!(texts(&g), [("Lead", 0), ("Build", 1), ("Code", 2), ("Tests", 2), ("Design", 1), ("Sketches", 2)]);
+        assert!(g.move_block(4, 0, 0));
+        assert_eq!(texts(&g)[0], ("Design", 0));
+        assert!(!g.move_block(99, 0, 0));
     }
 }
