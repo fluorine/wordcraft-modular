@@ -299,6 +299,7 @@ fn prepare_ime_preedit(app: &mut WordApp, ui: &Ui, layout: &DocLayout, cursor_wi
             ui.ctx(),
             app.fonts_hans,
             app.fonts_korean,
+            app.fonts_hant,
             app.fonts_system_cjk,
             &app.canvas.ime_faces,
             app.canvas.ime_face,

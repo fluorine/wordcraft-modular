@@ -71,7 +71,7 @@ pub fn parse_color(s: &str) -> Option<Rgb> {
             let a = if h.len() == 4 { d(3)? as f32 / 255.0 } else { 1.0 };
             return Some(over_white(r, g, b, a));
         }
-        if h.len() == 8 && h.is_ascii() {
+        if h.len() == 8 && h.bytes().all(|b| b.is_ascii_hexdigit()) {
             let p = |i: usize| h.get(i..i + 2).and_then(|x| u8::from_str_radix(x, 16).ok());
             return Some(over_white(p(0)?, p(2)?, p(4)?, p(6)? as f32 / 255.0));
         }
@@ -159,4 +159,15 @@ pub fn parse_color(s: &str) -> Option<Rgb> {
         "orange" => Rgb(255, 165, 0),
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn eight_digit_hex_rejects_signs() {
+        assert_eq!(parse_color("#+1+2+3+4"), None);
+        assert_eq!(parse_color("#11223344"), Some(Rgb(0x11, 0x22, 0x33)));
+    }
 }
