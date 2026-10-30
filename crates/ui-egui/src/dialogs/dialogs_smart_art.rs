@@ -472,7 +472,7 @@ pub fn text_pane(app: &mut WordApp, ui: &mut Ui) {
     let focus_id = egui::Id::unique("smart_art_focus");
     let want_focus: Option<usize> = ui.data_mut(|d| d.remove_temp(focus_id));
     let mut typed = false;
-    let drag_id = egui::Id::new("smart_art_drag");
+    let drag_id = egui::Id::unique("smart_art_drag");
     let mut dropped = false;
     let mut rows: Vec<Rect> = Vec::new();
     app.smart_art_row_focused = false;
