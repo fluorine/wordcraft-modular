@@ -284,6 +284,8 @@ impl SmartArtSpec {
         let end = self.descendants(i).end;
         let Some(first) = self.items.get(i).map(|it| it.level) else { return false };
         let block: Vec<SmartArtItem> = self.items.drain(i..end).collect();
+        let depth = block.iter().map(|it| it.level.saturating_sub(first)).max().unwrap_or(0);
+        let level = level.min(MAX_LEVEL.saturating_sub(depth));
         let at = slot.min(self.items.len());
         let moved = block.into_iter().map(|mut it| {
             it.level = it.level.saturating_sub(first).saturating_add(level).min(MAX_LEVEL);
@@ -403,5 +405,21 @@ mod move_tests {
         assert!(g.move_block(4, 0, 0));
         assert_eq!(texts(&g)[0], ("Design", 0));
         assert!(!g.move_block(99, 0, 0));
+    }
+
+    #[test]
+    fn a_deep_block_keeps_its_shape_when_the_level_is_too_deep() {
+        let mut g = SmartArtSpec::sample(SmartArtLayout::Hierarchy);
+        g.items[0].level = 0;
+        g.items[1].level = 1;
+        g.items[2].level = 2;
+        g.items.truncate(3);
+        let mut other = SmartArtItem::new("Other", 0);
+        other.level = 0;
+        g.items.push(other);
+        assert!(g.move_block(0, 4, MAX_LEVEL));
+        let lv: Vec<u8> = g.items.iter().map(|i| i.level).collect();
+        assert_eq!(lv.len(), 4);
+        assert!(lv[1] < lv[2] && lv[2] < lv[3]);
     }
 }
